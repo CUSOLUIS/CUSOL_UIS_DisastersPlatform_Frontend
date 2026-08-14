@@ -1,0 +1,237 @@
+import { useEffect, useState } from "react";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { HumanImpactDashboard } from "./features/human-impact/HumanImpactDashboard";
+import { humanImpactDataSource } from "./features/human-impact/dataSource";
+import type {
+  HumanImpactDataSource,
+  HumanImpactOverview,
+  PeopleRecordsDataSource,
+} from "./features/human-impact/types";
+import { peopleRecordsDataSource } from "./features/human-impact/peopleRecordsDataSource";
+import { communityContributionDataSource } from "./features/humanitarian-directory/contributionDataSource";
+import { humanitarianDirectoryDataSource } from "./features/humanitarian-directory/dataSource";
+import type {
+  CommunityContributionDataSource,
+  HumanitarianDirectoryDataSource,
+} from "./features/humanitarian-directory/types";
+import { operationalMapDataSource } from "./features/operational-map/dataSource";
+import { humanMapDataSource } from "./features/operational-map/humanMapDataSource";
+import type {
+  HumanMapDataSource,
+  OperationalMapDataSource,
+} from "./features/operational-map/types";
+import { colors } from "./theme";
+
+type LoadState =
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "success"; data: HumanImpactOverview; stale: boolean };
+
+interface AppProps {
+  dataSource?: HumanImpactDataSource;
+  mapDataSource?: OperationalMapDataSource;
+  humanMapDataSource?: HumanMapDataSource;
+  peopleRecordsDataSource?: PeopleRecordsDataSource;
+  humanitarianDirectoryDataSource?: HumanitarianDirectoryDataSource;
+  communityContributionDataSource?: CommunityContributionDataSource;
+  onReportMissingPerson?: () => void;
+  onReportUnverifiedBuilding?: () => void;
+  onRegisterCollectionCenter?: () => void;
+  onRegisterDonationPoint?: () => void;
+  onLogin?: () => void;
+  onRegister?: () => void;
+  onAbout?: () => void;
+}
+
+export function App({
+  dataSource = humanImpactDataSource,
+  mapDataSource = operationalMapDataSource,
+  humanMapDataSource: humanLayerDataSource = humanMapDataSource,
+  peopleRecordsDataSource: recordsDataSource = peopleRecordsDataSource,
+  humanitarianDirectoryDataSource: directoryDataSource = humanitarianDirectoryDataSource,
+  communityContributionDataSource: contributionDataSource = communityContributionDataSource,
+  onReportMissingPerson = () => undefined,
+  onReportUnverifiedBuilding = () => undefined,
+  onRegisterCollectionCenter = () => undefined,
+  onRegisterDonationPoint = () => undefined,
+  onLogin = () => undefined,
+  onRegister = () => undefined,
+  onAbout = () => undefined,
+}: AppProps) {
+  return (
+    <SafeAreaProvider>
+      <DashboardLoader
+        dataSource={dataSource}
+        mapDataSource={mapDataSource}
+        humanMapDataSource={humanLayerDataSource}
+        peopleRecordsDataSource={recordsDataSource}
+        humanitarianDirectoryDataSource={directoryDataSource}
+        communityContributionDataSource={contributionDataSource}
+        onReportMissingPerson={onReportMissingPerson}
+        onReportUnverifiedBuilding={onReportUnverifiedBuilding}
+        onRegisterCollectionCenter={onRegisterCollectionCenter}
+        onRegisterDonationPoint={onRegisterDonationPoint}
+        onLogin={onLogin}
+        onRegister={onRegister}
+        onAbout={onAbout}
+      />
+    </SafeAreaProvider>
+  );
+}
+
+function DashboardLoader({
+  dataSource,
+  mapDataSource,
+  humanMapDataSource,
+  peopleRecordsDataSource,
+  humanitarianDirectoryDataSource,
+  communityContributionDataSource,
+  onReportMissingPerson,
+  onReportUnverifiedBuilding,
+  onRegisterCollectionCenter,
+  onRegisterDonationPoint,
+  onLogin,
+  onRegister,
+  onAbout,
+}: {
+  dataSource: HumanImpactDataSource;
+  mapDataSource: OperationalMapDataSource;
+  humanMapDataSource: HumanMapDataSource;
+  peopleRecordsDataSource: PeopleRecordsDataSource;
+  humanitarianDirectoryDataSource: HumanitarianDirectoryDataSource;
+  communityContributionDataSource: CommunityContributionDataSource;
+  onReportMissingPerson: () => void;
+  onReportUnverifiedBuilding: () => void;
+  onRegisterCollectionCenter: () => void;
+  onRegisterDonationPoint: () => void;
+  onLogin: () => void;
+  onRegister: () => void;
+  onAbout: () => void;
+}) {
+  const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadOverview = async () => {
+      try {
+        const data = await dataSource.getOverview(controller.signal);
+        setLoadState({ status: "success", data, stale: false });
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === "AbortError") {
+          return;
+        }
+
+        const message =
+          error instanceof Error
+            ? error.message
+            : "No fue posible consultar la situación humana.";
+
+        setLoadState((current) =>
+          current.status === "success"
+            ? { ...current, stale: true }
+            : { status: "error", message },
+        );
+      }
+    };
+
+    void loadOverview();
+
+    const refreshTimer =
+      dataSource.transport === "api"
+        ? globalThis.setInterval(() => void loadOverview(), 30_000)
+        : undefined;
+
+    return () => {
+      controller.abort();
+      if (refreshTimer !== undefined) {
+        globalThis.clearInterval(refreshTimer);
+      }
+    };
+  }, [dataSource]);
+
+  if (loadState.status === "loading") {
+    return (
+      <View style={styles.statePage} accessibilityLabel="Cargando situación humana">
+        <ActivityIndicator size="large" color={colors.cyan} />
+        <Text style={styles.stateText}>Preparando el panorama de situación…</Text>
+      </View>
+    );
+  }
+
+  if (loadState.status === "error") {
+    return (
+      <View style={styles.statePage} accessibilityRole="alert">
+        <View style={styles.errorMark}>
+          <Text style={styles.errorMarkText}>!</Text>
+        </View>
+        <Text style={styles.errorTitle} accessibilityRole="header">
+          No pudimos cargar la situación
+        </Text>
+        <Text style={styles.stateText}>{loadState.message}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <HumanImpactDashboard
+      data={loadState.data}
+      isDemo={dataSource.dataKind === "demonstrative"}
+      stale={loadState.stale}
+      mapDataSource={mapDataSource}
+      humanMapDataSource={humanMapDataSource}
+      peopleRecordsDataSource={peopleRecordsDataSource}
+      humanitarianDirectoryDataSource={humanitarianDirectoryDataSource}
+      communityContributionDataSource={communityContributionDataSource}
+      onReportMissingPerson={onReportMissingPerson}
+      onReportUnverifiedBuilding={onReportUnverifiedBuilding}
+      onRegisterCollectionCenter={onRegisterCollectionCenter}
+      onRegisterDonationPoint={onRegisterDonationPoint}
+      onLogin={onLogin}
+      onRegister={onRegister}
+      onAbout={onAbout}
+    />
+  );
+}
+
+const styles = StyleSheet.create({
+  statePage: {
+    flex: 1,
+    minHeight: 600,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 18,
+    padding: 32,
+    backgroundColor: colors.canvas,
+  },
+  stateText: {
+    maxWidth: 460,
+    color: colors.inkSoft,
+    fontSize: 15,
+    lineHeight: 23,
+    textAlign: "center",
+  },
+  errorMark: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 103, 136, 0.42)",
+    borderRadius: 10,
+    backgroundColor: "rgba(255, 103, 136, 0.10)",
+  },
+  errorMarkText: {
+    color: colors.reported,
+    fontSize: 24,
+    fontWeight: "700",
+  },
+  errorTitle: {
+    color: colors.ink,
+    fontSize: 36,
+    fontWeight: "600",
+    letterSpacing: -1.5,
+    textAlign: "center",
+  },
+});

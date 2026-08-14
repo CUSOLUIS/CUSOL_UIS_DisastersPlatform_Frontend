@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "CUSOL Desastres Colombia",
+    "slug": "cusol-disasters-colombia",
+    "scheme": "cusoldisasters",
+    "version": "0.1.0",
+    "orientation": "default",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "co.edu.uis.cusol.disasters"
+    },
+    "android": {
+      "package": "co.edu.uis.cusol.disasters",
+      "predictiveBackGestureEnabled": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

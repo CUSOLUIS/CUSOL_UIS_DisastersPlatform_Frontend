@@ -1,0 +1,1363 @@
+import { LinearGradient } from "expo-linear-gradient";
+import { useEffect, useRef, useState } from "react";
+import type { ReactNode, RefObject } from "react";
+import {
+  Animated,
+  Easing,
+  Image,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import Svg, { Circle, Path } from "react-native-svg";
+import cusolUisLogo from "../../assets/cusol-uis-logo-enhanced.png";
+import prometeoLogo from "../../assets/prometeo-logo-hd.png";
+import { useReducedMotion } from "../../hooks/useReducedMotion";
+import { colors, contentMaxWidth, fontFamilies } from "../../theme";
+import { HumanitarianSearchPanel } from "../humanitarian-directory/HumanitarianSearchPanel";
+import type {
+  CommunityContributionDataSource,
+  HumanitarianDirectoryDataSource,
+} from "../humanitarian-directory/types";
+import { ReportActions } from "../missing-persons/MissingPersonCommandCenter";
+import { OperationalMapPanel } from "../operational-map/OperationalMapPanel";
+import type {
+  HumanMapDataSource,
+  OperationalMapDataSource,
+} from "../operational-map/types";
+import { DonutChart } from "./DonutChart";
+import { RecentPeopleTable } from "./RecentPeopleTable";
+import type {
+  HumanImpactOverview,
+  HumanImpactSummary,
+  PeopleRecordsDataSource,
+} from "./types";
+
+interface HumanImpactDashboardProps {
+  data: HumanImpactOverview;
+  isDemo: boolean;
+  stale: boolean;
+  mapDataSource: OperationalMapDataSource;
+  humanMapDataSource: HumanMapDataSource;
+  peopleRecordsDataSource: PeopleRecordsDataSource;
+  humanitarianDirectoryDataSource: HumanitarianDirectoryDataSource;
+  communityContributionDataSource: CommunityContributionDataSource;
+  onReportMissingPerson: () => void;
+  onReportUnverifiedBuilding: () => void;
+  onRegisterCollectionCenter: () => void;
+  onRegisterDonationPoint: () => void;
+  onLogin: () => void;
+  onRegister: () => void;
+  onAbout: () => void;
+}
+
+const numberFormatter = new Intl.NumberFormat("es-CO");
+
+export const PRIORITY_LAYOUT_BREAKPOINT = 1080;
+export const DASHBOARD_HEADER_HEIGHT = 124;
+export const DASHBOARD_STACKED_NAV_HEADER_HEIGHT = 166;
+export const DASHBOARD_COMPACT_HEADER_HEIGHT = 160;
+export const DASHBOARD_TOOL_TITLE = "CUSOL DISASTER PLATFORM";
+export const CUSOL_INSTAGRAM_URL = "https://www.instagram.com/cusol_uis/";
+export const PROMETEO_INSTAGRAM_URL = "https://www.instagram.com/prometeo.uis/";
+
+export function getBrandLinkScale({
+  focused,
+  hovered,
+  pressed,
+  reducedMotion,
+}: {
+  focused: boolean;
+  hovered: boolean;
+  pressed: boolean;
+  reducedMotion: boolean;
+}): number {
+  if (reducedMotion) return 1;
+  if (pressed) return 1.04;
+  return hovered || focused ? 1.07 : 1;
+}
+
+export function shouldStackPriorityLayout(width: number): boolean {
+  return width < PRIORITY_LAYOUT_BREAKPOINT;
+}
+
+export function shouldCenterEntryContent(width: number): boolean {
+  return !shouldStackPriorityLayout(width);
+}
+
+export function getDashboardEntryMinHeight(
+  viewportHeight: number,
+  compact: boolean,
+  stackedNavigation = compact,
+): number {
+  return Math.max(
+    0,
+    viewportHeight - getDashboardHeaderHeight(compact, stackedNavigation),
+  );
+}
+
+export function getDashboardHeaderHeight(
+  compact: boolean,
+  stackedNavigation: boolean,
+): number {
+  return compact
+    ? DASHBOARD_COMPACT_HEADER_HEIGHT
+    : stackedNavigation
+      ? DASHBOARD_STACKED_NAV_HEADER_HEIGHT
+      : DASHBOARD_HEADER_HEIGHT;
+}
+
+export function getLiveRecordsMinHeight(
+  viewportHeight: number,
+  headerHeight: number,
+): number {
+  return Math.max(0, viewportHeight - headerHeight);
+}
+
+export function getSectionScrollDestination({
+  currentScroll,
+  headerHeight,
+  pageY,
+  spacingBelowHeader,
+}: {
+  currentScroll: number;
+  headerHeight: number;
+  pageY: number;
+  spacingBelowHeader: number;
+}): number {
+  return Math.max(
+    0,
+    currentScroll + pageY - headerHeight - spacingBelowHeader,
+  );
+}
+
+export function HumanImpactDashboard({
+  data,
+  isDemo,
+  stale,
+  mapDataSource,
+  humanMapDataSource,
+  peopleRecordsDataSource,
+  humanitarianDirectoryDataSource,
+  communityContributionDataSource,
+  onReportMissingPerson,
+  onReportUnverifiedBuilding,
+  onRegisterCollectionCenter,
+  onRegisterDonationPoint,
+  onLogin,
+  onRegister,
+  onAbout,
+}: HumanImpactDashboardProps) {
+  const { height, width } = useWindowDimensions();
+  const tablet = shouldStackPriorityLayout(width);
+  const compact = width < 760;
+  const narrowHeader = width < 360;
+  const stackedNavigation = width < 1120;
+  const priorityStacked = tablet;
+  const centerEntryContent = shouldCenterEntryContent(width);
+  const entryMinHeight = getDashboardEntryMinHeight(
+    height,
+    compact,
+    stackedNavigation,
+  );
+  const headerHeight = getDashboardHeaderHeight(compact, stackedNavigation);
+  const liveRecordsMinHeight = getLiveRecordsMinHeight(height, headerHeight);
+  const scrollRef = useRef<ScrollView>(null);
+  const mapRef = useRef<View>(null);
+  const dataRef = useRef<View>(null);
+  const liveRef = useRef<View>(null);
+  const scrollPosition = useRef(0);
+  const reducedMotion = useReducedMotion();
+
+  const scrollToSection = (
+    target: RefObject<View | null>,
+    spacingBelowHeader = 16,
+  ) => {
+    target.current?.measure((_x, _y, _width, _height, _pageX, pageY) => {
+      const destination = getSectionScrollDestination({
+        currentScroll: scrollPosition.current,
+        headerHeight,
+        pageY,
+        spacingBelowHeader,
+      });
+      scrollRef.current?.scrollTo({
+        y: destination,
+        animated: !reducedMotion,
+      });
+    });
+  };
+
+  const showMap = () => scrollToSection(mapRef);
+
+  return (
+    <LinearGradient
+      colors={["#080b14", colors.canvas, "#080b14"]}
+      locations={[0, 0.52, 1]}
+      style={styles.root}
+    >
+      <View style={[styles.ambientGlowOne, styles.noPointerEvents]} />
+      <View style={[styles.ambientGlowTwo, styles.noPointerEvents]} />
+      <SafeAreaView edges={["top"]} style={styles.safeArea}>
+        <Header
+          compact={compact}
+          narrow={narrowHeader}
+          stackedNavigation={stackedNavigation}
+          onNavigateMap={showMap}
+          onNavigateAbout={onAbout}
+          onNavigateData={() => scrollToSection(dataRef)}
+          onNavigateLive={() => scrollToSection(liveRef, 0)}
+          onLogin={onLogin}
+          onRegister={onRegister}
+        />
+
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.scrollContent}
+          onScroll={(event) => {
+            scrollPosition.current = event.nativeEvent.contentOffset.y;
+          }}
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}
+        >
+          <View
+            testID="dashboard-main-content"
+            style={[styles.content, compact && styles.contentCompact]}
+          >
+            <View
+              testID="dashboard-entry-hero"
+              style={[
+                styles.entryHero,
+                compact && styles.entryHeroCompact,
+                { minHeight: entryMinHeight },
+              ]}
+            >
+              <View
+                testID="dashboard-priority-layout"
+                style={[
+                  styles.priorityLayout,
+                  centerEntryContent && styles.priorityLayoutViewport,
+                  priorityStacked && styles.priorityLayoutStacked,
+                ]}
+              >
+                <View
+                  testID="situation-human-priority"
+                  style={[
+                    styles.priorityIntroColumn,
+                    priorityStacked && styles.priorityStackedColumn,
+                  ]}
+                >
+                  <SituationIntro
+                    compact={compact}
+                    narrow={narrowHeader}
+                    stacked={priorityStacked}
+                  />
+                </View>
+
+                <View
+                  testID="person-search-priority"
+                  style={[
+                    styles.priorityActionsColumn,
+                    priorityStacked && styles.priorityStackedColumn,
+                  ]}
+                >
+                  <HumanitarianSearchPanel
+                    compact={compact}
+                    dataSource={humanitarianDirectoryDataSource}
+                    contributionDataSource={communityContributionDataSource}
+                  />
+                </View>
+              </View>
+
+              <ReportActions
+                compact={compact}
+                onReportMissingPerson={onReportMissingPerson}
+                onReportUnverifiedBuilding={onReportUnverifiedBuilding}
+                onRegisterCollectionCenter={onRegisterCollectionCenter}
+                onRegisterDonationPoint={onRegisterDonationPoint}
+              />
+
+              <ScrollContinuationCue onPress={showMap} />
+            </View>
+
+            <View
+              ref={mapRef}
+              testID="dashboard-operational-map"
+              style={styles.fullWidth}
+            >
+              <OperationalMapPanel
+                dataSource={mapDataSource}
+                humanDataSource={humanMapDataSource}
+                compact={compact}
+              />
+            </View>
+
+            {stale && (
+              <View style={[styles.notice, styles.staleNotice]} accessibilityRole="alert">
+                <Text style={styles.staleNoticeText}>
+                  No fue posible actualizar los datos. Se conserva el último reporte disponible.
+                </Text>
+              </View>
+            )}
+
+            <View
+              ref={dataRef}
+              testID="dashboard-data-and-figures"
+              style={styles.dataSection}
+            >
+              <SummaryCards
+                summary={data.summary}
+                tablet={tablet}
+                compact={compact}
+                isDemo={isDemo}
+              />
+
+              <View
+                testID="human-impact-distribution-panel"
+                style={[styles.analysis, tablet && styles.analysisTablet]}
+              >
+                <Text style={styles.panelCode}>MODULE / DISTRIBUTION</Text>
+                <View style={[styles.analysisCopy, tablet && styles.analysisCopyTablet]}>
+                  <Text style={styles.eyebrow}>DISTRIBUCIÓN GENERAL</Text>
+                  <Text style={styles.sectionTitle} accessibilityRole="header">
+                    Estado de las personas
+                  </Text>
+                  <Text style={styles.bodyCopy}>
+                    Relación proporcional entre los cuatro estados registrados en la plataforma.
+                  </Text>
+                </View>
+                <DonutChart summary={data.summary} />
+              </View>
+            </View>
+
+            <View
+              ref={liveRef}
+              testID="dashboard-live-transmission"
+              style={[styles.liveSection, { minHeight: liveRecordsMinHeight }]}
+            >
+              <RecentPeopleTable
+                dataSource={peopleRecordsDataSource}
+                viewportMinHeight={liveRecordsMinHeight}
+              />
+            </View>
+          </View>
+
+          <PlatformFooter
+            compact={compact}
+            onNavigateAbout={onAbout}
+            onNavigateData={() => scrollToSection(dataRef)}
+            onNavigateLive={() => scrollToSection(liveRef, 0)}
+            onNavigateMap={showMap}
+          />
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
+  );
+}
+
+function PlatformFooter({
+  compact,
+  onNavigateAbout,
+  onNavigateData,
+  onNavigateLive,
+  onNavigateMap,
+}: {
+  compact: boolean;
+  onNavigateAbout: () => void;
+  onNavigateData: () => void;
+  onNavigateLive: () => void;
+  onNavigateMap: () => void;
+}) {
+  return (
+    <View
+      testID="platform-footer"
+      accessibilityLabel="Información institucional y navegación de cierre"
+      style={[styles.footerShell, compact && styles.footerShellCompact]}
+    >
+      <View style={[styles.footerInner, compact && styles.footerInnerCompact]}>
+        <View style={[styles.footerMain, compact && styles.footerMainCompact]}>
+          <View style={styles.footerIdentity}>
+            <Text style={styles.footerEyebrow}>CENTRO DIGITAL DE AYUDA Y MONITOREO</Text>
+            <Text style={styles.footerTitle}>CUSOL DISASTER PLATFORM</Text>
+            <Text style={styles.footerDescription}>
+              Información pública y trazable para localizar personas, coordinar ayudas y
+              comprender la respuesta humanitaria ante emergencias y desastres.
+            </Text>
+            <Text style={styles.footerAlliance}>
+              CUSOL UIS · GRUPO PROMETEO · UNIVERSIDAD INDUSTRIAL DE SANTANDER
+            </Text>
+          </View>
+
+          <View style={[styles.footerNavigation, compact && styles.footerNavigationCompact]}>
+            <FooterColumn title="EXPLORAR">
+              <FooterLink label="Mapa operativo" onPress={onNavigateMap} />
+              <FooterLink label="Cifras y datos" onPress={onNavigateData} />
+              <FooterLink label="Transmisión en vivo" onPress={onNavigateLive} />
+              <FooterLink label="Quiénes somos" onPress={onNavigateAbout} />
+            </FooterColumn>
+            <FooterColumn title="COMUNIDAD">
+              <FooterLink
+                external
+                label="CUSOL en Instagram ↗"
+                onPress={() => void Linking.openURL(CUSOL_INSTAGRAM_URL)}
+              />
+              <FooterLink
+                external
+                label="Prometeo en Instagram ↗"
+                onPress={() => void Linking.openURL(PROMETEO_INSTAGRAM_URL)}
+              />
+            </FooterColumn>
+          </View>
+        </View>
+
+        <View style={[styles.footerNotice, compact && styles.footerNoticeCompact]}>
+          <Text style={styles.footerNoticeLabel}>USO RESPONSABLE</Text>
+          <Text style={styles.footerNoticeText}>
+            Verifica la fuente, la fecha y el estado antes de actuar. Esta plataforma no
+            reemplaza los canales oficiales de atención de emergencias.
+          </Text>
+        </View>
+
+        <View style={[styles.footerBottom, compact && styles.footerBottomCompact]}>
+          <Text style={styles.footerMeta}>© 2026 CUSOL · PROMETEO · UIS</Text>
+          <Text style={styles.footerMeta}>COLOMBIA · INFORMACIÓN PÚBLICA</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function FooterColumn({ children, title }: { children: ReactNode; title: string }) {
+  return (
+    <View style={styles.footerColumn}>
+      <Text style={styles.footerColumnTitle}>{title}</Text>
+      <View style={styles.footerLinks}>{children}</View>
+    </View>
+  );
+}
+
+function FooterLink({
+  external = false,
+  label,
+  onPress,
+}: {
+  external?: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={label}
+      accessibilityHint={external ? "Abre un sitio externo" : "Navega dentro de la plataforma"}
+      onPress={onPress}
+      style={({ pressed }) => [styles.footerLink, pressed && styles.footerLinkPressed]}
+    >
+      <Text style={styles.footerLinkText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function Header({
+  compact,
+  narrow,
+  stackedNavigation,
+  onNavigateMap,
+  onNavigateAbout,
+  onNavigateData,
+  onNavigateLive,
+  onLogin,
+  onRegister,
+}: {
+  compact: boolean;
+  narrow: boolean;
+  stackedNavigation: boolean;
+  onNavigateMap: () => void;
+  onNavigateAbout: () => void;
+  onNavigateData: () => void;
+  onNavigateLive: () => void;
+  onLogin: () => void;
+  onRegister: () => void;
+}) {
+  const reducedMotion = useReducedMotion();
+
+  return (
+    <View style={styles.headerShell}>
+      <View
+        style={[
+          styles.header,
+          stackedNavigation && styles.headerStackedNavigation,
+          compact && styles.headerCompact,
+          narrow && styles.headerNarrow,
+        ]}
+      >
+        <View
+          style={[
+            styles.headerPrimary,
+            stackedNavigation && styles.headerPrimaryStacked,
+            compact && styles.headerPrimaryCompact,
+            narrow && styles.headerPrimaryNarrow,
+          ]}
+        >
+          <View
+            testID="brand-lockup"
+            style={styles.brand}
+          >
+            <View
+              testID="brand-logo-frame"
+              style={[
+                styles.brandLogoFrame,
+                compact && styles.brandLogoFrameCompact,
+                narrow && styles.brandLogoFrameNarrow,
+              ]}
+            >
+              <View style={[styles.brandLogos, narrow && styles.brandLogosNarrow]}>
+                <BrandLink
+                  testID="cusol-brand-link"
+                  accessibilityLabel="CUSOL UIS en Instagram"
+                  url={CUSOL_INSTAGRAM_URL}
+                  reducedMotion={reducedMotion}
+                >
+                  <BrandIcon compact={compact} narrow={narrow} />
+                </BrandLink>
+                <BrandLink
+                  testID="prometeo-brand-link"
+                  accessibilityLabel="Prometeo UIS en Instagram"
+                  url={PROMETEO_INSTAGRAM_URL}
+                  reducedMotion={reducedMotion}
+                >
+                  <PrometeoIcon compact={compact} narrow={narrow} />
+                </BrandLink>
+              </View>
+            </View>
+            <Text
+              style={[
+                styles.brandToolTitle,
+                compact && styles.brandToolTitleCompact,
+                narrow && styles.brandToolTitleNarrow,
+              ]}
+            >
+              {DASHBOARD_TOOL_TITLE}
+            </Text>
+          </View>
+
+          {!stackedNavigation && (
+            <HeaderNavigation
+              onNavigateMap={onNavigateMap}
+              onNavigateAbout={onNavigateAbout}
+              onNavigateData={onNavigateData}
+              onNavigateLive={onNavigateLive}
+            />
+          )}
+
+          <View
+            style={[
+              styles.authActions,
+              compact && styles.authActionsCompact,
+              narrow && styles.authActionsNarrow,
+            ]}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Iniciar sesión"
+              onPress={onLogin}
+              style={({ pressed }) => [
+                styles.loginButton,
+                compact && styles.authButtonCompact,
+                narrow && styles.authButtonNarrow,
+                pressed && styles.authButtonPressed,
+              ]}
+            >
+              <Text style={[styles.loginButtonText, narrow && styles.authButtonTextNarrow]}>
+                INICIAR SESIÓN
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Registrarse"
+              onPress={onRegister}
+              style={({ pressed }) => [
+                styles.registerButton,
+                compact && styles.authButtonCompact,
+                narrow && styles.authButtonNarrow,
+                pressed && styles.authButtonPressed,
+              ]}
+            >
+              <Text style={[styles.registerButtonText, narrow && styles.authButtonTextNarrow]}>
+                REGISTRARSE
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {stackedNavigation && (
+          <ScrollView
+            horizontal
+            accessibilityLabel="Navegación principal"
+            contentContainerStyle={styles.headerNavigationScrollContent}
+            showsHorizontalScrollIndicator={false}
+            style={styles.headerNavigationScroll}
+          >
+            <HeaderNavigation
+              stacked
+              onNavigateMap={onNavigateMap}
+              onNavigateAbout={onNavigateAbout}
+              onNavigateData={onNavigateData}
+              onNavigateLive={onNavigateLive}
+            />
+          </ScrollView>
+        )}
+      </View>
+    </View>
+  );
+}
+
+function HeaderNavigation({
+  stacked = false,
+  onNavigateMap,
+  onNavigateAbout,
+  onNavigateData,
+  onNavigateLive,
+}: {
+  stacked?: boolean;
+  onNavigateMap: () => void;
+  onNavigateAbout: () => void;
+  onNavigateData: () => void;
+  onNavigateLive: () => void;
+}) {
+  const items = [
+    { id: "map", label: "VER MAPA", hint: "Baja al mapa operativo", onPress: onNavigateMap },
+    { id: "about", label: "QUIÉNES SOMOS", hint: "Abre la página institucional", onPress: onNavigateAbout },
+    { id: "data", label: "CIFRAS Y DATOS", hint: "Baja al resumen de cifras", onPress: onNavigateData },
+    { id: "live", label: "TRANSMISIÓN EN VIVO", hint: "Baja a las personas agregadas recientemente", onPress: onNavigateLive },
+  ];
+
+  return (
+    <View
+      testID="header-navigation"
+      accessibilityRole="toolbar"
+      accessibilityLabel="Navegación principal"
+      style={[styles.headerNavigation, stacked && styles.headerNavigationStacked]}
+    >
+      {items.map((item) => (
+        <HeaderNavigationLink key={item.label} stacked={stacked} {...item} />
+      ))}
+    </View>
+  );
+}
+
+function HeaderNavigationLink({
+  hint,
+  id,
+  label,
+  onPress,
+  stacked,
+}: {
+  hint: string;
+  id: string;
+  label: string;
+  onPress: () => void;
+  stacked: boolean;
+}) {
+  const [focused, setFocused] = useState(false);
+
+  return (
+    <Pressable
+      testID={`header-navigation-${id}`}
+      accessibilityRole="link"
+      accessibilityLabel={label.toLocaleLowerCase("es-CO")}
+      accessibilityHint={hint}
+      onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)}
+      onPress={onPress}
+      style={({ hovered, pressed }) => [
+        styles.headerNavigationLink,
+        (focused || hovered) && styles.headerNavigationLinkInteractive,
+        pressed && styles.headerNavigationLinkPressed,
+      ]}
+    >
+      <Text
+        style={[
+          styles.headerNavigationText,
+          !stacked && styles.headerNavigationTextDesktop,
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function ScrollContinuationCue({ onPress }: { onPress: () => void }) {
+  const reducedMotion = useReducedMotion();
+  const progress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (reducedMotion) return;
+
+    const animation = Animated.loop(
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: 2600,
+        easing: Easing.linear,
+        useNativeDriver: Platform.OS !== "web",
+      }),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [progress, reducedMotion]);
+
+  const translateX = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-180, contentMaxWidth],
+  });
+
+  return (
+    <Pressable
+      testID="dashboard-scroll-cue"
+      accessibilityRole="button"
+      accessibilityLabel="Ver más contenido"
+      accessibilityHint="Baja hasta el mapa y los demás módulos"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.scrollCue,
+        pressed && styles.scrollCuePressed,
+      ]}
+    >
+      <View style={styles.scrollCueRail} accessibilityElementsHidden>
+        <Animated.View
+          testID="dashboard-scroll-cue-scan"
+          style={[
+            styles.scrollCueScan,
+            reducedMotion
+              ? styles.scrollCueScanReduced
+              : { transform: [{ translateX }] },
+          ]}
+        />
+      </View>
+      <View style={styles.scrollCueLabelRow}>
+        <Text style={styles.scrollCueLabel}>VER MÁS</Text>
+        <Text style={styles.scrollCueArrow}>↓</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function SituationIntro({
+  compact,
+  narrow,
+  stacked,
+}: {
+  compact: boolean;
+  narrow: boolean;
+  stacked: boolean;
+}) {
+  const missionTitleStyle = [
+    styles.heroTitle,
+    !stacked && styles.heroTitleMissionWide,
+    compact && styles.heroTitleMissionCompact,
+    narrow && styles.heroTitleMissionNarrow,
+  ];
+
+  return (
+    <View style={[styles.hero, styles.situationIntro, compact && styles.heroCompact]}>
+      <View style={styles.heroCopy}>
+        <View style={styles.signalLabel}>
+          <View style={styles.signalLine} />
+          <Text
+            testID="dashboard-signal-label"
+            style={[styles.signalText, narrow && styles.signalTextNarrow]}
+          >
+            CENTRO DIGITAL DE AYUDA Y MONITOREO
+          </Text>
+        </View>
+        <Text style={missionTitleStyle} accessibilityRole="header">
+          Misión
+        </Text>
+        <Text style={[missionTitleStyle, styles.heroTitleAccent]}>
+          Humanitaria
+        </Text>
+        <Text style={styles.heroDescription}>
+          Unimos datos verificables y reportes ciudadanos para localizar personas,
+          coordinar ayudas y monitorear la respuesta humanitaria ante emergencias y
+          desastres.
+        </Text>
+        <View style={styles.tags}>
+          <Tag label="COL / NACIONAL" />
+          <Tag label="LECTURA CONSOLIDADA" />
+          <Tag label="MONITOREO ACTIVO" active />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function Tag({ label, active = false }: { label: string; active?: boolean }) {
+  return (
+    <View style={[styles.tag, active && styles.tagActive]}>
+      <Text style={[styles.tagText, active && styles.tagTextActive]}>{label}</Text>
+    </View>
+  );
+}
+
+function SummaryCards({
+  summary,
+  tablet,
+  compact,
+  isDemo,
+}: {
+  summary: HumanImpactSummary;
+  tablet: boolean;
+  compact: boolean;
+  isDemo: boolean;
+}) {
+  const secondaryCards = [
+    {
+      key: "reported",
+      label: "Muertos reportados",
+      note: "Pendientes de confirmación",
+      value: summary.reportedDeceased,
+      color: colors.reported,
+    },
+    {
+      key: "alive",
+      label: "Confirmados vivos",
+      note: "Verificación completada",
+      value: summary.confirmedAlive,
+      color: colors.alive,
+    },
+    {
+      key: "deceased",
+      label: "Muertos confirmados",
+      note: "Verificación completada",
+      value: summary.confirmedDeceased,
+      color: colors.deceased,
+    },
+  ];
+
+  return (
+    <View
+      testID="human-impact-summary"
+      style={[styles.summary, tablet && styles.summaryTablet]}
+      accessibilityLabel="Resumen de situación humana"
+    >
+      <LinearGradient
+        colors={["#171d2b", "#0a0f1a"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.primaryMetric, tablet && styles.primaryMetricTablet]}
+      >
+        <View style={styles.metricHeader}>
+          <View style={styles.metricIcon}><MissingIcon /></View>
+          <Text style={styles.metricHeaderText}>INDICADOR PRINCIPAL · PRIORIDAD 01</Text>
+        </View>
+        <View style={styles.primaryMetricCopy}>
+          <View style={styles.metricCodeRow}>
+            <Text style={[styles.metricCode, styles.metricCodeInline]}>MISSING / ACTIVE</Text>
+            {isDemo && <Text style={styles.testScenarioLabel}>ESCENARIO DE PRUEBA</Text>}
+          </View>
+          <Text style={[styles.primaryValue, compact && styles.primaryValueCompact]}>
+            {numberFormatter.format(summary.missing)}
+          </Text>
+          <Text style={styles.primaryLabel} accessible accessibilityRole="header">
+            Desaparecidos
+          </Text>
+          <Text style={styles.primaryDescription}>
+            Personas cuya ubicación aún no ha sido confirmada.
+          </Text>
+        </View>
+        <SignalBars />
+      </LinearGradient>
+
+      <View
+        style={[
+          styles.secondaryMetrics,
+          tablet && styles.secondaryMetricsTablet,
+          compact && styles.secondaryMetricsCompact,
+        ]}
+      >
+        {secondaryCards.map((card) => (
+          <View key={card.key} style={styles.secondaryMetric}>
+            <View style={[styles.metricAccent, { backgroundColor: card.color }]} />
+            <Text style={[styles.secondaryCode, { color: card.color }]}>STATUS / {card.key.toUpperCase()}</Text>
+            <Text style={styles.secondaryLabel}>{card.label}</Text>
+            <Text style={styles.secondaryValue}>{numberFormatter.format(card.value)}</Text>
+            <Text style={styles.secondaryNote}>{card.note}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function SignalBars() {
+  return (
+    <View style={styles.signalBars} accessibilityElementsHidden>
+      {[18, 35, 58, 28, 72, 43, 86, 34, 60, 96, 41, 68].map((height, index) => (
+        <View key={`${height}-${index}`} style={[styles.signalBar, { height }]} />
+      ))}
+    </View>
+  );
+}
+
+function BrandLink({
+  accessibilityLabel,
+  children,
+  reducedMotion,
+  testID,
+  url,
+}: {
+  accessibilityLabel: string;
+  children: ReactNode;
+  reducedMotion: boolean;
+  testID: string;
+  url: string;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  const scale = useRef(new Animated.Value(1)).current;
+  const targetScale = getBrandLinkScale({
+    focused,
+    hovered,
+    pressed,
+    reducedMotion,
+  });
+
+  useEffect(() => {
+    scale.stopAnimation();
+    if (reducedMotion) {
+      scale.setValue(1);
+      return;
+    }
+
+    const animation = Animated.timing(scale, {
+      toValue: targetScale,
+      duration: targetScale === 1 ? 120 : 150,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: Platform.OS !== "web",
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [reducedMotion, scale, targetScale]);
+
+  return (
+    <Animated.View
+      testID={`${testID}-motion`}
+      style={[styles.brandLinkMotion, { transform: [{ scale }] }]}
+    >
+      <Pressable
+        testID={testID}
+        accessibilityRole="link"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityHint="Abre el perfil de Instagram en una aplicación externa"
+        hitSlop={4}
+        onBlur={() => setFocused(false)}
+        onFocus={() => setFocused(true)}
+        onHoverIn={() => setHovered(true)}
+        onHoverOut={() => setHovered(false)}
+        onPress={() => {
+          void Linking.openURL(url);
+        }}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
+        style={({ pressed: isPressed }) => [
+          styles.brandLink,
+          isPressed && styles.brandLinkPressed,
+        ]}
+      >
+        {children}
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+function BrandIcon({ compact, narrow }: { compact: boolean; narrow: boolean }) {
+  return (
+    <Image
+      testID="cusol-brand-logo"
+      source={cusolUisLogo}
+      resizeMode="contain"
+      style={[
+        styles.brandLogo,
+        compact && styles.brandLogoCompact,
+        narrow && styles.brandLogoNarrow,
+      ]}
+      accessible={false}
+    />
+  );
+}
+
+function PrometeoIcon({ compact, narrow }: { compact: boolean; narrow: boolean }) {
+  return (
+    <View
+      testID="prometeo-brand-circle"
+      style={[
+        styles.prometeoCircle,
+        compact && styles.prometeoCircleCompact,
+        narrow && styles.prometeoCircleNarrow,
+      ]}
+    >
+      <Image
+        testID="prometeo-brand-logo"
+        accessibilityIgnoresInvertColors
+        source={prometeoLogo}
+        resizeMode="contain"
+        style={styles.prometeoLogo}
+      />
+    </View>
+  );
+}
+
+function MissingIcon() {
+  return (
+    <Svg width={21} height={21} viewBox="0 0 24 24">
+      <Circle cx="12" cy="8" r="3.5" fill="none" stroke={colors.missing} strokeWidth={1.4} />
+      <Path d="M5.5 20c.8-4 3-6 6.5-6s5.7 2 6.5 6M19 4v5M16.5 6.5h5" fill="none" stroke={colors.missing} strokeWidth={1.4} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, minHeight: 700 },
+  noPointerEvents: { pointerEvents: "none" },
+  safeArea: { flex: 1 },
+  ambientGlowOne: {
+    position: "absolute", top: 320, left: -260, width: 520, height: 520,
+    borderRadius: 260, backgroundColor: "rgba(77, 78, 224, 0.07)",
+  },
+  ambientGlowTwo: {
+    position: "absolute", top: 1120, right: -280, width: 560, height: 560,
+    borderRadius: 280, backgroundColor: "rgba(25, 194, 170, 0.06)",
+  },
+  headerShell: {
+    zIndex: 10, borderBottomWidth: 1, borderBottomColor: colors.line,
+    backgroundColor: "rgba(5, 8, 16, 0.96)",
+  },
+  header: {
+    width: "100%", maxWidth: contentMaxWidth, minHeight: DASHBOARD_HEADER_HEIGHT, alignSelf: "center",
+    justifyContent: "center", paddingHorizontal: 24, paddingVertical: 10,
+  },
+  headerStackedNavigation: { minHeight: DASHBOARD_STACKED_NAV_HEADER_HEIGHT, gap: 8 },
+  headerCompact: { minHeight: DASHBOARD_COMPACT_HEADER_HEIGHT, paddingHorizontal: 10, paddingVertical: 9 },
+  headerNarrow: { paddingHorizontal: 6 },
+  headerPrimary: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 24,
+  },
+  headerPrimaryStacked: { gap: 12 },
+  headerPrimaryCompact: { gap: 8 },
+  headerPrimaryNarrow: { gap: 4 },
+  brand: { flexShrink: 0, alignItems: "center", justifyContent: "center" },
+  brandLogoFrame: {
+    borderWidth: 1,
+    borderColor: "rgba(170, 188, 209, 0.48)",
+    borderRadius: 18,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    backgroundColor: "rgba(8, 13, 22, 0.72)",
+  },
+  brandLogoFrameCompact: { borderRadius: 16, paddingHorizontal: 7, paddingVertical: 5 },
+  brandLogoFrameNarrow: { borderRadius: 14, paddingHorizontal: 6, paddingVertical: 4 },
+  brandLogos: { flexDirection: "row", alignItems: "center", gap: 12 },
+  brandLogosNarrow: { gap: 8 },
+  brandLinkMotion: { borderRadius: 999 },
+  brandLink: { borderRadius: 999 },
+  brandLinkPressed: { opacity: 0.86 },
+  brandLogo: { width: 68, height: 68 },
+  brandLogoCompact: { width: 60, height: 60 },
+  brandLogoNarrow: { width: 52, height: 52 },
+  prometeoCircle: { width: 68, height: 68, alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.85)", borderRadius: 34, backgroundColor: "#ffffff" },
+  prometeoCircleCompact: { width: 60, height: 60, borderRadius: 30 },
+  prometeoCircleNarrow: { width: 52, height: 52, borderRadius: 26 },
+  prometeoLogo: { width: "100%", height: "100%" },
+  brandToolTitle: { marginTop: 7, color: colors.ink, fontFamily: fontFamilies.mono, fontSize: 7.5, fontWeight: "900", letterSpacing: 1.8, lineHeight: 10, textAlign: "center" },
+  brandToolTitleCompact: { marginTop: 6, fontSize: 6.5, letterSpacing: 1.35, lineHeight: 9 },
+  brandToolTitleNarrow: { marginTop: 5, fontSize: 5.5, letterSpacing: 0.8, lineHeight: 7 },
+  headerNavigation: {
+    minWidth: 0,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  headerNavigationStacked: { flexGrow: 0, flexShrink: 0 },
+  headerNavigationScroll: { width: "100%", flexGrow: 0 },
+  headerNavigationScrollContent: {
+    minWidth: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  headerNavigationLink: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 13,
+    borderWidth: 1,
+    borderColor: "transparent",
+    borderRadius: 8,
+    backgroundColor: "rgba(81, 229, 255, 0.025)",
+  },
+  headerNavigationLinkPressed: {
+    borderColor: colors.lineStrong,
+    backgroundColor: "rgba(81, 229, 255, 0.10)",
+    transform: [{ translateY: 1 }],
+  },
+  headerNavigationLinkInteractive: {
+    borderColor: "rgba(81, 229, 255, 0.24)",
+    backgroundColor: "rgba(81, 229, 255, 0.07)",
+  },
+  headerNavigationText: {
+    color: colors.inkSoft,
+    fontFamily: fontFamilies.mono,
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "800",
+    letterSpacing: 0.75,
+  },
+  headerNavigationTextDesktop: { fontSize: 11, letterSpacing: 0.85 },
+  authActions: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 9 },
+  authActionsCompact: { gap: 6 },
+  authActionsNarrow: { gap: 4 },
+  loginButton: { minHeight: 38, alignItems: "center", justifyContent: "center", paddingHorizontal: 15, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 7, backgroundColor: "rgba(81,229,255,0.04)" },
+  registerButton: { minHeight: 38, alignItems: "center", justifyContent: "center", paddingHorizontal: 16, borderWidth: 1, borderColor: colors.cyan, borderRadius: 7, backgroundColor: colors.cyan },
+  authButtonCompact: { minHeight: 36, paddingHorizontal: 9 },
+  authButtonNarrow: { minHeight: 34, paddingHorizontal: 6 },
+  authButtonPressed: { opacity: 0.72, transform: [{ scale: 0.985 }] },
+  loginButtonText: { color: colors.cyan, fontFamily: fontFamilies.mono, fontSize: 8, fontWeight: "800", letterSpacing: 0.7 },
+  registerButtonText: { color: "#06101a", fontFamily: fontFamilies.mono, fontSize: 8, fontWeight: "900", letterSpacing: 0.7 },
+  authButtonTextNarrow: { fontSize: 7, letterSpacing: 0.35 },
+  scrollContent: { flexGrow: 1 },
+  content: { width: "100%", maxWidth: contentMaxWidth, alignSelf: "center", gap: 16, paddingHorizontal: 24 },
+  contentCompact: { paddingHorizontal: 8 },
+  dataSection: { width: "100%", gap: 16 },
+  entryHero: {
+    width: "100%",
+    justifyContent: "space-between",
+    gap: 16,
+    paddingTop: 18,
+    paddingBottom: 12,
+  },
+  entryHeroCompact: {
+    paddingTop: 32,
+    paddingBottom: 14,
+  },
+  priorityLayout: { width: "100%", flexDirection: "row", alignItems: "center", gap: 24 },
+  priorityLayoutViewport: { flexGrow: 1, flexShrink: 0 },
+  priorityLayoutStacked: { flexDirection: "column", gap: 16 },
+  priorityIntroColumn: { minWidth: 0, flexGrow: 1, flexShrink: 1, flexBasis: 0 },
+  priorityActionsColumn: { minWidth: 0, flexGrow: 1, flexShrink: 1, flexBasis: 0 },
+  priorityStackedColumn: { width: "100%", flexGrow: 0, flexShrink: 0, flexBasis: "auto" },
+  scrollCue: {
+    width: "100%",
+    alignItems: "center",
+    gap: 9,
+    paddingTop: 8,
+    paddingBottom: 2,
+  },
+  scrollCuePressed: {
+    opacity: 0.68,
+  },
+  scrollCueRail: {
+    width: "100%",
+    height: 1,
+    overflow: "hidden",
+    backgroundColor: "rgba(81,229,255,0.20)",
+  },
+  scrollCueScan: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: 180,
+    height: 1,
+    backgroundColor: colors.cyan,
+    shadowColor: colors.cyan,
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
+  },
+  scrollCueScanReduced: {
+    left: "43%",
+    width: "14%",
+  },
+  scrollCueLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  scrollCueLabel: {
+    color: colors.cyan,
+    fontFamily: fontFamilies.mono,
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+  },
+  scrollCueArrow: {
+    color: colors.cyan,
+    fontSize: 15,
+    lineHeight: 17,
+  },
+  fullWidth: { width: "100%" },
+  liveSection: { width: "100%" },
+  hero: { minHeight: 610, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 54, marginBottom: 24 },
+  situationIntro: { minHeight: 430, marginBottom: 0, paddingTop: 34, paddingHorizontal: 22, borderLeftWidth: 1, borderLeftColor: "rgba(81,229,255,0.25)" },
+  heroStacked: { flexDirection: "column", alignItems: "stretch", gap: 40, paddingTop: 12 },
+  heroCompact: { minHeight: 0, flexDirection: "column", alignItems: "stretch", justifyContent: "flex-start", gap: 34 },
+  heroCopy: { zIndex: 2, flex: 1 },
+  signalLabel: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 },
+  signalLine: { width: 28, height: 1, backgroundColor: colors.cyan },
+  signalText: { color: colors.cyan, fontFamily: fontFamilies.mono, fontSize: 10, fontWeight: "700", letterSpacing: 1.4 },
+  signalTextNarrow: { fontSize: 8, letterSpacing: 0.8 },
+  heroTitle: { color: colors.ink, fontSize: 118, fontWeight: "700", letterSpacing: -9, lineHeight: 96 },
+  heroTitleAccent: { color: colors.cyan },
+  heroTitleCompact: { fontSize: 70, letterSpacing: -5, lineHeight: 61 },
+  heroTitleMissionWide: { fontSize: 108, letterSpacing: -8, lineHeight: 92 },
+  heroTitleMissionCompact: { fontSize: 52, letterSpacing: -3.8, lineHeight: 54 },
+  heroTitleMissionNarrow: { fontSize: 41, letterSpacing: -3, lineHeight: 44 },
+  heroDescription: { maxWidth: 660, marginTop: 28, color: colors.inkSoft, fontSize: 16, lineHeight: 27 },
+  tags: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 24 },
+  tag: { paddingHorizontal: 11, paddingVertical: 8, borderWidth: 1, borderColor: colors.line, borderRadius: 5, backgroundColor: "rgba(16, 25, 40, 0.42)" },
+  tagActive: { borderColor: "rgba(67, 231, 173, 0.28)" },
+  tagText: { color: colors.inkSoft, fontFamily: fontFamilies.mono, fontSize: 8, letterSpacing: 0.8 },
+  tagTextActive: { color: colors.alive },
+  notice: { minHeight: 54, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: "rgba(255, 207, 102, 0.28)", borderRadius: 9, backgroundColor: "rgba(255, 207, 102, 0.07)" },
+  staleNotice: { borderColor: "rgba(255, 103, 136, 0.30)", backgroundColor: "rgba(255, 103, 136, 0.08)" },
+  staleNoticeText: { color: "#e6a3b2", fontSize: 11 },
+  summary: { flexDirection: "row", gap: 16 },
+  summaryTablet: { flexDirection: "column" },
+  primaryMetric: { position: "relative", minHeight: 500, flex: 1.6, justifyContent: "space-between", overflow: "hidden", padding: 40, borderWidth: 1, borderColor: "rgba(255, 207, 102, 0.22)", borderRadius: 14 },
+  primaryMetricTablet: { minHeight: 440 },
+  metricHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
+  metricIcon: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255, 207, 102, 0.24)", borderRadius: 8, backgroundColor: "rgba(255, 207, 102, 0.06)" },
+  metricHeaderText: { color: colors.inkSoft, fontFamily: fontFamilies.mono, fontSize: 9, fontWeight: "700", letterSpacing: 1.2 },
+  primaryMetricCopy: { zIndex: 2 },
+  metricCodeRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 9, marginBottom: 7 },
+  metricCode: { marginBottom: 7, color: "#927e52", fontFamily: fontFamilies.mono, fontSize: 8, letterSpacing: 1.2 },
+  metricCodeInline: { marginBottom: 0 },
+  testScenarioLabel: { paddingHorizontal: 6, paddingVertical: 3, borderWidth: 1, borderColor: "rgba(137,166,207,0.18)", borderRadius: 4, backgroundColor: "rgba(137,166,207,0.05)", color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 7, fontWeight: "700", letterSpacing: 0.7 },
+  primaryValue: { color: colors.missing, fontSize: 150, fontWeight: "700", letterSpacing: -11, lineHeight: 132 },
+  primaryValueCompact: { fontSize: 88, letterSpacing: -6, lineHeight: 80 },
+  primaryLabel: { marginBottom: 8, color: colors.ink, fontSize: 47, fontWeight: "500", letterSpacing: -2.5 },
+  primaryDescription: { maxWidth: 490, color: colors.inkSoft, fontSize: 13, lineHeight: 21 },
+  signalBars: { position: "absolute", right: 30, bottom: 28, height: 105, flexDirection: "row", alignItems: "flex-end", gap: 4, opacity: 0.38 },
+  signalBar: { width: 2, backgroundColor: colors.cyan },
+  secondaryMetrics: { flex: 0.75, gap: 16 },
+  secondaryMetricsTablet: { flexDirection: "row" },
+  secondaryMetricsCompact: { flexDirection: "column" },
+  secondaryMetric: { position: "relative", minHeight: 150, flex: 1, justifyContent: "flex-end", overflow: "hidden", padding: 23, borderWidth: 1, borderColor: colors.line, borderRadius: 12, backgroundColor: colors.panel },
+  metricAccent: { position: "absolute", top: 22, bottom: 22, left: 0, width: 2 },
+  secondaryCode: { position: "absolute", top: 18, right: 18, fontFamily: fontFamilies.mono, fontSize: 7, letterSpacing: 1, opacity: 0.55 },
+  secondaryLabel: { marginBottom: 5, color: colors.inkSoft, fontSize: 10, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase" },
+  secondaryValue: { color: colors.ink, fontSize: 54, fontWeight: "600", letterSpacing: -3.5, lineHeight: 57 },
+  secondaryNote: { marginTop: 4, color: colors.inkDim, fontSize: 9 },
+  analysis: { position: "relative", flexDirection: "row", alignItems: "center", gap: 56, overflow: "hidden", padding: 42, borderWidth: 1, borderColor: colors.line, borderRadius: 14, backgroundColor: colors.panel },
+  analysisTablet: { flexDirection: "column", alignItems: "stretch" },
+  analysisCopy: { width: 300 },
+  analysisCopyTablet: { width: "100%", maxWidth: 600 },
+  panelCode: { position: "absolute", top: 18, right: 22, color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 8, letterSpacing: 1.2 },
+  eyebrow: { marginBottom: 11, color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 10, fontWeight: "700", letterSpacing: 1.5 },
+  sectionTitle: { marginBottom: 12, color: colors.ink, fontSize: 47, fontWeight: "500", letterSpacing: -2.4, lineHeight: 48 },
+  bodyCopy: { maxWidth: 450, color: colors.inkSoft, fontSize: 13, lineHeight: 22 },
+  footerShell: {
+    width: "100%",
+    marginTop: 32,
+    backgroundColor: "#010204",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(137, 166, 207, 0.20)",
+  },
+  footerShellCompact: { marginTop: 24 },
+  footerInner: {
+    width: "100%",
+    maxWidth: contentMaxWidth,
+    alignSelf: "center",
+    gap: 30,
+    paddingHorizontal: 34,
+    paddingTop: 48,
+    paddingBottom: 26,
+  },
+  footerInnerCompact: { gap: 24, paddingHorizontal: 20, paddingTop: 36 },
+  footerMain: { flexDirection: "row", justifyContent: "space-between", gap: 80 },
+  footerMainCompact: { flexDirection: "column", gap: 32 },
+  footerIdentity: { flex: 1, maxWidth: 650 },
+  footerEyebrow: {
+    marginBottom: 10,
+    color: colors.cyan,
+    fontFamily: fontFamilies.mono,
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 1.3,
+  },
+  footerTitle: { color: colors.ink, fontSize: 25, fontWeight: "700", letterSpacing: -0.8 },
+  footerDescription: {
+    maxWidth: 590,
+    marginTop: 13,
+    color: colors.inkSoft,
+    fontSize: 13,
+    lineHeight: 21,
+  },
+  footerAlliance: {
+    marginTop: 18,
+    color: colors.inkDim,
+    fontFamily: fontFamilies.mono,
+    fontSize: 8,
+    lineHeight: 14,
+    letterSpacing: 0.75,
+  },
+  footerNavigation: { flexDirection: "row", gap: 64 },
+  footerNavigationCompact: { flexWrap: "wrap", gap: 36 },
+  footerColumn: { minWidth: 150 },
+  footerColumnTitle: {
+    marginBottom: 13,
+    color: colors.inkDim,
+    fontFamily: fontFamilies.mono,
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 1.1,
+  },
+  footerLinks: { gap: 6 },
+  footerLink: { alignSelf: "flex-start", paddingVertical: 5 },
+  footerLinkPressed: { opacity: 0.62 },
+  footerLinkText: { color: "#c4cfdd", fontSize: 12, fontWeight: "600" },
+  footerNotice: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 18,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(137, 166, 207, 0.13)",
+  },
+  footerNoticeCompact: { flexDirection: "column", gap: 8 },
+  footerNoticeLabel: {
+    color: colors.missing,
+    fontFamily: fontFamilies.mono,
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  footerNoticeText: { flex: 1, color: colors.inkDim, fontSize: 10, lineHeight: 16 },
+  footerBottom: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 20,
+    paddingTop: 19,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(137, 166, 207, 0.13)",
+  },
+  footerBottomCompact: { flexDirection: "column", gap: 8 },
+  footerMeta: {
+    color: "#465267",
+    fontFamily: fontFamilies.mono,
+    fontSize: 7,
+    letterSpacing: 0.75,
+  },
+});
