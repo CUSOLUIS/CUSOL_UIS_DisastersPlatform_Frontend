@@ -258,8 +258,8 @@ describe("App universal", () => {
       "situation-human-priority",
       "person-search-priority",
     ]);
-    expect(within(missionIntro).getByText("Misión")).toBeTruthy();
-    expect(within(missionIntro).getByText("Humanitaria")).toBeTruthy();
+    expect(within(missionIntro).getByText("Mariana")).toBeTruthy();
+    expect(within(missionIntro).getByText("es boba")).toBeTruthy();
     expect(
       within(missionIntro).getByText("CENTRO DIGITAL DE AYUDA Y MONITOREO"),
     ).toBeTruthy();

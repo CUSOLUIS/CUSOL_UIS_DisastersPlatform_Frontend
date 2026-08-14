@@ -777,10 +777,10 @@ function SituationIntro({
           </Text>
         </View>
         <Text style={missionTitleStyle} accessibilityRole="header">
-          Misión
+          Mariana
         </Text>
         <Text style={[missionTitleStyle, styles.heroTitleAccent]}>
-          Humanitaria
+          es boba
         </Text>
         <Text style={styles.heroDescription}>
           Unimos datos verificables y reportes ciudadanos para localizar personas,
