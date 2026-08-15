@@ -20,7 +20,6 @@ export type UnverifiedBuildingReportPayload = Record<
 
 const OPTIONAL_TEXT_FIELDS = [
   "address",
-  "relatedDisasterId",
   "observedTime",
   "reporterOrganization",
   "reporterPhone",
@@ -57,6 +56,14 @@ export function buildBuildingReportPayload(
       payload[field] = value;
     }
   });
+
+  // CHG-092: selección → id; texto libre → nombre (el backend
+  // deduplica o crea el evento). Nunca ambos.
+  if (draft.relatedEventId.trim()) {
+    payload.relatedDisasterId = draft.relatedEventId.trim();
+  } else if (draft.relatedEventName.trim()) {
+    payload.relatedEventName = draft.relatedEventName.trim();
+  }
 
   const latitude = Number.parseFloat(draft.latitude.trim());
   const longitude = Number.parseFloat(draft.longitude.trim());

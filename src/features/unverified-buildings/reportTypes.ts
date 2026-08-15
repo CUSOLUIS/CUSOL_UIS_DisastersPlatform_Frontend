@@ -48,7 +48,10 @@ export interface UnverifiedBuildingReportDraft {
   address: string;
   latitude: string;
   longitude: string;
-  relatedDisasterId: string;
+  // CHG-092: o el UUID del evento seleccionado, o el nombre escrito
+  // para que el backend lo resuelva o cree.
+  relatedEventId: string;
+  relatedEventName: string;
   observedDate: string;
   observedTime: string;
   searchStatus: BuildingSearchStatus;

@@ -28,6 +28,11 @@ import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { DatePickerField } from "../../components/DatePickerField";
 import { TimePickerField } from "../../components/TimePickerField";
 import { ReportConsiderations } from "../reporting/ReportConsiderations";
+import { RelatedEventField } from "./RelatedEventField";
+import {
+  relatedEventsDataSource,
+  type RelatedEventsDataSource,
+} from "./relatedEvents";
 import { reportActionCatalog } from "../reporting/reportActionCatalog";
 import {
   useSessionAccount,
@@ -58,7 +63,8 @@ export const initialUnverifiedBuildingDraft: UnverifiedBuildingReportDraft = {
   address: "",
   latitude: "",
   longitude: "",
-  relatedDisasterId: "",
+  relatedEventId: "",
+  relatedEventName: "",
   observedDate: "",
   observedTime: "",
   searchStatus: "unknown",
@@ -142,6 +148,8 @@ interface UnverifiedBuildingReportFormProps {
   // CHG-078: fuente de sesión inyectable en pruebas.
   sessionSource?: SessionAccountSource;
   pickPhotos?: () => Promise<SelectedPhoto[]>;
+  // CHG-092: fuente de eventos inyectable en pruebas.
+  relatedEventsSource?: RelatedEventsDataSource;
   submitReport?: (
     draft: UnverifiedBuildingReportDraft,
     photos: SelectedPhoto[],
@@ -170,6 +178,7 @@ export function UnverifiedBuildingReportForm({
   onLogin,
   sessionSource,
   pickPhotos = defaultPickPhotos,
+  relatedEventsSource = relatedEventsDataSource,
   submitReport = submitUnverifiedBuildingReport,
 }: UnverifiedBuildingReportFormProps) {
   const { width } = useWindowDimensions();
@@ -410,12 +419,18 @@ export function UnverifiedBuildingReportForm({
                   value={draft.observedTime}
                   onChange={(value) => setField("observedTime", value)}
                 />
-                <FormField
-                  label="ID del evento relacionado"
-                  hint="UUID opcional"
-                  autoCapitalize="none"
-                  value={draft.relatedDisasterId}
-                  onChangeText={(value) => setField("relatedDisasterId", value)}
+                <RelatedEventField
+                  selectedEventId={draft.relatedEventId}
+                  eventName={draft.relatedEventName}
+                  onSelect={(eventId, title) => {
+                    setField("relatedEventId", eventId);
+                    setField("relatedEventName", title);
+                  }}
+                  onNameChange={(value) => {
+                    setField("relatedEventId", "");
+                    setField("relatedEventName", value);
+                  }}
+                  dataSource={relatedEventsSource}
                 />
               </FieldGrid>
               <ChoiceGroup
@@ -738,14 +753,6 @@ export function validateUnverifiedBuildingDraft(
     !/^([01]\d|2[0-3]):[0-5]\d$/.test(draft.observedTime)
   ) {
     errors.push("La hora debe usar el formato HH:MM de 24 horas.");
-  }
-  if (
-    draft.relatedDisasterId.trim() &&
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      draft.relatedDisasterId.trim(),
-    )
-  ) {
-    errors.push("El ID del evento relacionado no tiene formato UUID válido.");
   }
 
   const hasLatitude = Boolean(draft.latitude.trim());

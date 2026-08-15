@@ -77,13 +77,14 @@ describe("CHG-035 · Reporte de edificio con búsqueda pendiente", () => {
     expect(submitReport).not.toHaveBeenCalled();
   });
 
-  it("valida coordenadas emparejadas, fecha real y UUID opcional", () => {
+  it("valida coordenadas emparejadas y fecha real; el evento ya no exige UUID", () => {
     const errors = validateUnverifiedBuildingDraft(
       {
         ...initialUnverifiedBuildingDraft,
         observedDate: "2026-02-30",
         latitude: "7.12",
-        relatedDisasterId: "evento-12",
+        // CHG-092: texto libre — el backend lo resuelve o crea.
+        relatedEventName: "Sismo en el Centro",
       },
       [validPhoto],
     );
@@ -94,9 +95,9 @@ describe("CHG-035 · Reporte de edificio con búsqueda pendiente", () => {
     expect(errors).toContain(
       "Completa latitud y longitud juntas o deja ambas vacías.",
     );
-    expect(errors).toContain(
-      "El ID del evento relacionado no tiene formato UUID válido.",
-    );
+    expect(
+      errors.some((message) => message.includes("UUID")),
+    ).toBe(false);
   });
 
   it("permite reportar una observación ocurrida hoy", () => {

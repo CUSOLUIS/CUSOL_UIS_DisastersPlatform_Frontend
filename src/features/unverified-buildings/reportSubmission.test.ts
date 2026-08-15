@@ -16,7 +16,8 @@ const completeDraft: UnverifiedBuildingReportDraft = {
   address: "Calle 10 # 12-30",
   latitude: "7.11935",
   longitude: "-73.12274",
-  relatedDisasterId: "",
+  relatedEventId: "",
+  relatedEventName: "",
   observedDate: "2026-08-13",
   observedTime: "14:20",
   searchStatus: "incomplete",
@@ -77,6 +78,7 @@ describe("CHG-035 · Payload de edificio", () => {
     expect(payload.reporterPhone).toBe("+57 3001234567");
     expect(payload).not.toHaveProperty("reporterEmail");
     expect(payload).not.toHaveProperty("relatedDisasterId");
+    expect(payload).not.toHaveProperty("relatedEventName");
   });
 
   it("omite coordenadas cuando la pareja está incompleta", () => {
@@ -148,5 +150,37 @@ describe("CHG-035 · Idempotencia", () => {
     const key = createBuildingReportIdempotencyKey();
     expect(key.length).toBeGreaterThanOrEqual(16);
     expect(key.length).toBeLessThanOrEqual(128);
+  });
+});
+
+/**
+ * CHG-092 — Evento relacionado creable: la selección viaja como id,
+ * el texto libre como nombre, nunca ambos.
+ */
+describe("evento relacionado (CHG-092)", () => {
+  it("la selección viaja como relatedDisasterId", () => {
+    const payload = buildBuildingReportPayload({
+      ...completeDraft,
+      relatedEventId: "77777777-7777-4777-8777-777777777701",
+      relatedEventName: "Sismo en el Centro",
+    });
+
+    expect(payload.relatedDisasterId).toBe(
+      "77777777-7777-4777-8777-777777777701",
+    );
+    expect(payload).not.toHaveProperty("relatedEventName");
+  });
+
+  it("el texto libre viaja como relatedEventName", () => {
+    const payload = buildBuildingReportPayload({
+      ...completeDraft,
+      relatedEventId: "",
+      relatedEventName: "Vendaval en el barrio La Cumbre",
+    });
+
+    expect(payload.relatedEventName).toBe(
+      "Vendaval en el barrio La Cumbre",
+    );
+    expect(payload).not.toHaveProperty("relatedDisasterId");
   });
 });
