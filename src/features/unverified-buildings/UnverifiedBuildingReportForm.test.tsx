@@ -267,3 +267,50 @@ describe('Detalle de "Otro motivo" (CHG-093)', () => {
     ).toBe(false);
   });
 });
+
+/**
+ * CHG-095 — "Radicado o reporte oficial": opcional y con ayuda
+ * contextual junto a la etiqueta.
+ */
+describe("Radicado o reporte oficial (CHG-095)", () => {
+  it("no bloquea el envío cuando queda vacío", () => {
+    const errors = validateUnverifiedBuildingDraft(
+      {
+        ...initialUnverifiedBuildingDraft,
+        buildingReference: "Edificio Torre Norte",
+        department: "Santander",
+        municipality: "Bucaramanga",
+        sector: "Colorados",
+        locationReference: "Frente al parque",
+        observedDate: "2026-08-13",
+        observationDescription:
+          "Acceso bloqueado por escombros; nadie ha revisado el lugar.",
+        pendingReasons: ["access_blocked"],
+        reporterName: "Reportante Demo",
+        reporterRole: "Vecino",
+        reporterPhone: "+57 3001234567",
+        officialReportNumber: "",
+        truthConfirmed: true,
+        photoAuthorizationConfirmed: true,
+        reviewAcknowledged: true,
+      },
+      [validPhoto],
+    );
+
+    expect(errors).toEqual([]);
+  });
+
+  it("explica para qué sirve el campo desde el icono de ayuda", () => {
+    render(<UnverifiedBuildingReportForm onBack={jest.fn()} />);
+
+    fireEvent.press(
+      screen.getByRole("button", {
+        name: "Qué es Radicado o reporte oficial",
+      }),
+    );
+
+    expect(
+      screen.getByText(/número de radicado/i),
+    ).toBeTruthy();
+  });
+});

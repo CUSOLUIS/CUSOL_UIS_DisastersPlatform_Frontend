@@ -28,6 +28,7 @@ import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { DatePickerField } from "../../components/DatePickerField";
 import { TimePickerField } from "../../components/TimePickerField";
 import { ReportConsiderations } from "../reporting/ReportConsiderations";
+import { FieldHelpTooltip } from "../../components/FieldHelpTooltip";
 import { RelatedEventField } from "./RelatedEventField";
 import {
   relatedEventsDataSource,
@@ -552,6 +553,8 @@ export function UnverifiedBuildingReportForm({
                 />
                 <FormField
                   label="Radicado o reporte oficial"
+                  hint="Opcional"
+                  help="Si existe un proceso, expediente o reporte oficial gestionado por entidades gubernamentales o de socorro para este incidente, ingresa aquí su código o número de radicado."
                   value={draft.officialReportNumber}
                   onChangeText={(value) =>
                     setField("officialReportNumber", value)
@@ -885,6 +888,8 @@ type FormFieldProps = {
   multiline?: boolean;
   // CHG-093: placeholder propio (por defecto "Escribe aquí").
   placeholder?: string;
+  // CHG-095: ayuda contextual junto a la etiqueta.
+  help?: string;
   keyboardType?:
     | "default"
     | "phone-pad"
@@ -898,12 +903,16 @@ function FormField({
   label,
   hint,
   multiline = false,
+  help,
   ...inputProps
 }: FormFieldProps) {
   return (
     <View style={[styles.field, multiline && styles.fieldWide]}>
       <View style={styles.fieldLabelRow}>
-        <Text style={styles.fieldLabel}>{label}</Text>
+        <View style={styles.fieldLabelWithHelp}>
+          <Text style={styles.fieldLabel}>{label}</Text>
+          {help && <FieldHelpTooltip label={label} help={help} />}
+        </View>
         {hint && <Text style={styles.fieldHint}>{hint}</Text>}
       </View>
       <TextInput
@@ -1265,6 +1274,14 @@ const styles = StyleSheet.create({
   fieldGridCompact: { flexDirection: "column" },
   field: { minWidth: 250, flex: 1, gap: 7 },
   fieldWide: { minWidth: "100%" },
+  // CHG-095: la etiqueta y su ayuda comparten fila sin empujar el
+  // ancho del campo; el popover flota en absoluto.
+  fieldLabelWithHelp: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexShrink: 1,
+  },
   fieldLabelRow: {
     flexDirection: "row",
     alignItems: "center",
