@@ -49,9 +49,17 @@ export function validatePublicOverview(
   return overview;
 }
 
+// El resumen se recalcula siempre desde los puntos, así que un backend
+// anterior (sin las categorías nuevas de CHG-049) sigue siendo válido.
 type LegacyOperationalMapOverview = Omit<OperationalMapOverview, "summary"> & {
-  summary: Omit<OperationalMapSummary, "buildingPending"> & {
+  summary: Omit<
+    OperationalMapSummary,
+    "buildingPending" | "collectionPoint" | "communityMeal" | "temporaryShelter"
+  > & {
     buildingPending?: number;
+    collectionPoint?: number;
+    communityMeal?: number;
+    temporaryShelter?: number;
   };
 };
 
@@ -63,9 +71,12 @@ export function normalizeOperationalMapOverview(
   const summary: OperationalMapSummary = {
     missingPerson: 0,
     collectionCenter: 0,
+    collectionPoint: 0,
     rubbleReviewed: 0,
     rubblePending: 0,
     buildingPending: 0,
+    communityMeal: 0,
+    temporaryShelter: 0,
   };
 
   items.forEach((point) => {
@@ -76,6 +87,9 @@ export function normalizeOperationalMapOverview(
       case "collection_center":
         summary.collectionCenter += 1;
         break;
+      case "collection_point":
+        summary.collectionPoint += 1;
+        break;
       case "rubble_reviewed":
         summary.rubbleReviewed += 1;
         break;
@@ -84,6 +98,12 @@ export function normalizeOperationalMapOverview(
         break;
       case "building_pending":
         summary.buildingPending += 1;
+        break;
+      case "community_meal":
+        summary.communityMeal += 1;
+        break;
+      case "temporary_shelter":
+        summary.temporaryShelter += 1;
         break;
     }
   });

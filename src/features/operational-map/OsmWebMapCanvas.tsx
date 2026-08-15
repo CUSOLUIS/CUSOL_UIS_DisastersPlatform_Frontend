@@ -59,7 +59,7 @@ export function OsmWebMapCanvas(props: OperationalMapCanvasProps) {
   );
   const [size, setSize] = useState<CanvasSize>({
     width: props.compact ? 360 : 1180,
-    height: props.compact ? 370 : 480,
+    height: props.canvasMinHeight ?? (props.compact ? 370 : 480),
   });
 
   const tiles = useMemo(
@@ -126,7 +126,13 @@ export function OsmWebMapCanvas(props: OperationalMapCanvasProps) {
       accessibilityLabel={`Mapa OpenStreetMap con ${props.points.length} puntos operativos`}
       onLayout={handleLayout}
       ref={attachMouseInteractions}
-      style={[styles.canvas, props.compact && styles.canvasCompact]}
+      style={[
+        styles.canvas,
+        props.compact && styles.canvasCompact,
+        props.canvasMinHeight !== undefined && {
+          minHeight: props.canvasMinHeight,
+        },
+      ]}
     >
       <View style={styles.tileLayer} accessibilityElementsHidden>
         {tiles.map((tile) => (

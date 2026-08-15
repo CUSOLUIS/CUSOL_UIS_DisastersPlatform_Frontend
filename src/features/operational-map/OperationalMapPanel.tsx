@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { colors, fontFamilies } from "../../theme";
 import type { HumanStatus } from "../human-impact/types";
@@ -21,7 +22,6 @@ import type {
   OperationalMapCategory,
   OperationalMapDataSource,
   OperationalMapOverview,
-  OperationalMapPoint,
 } from "./types";
 import { humanMapStatuses, operationalResponseCategories } from "./types";
 import {
@@ -67,6 +67,23 @@ const INITIAL_HUMAN_VIEWPORT: HumanMapViewport = {
   bounds: COLOMBIA_BOUNDS,
   zoom: 5,
 };
+
+// CHG-049: alto aproximado del encabezado del dashboard más los
+// controles que acompañan al lienzo (situación humana + filtros de
+// respuesta y rellenos del panel), para que toda la sección quepa en
+// una pantalla sin reacomodar nada.
+export const MAP_SECTION_CHROME_HEIGHT = 470;
+
+export function getMapCanvasMinHeight(
+  viewportHeight: number,
+  compact: boolean,
+): number {
+  if (compact) return 370;
+  return Math.max(
+    340,
+    Math.min(560, viewportHeight - MAP_SECTION_CHROME_HEIGHT),
+  );
+}
 
 export function OperationalMapPanel({
   dataSource,
@@ -276,12 +293,8 @@ function MapContent({
     );
   };
 
-  const accessibleSummary = visiblePoints
-    .map((point) => {
-      const meta = categoryMeta[point.category];
-      return `${meta.label}: ${point.title}, ${point.locationLabel}`;
-    })
-    .join(". ");
+  const { height: viewportHeight } = useWindowDimensions();
+  const canvasMinHeight = getMapCanvasMinHeight(viewportHeight, compact);
 
   return (
     <MapFrame
@@ -299,6 +312,7 @@ function MapContent({
         selectedId={selectedPoint?.id ?? null}
         onSelect={handleSelect}
         compact={compact}
+        canvasMinHeight={canvasMinHeight}
         humanFeatures={humanFeatures}
         selectedHumanFeatureId={selectedHumanFeature?.id ?? null}
         onSelectHumanFeature={setSelectedHumanFeatureId}
@@ -367,28 +381,6 @@ function MapContent({
         </View>
       </View>
 
-      <View
-        accessible
-        accessibilityLabel={`${visiblePoints.length} ubicaciones de respuesta e infraestructura visibles. ${accessibleSummary}`}
-        style={styles.mapCount}
-      >
-        <Text style={styles.mapCountText}>
-          {visiblePoints.length.toString().padStart(2, "0")} UBICACIONES OPERATIVAS
-        </Text>
-        <Text style={styles.mapTime}>
-          CORTE {dateFormatter.format(new Date(data.generatedAt)).toUpperCase()}
-        </Text>
-      </View>
-
-      {selectedPoint ? (
-        <PointDetail point={selectedPoint} />
-      ) : (
-        <View style={styles.noSelection}>
-          <Text style={styles.noSelectionText}>
-            Activa una categoría para consultar sus ubicaciones.
-          </Text>
-        </View>
-      )}
     </MapFrame>
   );
 }
@@ -599,30 +591,6 @@ function HumanFeatureDetail({ feature }: { feature: HumanMapFeature }) {
         <Text style={styles.humanDetailMeta}>{verificationLabels[feature.verificationStatus]}</Text>
         <Text style={styles.humanDetailMeta}>{feature.source.name}</Text>
         <Text style={styles.humanDetailMeta}>{dateFormatter.format(new Date(feature.updatedAt))}</Text>
-      </View>
-    </View>
-  );
-}
-
-function PointDetail({ point }: { point: OperationalMapPoint }) {
-  const meta = categoryMeta[point.category];
-
-  return (
-    <View style={styles.detail} testID="operational-map-detail">
-      <View style={[styles.detailAccent, { backgroundColor: meta.color }]} />
-      <View style={styles.detailMain}>
-        <Text style={[styles.detailCategory, { color: meta.color }]}>{meta.shortLabel}</Text>
-        <Text style={styles.detailTitle}>{point.title}</Text>
-        <Text style={styles.detailLocation}>{point.locationLabel}</Text>
-        {point.description && <Text style={styles.detailDescription}>{point.description}</Text>}
-      </View>
-      <View style={styles.detailMeta}>
-        <Text style={styles.detailMetaText}>{verificationLabels[point.verificationStatus]}</Text>
-        <Text style={styles.detailMetaText}>{precisionLabels[point.coordinatePrecision]}</Text>
-        <Text style={styles.detailMetaText}>{point.source.name}</Text>
-        <Text style={styles.detailMetaText}>
-          {dateFormatter.format(new Date(point.updatedAt))}
-        </Text>
       </View>
     </View>
   );

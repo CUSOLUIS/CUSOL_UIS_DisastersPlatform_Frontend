@@ -210,7 +210,13 @@ export function OperationalMapCanvas(props: OperationalMapCanvasProps) {
   return (
     <View
       ref={attachMouseInteractions}
-      style={[styles.container, props.compact && styles.containerCompact]}
+      style={[
+        styles.container,
+        props.compact && styles.containerCompact,
+        props.canvasMinHeight !== undefined && {
+          minHeight: props.canvasMinHeight,
+        },
+      ]}
     >
       <View
         ref={(node) => {

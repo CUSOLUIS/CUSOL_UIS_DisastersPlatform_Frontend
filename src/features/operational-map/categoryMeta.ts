@@ -10,9 +10,12 @@ interface CategoryMeta {
   summaryKey:
     | "missingPerson"
     | "collectionCenter"
+    | "collectionPoint"
     | "rubbleReviewed"
     | "rubblePending"
-    | "buildingPending";
+    | "buildingPending"
+    | "communityMeal"
+    | "temporaryShelter";
 }
 
 export const categoryMeta: Record<OperationalMapCategory, CategoryMeta> = {
@@ -31,6 +34,16 @@ export const categoryMeta: Record<OperationalMapCategory, CategoryMeta> = {
     color: colors.cyan,
     markerKind: "person",
     summaryKey: "collectionCenter",
+  },
+  // CHG-049: categorías de las acciones comunitarias recientes, con
+  // colores propios que no chocan con las categorías previas.
+  collection_point: {
+    label: "Puntos de recolección",
+    shortLabel: "Punto de recolección",
+    glyph: "▲",
+    color: colors.deceased,
+    markerKind: "person",
+    summaryKey: "collectionPoint",
   },
   rubble_reviewed: {
     label: "Escombros revisados",
@@ -55,5 +68,21 @@ export const categoryMeta: Record<OperationalMapCategory, CategoryMeta> = {
     color: colors.building,
     markerKind: "building",
     summaryKey: "buildingPending",
+  },
+  community_meal: {
+    label: "Comida comunitaria",
+    shortLabel: "Oferta de comida comunitaria",
+    glyph: "♨",
+    color: "#a3e635",
+    markerKind: "person",
+    summaryKey: "communityMeal",
+  },
+  temporary_shelter: {
+    label: "Alojamiento temporal",
+    shortLabel: "Oferta de alojamiento temporal",
+    glyph: "⌂",
+    color: "#f28dd0",
+    markerKind: "building",
+    summaryKey: "temporaryShelter",
   },
 };

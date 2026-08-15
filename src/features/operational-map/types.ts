@@ -3,18 +3,27 @@ import type { HumanStatus, SourceType } from "../human-impact/types";
 export const operationalMapCategories = [
   "missing_person",
   "collection_center",
+  "collection_point",
   "rubble_reviewed",
   "rubble_pending",
   "building_pending",
+  "community_meal",
+  "temporary_shelter",
 ] as const;
 
 export type OperationalMapCategory = (typeof operationalMapCategories)[number];
 
+// CHG-049: los puntos de recolección y las ofertas comunitarias tienen
+// su categoría lista; sus marcadores aparecerán cuando la moderación
+// publique ubicaciones (las ofertas siguen bloqueadas por DEC-021).
 export const operationalResponseCategories = [
   "collection_center",
+  "collection_point",
   "rubble_reviewed",
   "rubble_pending",
   "building_pending",
+  "community_meal",
+  "temporary_shelter",
 ] as const satisfies readonly OperationalMapCategory[];
 
 export type CoordinatePrecision = "exact" | "approximate" | "municipality";
@@ -46,9 +55,12 @@ export interface OperationalMapPoint {
 export interface OperationalMapSummary {
   missingPerson: number;
   collectionCenter: number;
+  collectionPoint: number;
   rubbleReviewed: number;
   rubblePending: number;
   buildingPending: number;
+  communityMeal: number;
+  temporaryShelter: number;
 }
 
 export interface OperationalMapOverview {
@@ -147,6 +159,9 @@ export interface OperationalMapCanvasProps {
   selectedId: string | null;
   onSelect: (pointId: string) => void;
   compact: boolean;
+  // CHG-049: alto del lienzo ajustado al viewport para que toda la
+  // sección del mapa quepa en una pantalla.
+  canvasMinHeight?: number;
   humanFeatures?: HumanMapFeature[];
   selectedHumanFeatureId?: string | null;
   onSelectHumanFeature?: (featureId: string) => void;

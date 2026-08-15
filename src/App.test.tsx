@@ -850,7 +850,7 @@ describe("App universal", () => {
     expect(screen.getByText(/No fue posible actualizar los datos/)).toBeTruthy();
   });
 
-  it("separa personas de las cuatro categorías de respuesta e infraestructura", async () => {
+  it("separa personas de las categorías de respuesta e infraestructura", async () => {
     render(<App dataSource={demoDataSource} mapDataSource={demoMapDataSource} />);
 
     expect(await screen.findByText("DATOS DEMO")).toBeTruthy();
@@ -876,7 +876,9 @@ describe("App universal", () => {
       });
     expect(
       screen.getAllByTestId("building-marker-icon", { includeHiddenElements: true }),
-    ).toHaveLength(3);
+      // CHG-049: chip de edificios + 2 marcadores demo + chip de
+      // alojamiento temporal (también con icono de edificio).
+    ).toHaveLength(4);
   });
 
   it("representa las 2.012 personas distribuidas por Colombia en clusters trazables", async () => {
@@ -943,19 +945,45 @@ describe("App universal", () => {
     ).toBeTruthy();
   });
 
-  it("mantiene filtros, mapa y contador sobre el mismo subconjunto", async () => {
+  it("mantiene filtros y mapa sobre el mismo subconjunto sin listado inferior", async () => {
     render(<App dataSource={demoDataSource} mapDataSource={demoMapDataSource} />);
 
-    await screen.findByText("08 UBICACIONES OPERATIVAS");
+    await waitFor(() =>
+      expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(8),
+    );
+    // CHG-049: el bloque "UBICACIONES OPERATIVAS" y el detalle inferior
+    // se retiraron; el mapa y sus filtros son la única superficie.
+    expect(screen.queryByText(/UBICACIONES OPERATIVAS/)).toBeNull();
+    expect(
+      screen.queryByText("Activa una categoría para consultar sus ubicaciones."),
+    ).toBeNull();
+
     fireEvent.press(
       screen.getByRole("button", { name: "Filtrar mapa por Centros de acopio" }),
     );
 
     expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(6);
-    expect(screen.getByText("06 UBICACIONES OPERATIVAS")).toBeTruthy();
   });
 
-  it("filtra únicamente los edificios sin revisar y muestra su semántica", async () => {
+  it("expone las categorías comunitarias nuevas como filtros del mapa", async () => {
+    render(<App dataSource={demoDataSource} mapDataSource={demoMapDataSource} />);
+
+    expect(
+      await screen.findByRole("button", {
+        name: "Filtrar mapa por Puntos de recolección",
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Filtrar mapa por Comida comunitaria" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", {
+        name: "Filtrar mapa por Alojamiento temporal",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("filtra únicamente los edificios sin revisar y permite seleccionarlos", async () => {
     render(<App dataSource={demoDataSource} mapDataSource={demoMapDataSource} />);
 
     const buildingFilter = await screen.findByRole("button", {
@@ -963,17 +991,13 @@ describe("App universal", () => {
     });
     fireEvent.press(buildingFilter);
     expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(6);
-    expect(screen.getByText("06 UBICACIONES OPERATIVAS")).toBeTruthy();
 
     fireEvent.press(buildingFilter);
-    fireEvent.press(
-      screen.getByRole("button", {
-        name: "Edificios sin revisar: Edificio comunitario demo 01, Floridablanca, Santander",
-      }),
-    );
-    expect(screen.getByText("Inspección de edificio pendiente")).toBeTruthy();
-    expect(screen.getByText("Inventario estructural frontend demo")).toBeTruthy();
-    expect(screen.getByText(/No declara que el edificio sea inseguro/)).toBeTruthy();
+    const buildingMarker = screen.getByRole("button", {
+      name: "Edificios sin revisar: Edificio comunitario demo 01, Floridablanca, Santander",
+    });
+    fireEvent.press(buildingMarker);
+    expect(buildingMarker.props.accessibilityState.selected).toBe(true);
   });
 
   it("ofrece controles de zoom accesibles y conserva el encuadre nacional al alejar", async () => {
@@ -989,18 +1013,18 @@ describe("App universal", () => {
     expect(screen.getByRole("button", { name: "Alejar mapa" }).props.accessibilityState.disabled).toBe(true);
   });
 
-  it("muestra el detalle trazable del punto seleccionado", async () => {
+  it("marca como seleccionado el punto elegido sin panel de detalle inferior", async () => {
     render(<App dataSource={demoDataSource} mapDataSource={demoMapDataSource} />);
 
-    fireEvent.press(
-      await screen.findByRole("button", {
-        name: "Centros de acopio: Centro de acopio Norte, Bogotá, Distrito Capital",
-      }),
-    );
+    const marker = await screen.findByRole("button", {
+      name: "Centros de acopio: Centro de acopio Norte, Bogotá, Distrito Capital",
+    });
+    fireEvent.press(marker);
 
-    expect(screen.getByText("Centro de acopio Norte")).toBeTruthy();
-    expect(screen.getByText("Logística territorial demo")).toBeTruthy();
-    expect(screen.getByText("Coordenada exacta")).toBeTruthy();
+    // CHG-049: el panel de detalle inferior se retiró; la selección
+    // vive en el propio marcador.
+    expect(marker.props.accessibilityState.selected).toBe(true);
+    expect(screen.queryByTestId("operational-map-detail")).toBeNull();
   });
 
   it("mantiene el dashboard humano si falla solo el mapa", async () => {
@@ -1028,7 +1052,7 @@ describe("App universal", () => {
 
     render(<App dataSource={demoDataSource} mapDataSource={updatingMapSource} />);
     await act(async () => Promise.resolve());
-    expect(screen.getByText("08 UBICACIONES OPERATIVAS")).toBeTruthy();
+    expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(8);
 
     await act(async () => {
       jest.advanceTimersByTime(30_000);
@@ -1036,7 +1060,7 @@ describe("App universal", () => {
     });
 
     expect(screen.getByText("DESACTUALIZADO")).toBeTruthy();
-    expect(screen.getByText("08 UBICACIONES OPERATIVAS")).toBeTruthy();
+    expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(8);
   });
 
   it("no inventa puntos operativos aunque la capa humana sí tenga clusters", async () => {
@@ -1046,9 +1070,12 @@ describe("App universal", () => {
         summary: {
           missingPerson: 0,
           collectionCenter: 0,
+          collectionPoint: 0,
           rubbleReviewed: 0,
           rubblePending: 0,
           buildingPending: 0,
+          communityMeal: 0,
+          temporaryShelter: 0,
         },
         items: [],
         generatedAt: "2026-08-12T18:30:00.000Z",
@@ -1058,10 +1085,11 @@ describe("App universal", () => {
 
     render(<App dataSource={demoDataSource} mapDataSource={emptyMapSource} />);
 
-    expect(await screen.findByText("00 UBICACIONES OPERATIVAS")).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.getAllByTestId(/^human-map-feature-/)).toHaveLength(14),
+    );
     expect(screen.queryAllByTestId(/^map-marker-/)).toHaveLength(0);
     expect(screen.queryByText("SIN PUNTOS VISIBLES")).toBeNull();
-    expect(screen.getAllByTestId(/^human-map-feature-/)).toHaveLength(14);
   });
 
   it("bloquea coordenadas exactas públicas de desaparecidos", () => {

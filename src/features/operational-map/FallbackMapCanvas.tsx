@@ -50,6 +50,7 @@ export function FallbackMapCanvas({
   selectedId,
   onSelect,
   compact,
+  canvasMinHeight,
   humanFeatures,
   selectedHumanFeatureId,
   onSelectHumanFeature,
@@ -86,7 +87,11 @@ export function FallbackMapCanvas({
   return (
     <View
       ref={attachMouseInteractions}
-      style={[styles.canvas, compact && styles.canvasCompact]}
+      style={[
+        styles.canvas,
+        compact && styles.canvasCompact,
+        canvasMinHeight !== undefined && { minHeight: canvasMinHeight },
+      ]}
       accessibilityLabel={`Lienzo cartográfico neutro con ${points.length} puntos operativos`}
     >
       <Svg
