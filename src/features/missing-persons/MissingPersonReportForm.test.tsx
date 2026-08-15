@@ -313,7 +313,9 @@ describe("Listas cerradas del formulario de persona", () => {
 // CHG-089 — La hora se elige en el selector estándar (24 h, bloques
 // de 15 minutos), sin texto libre.
 describe("Selector de hora estándar", () => {
-  it("elige la hora en bloques y produce HH:MM", async () => {
+  // CHG-096: la interfaz pasa a 12 horas con AM/PM; el valor guardado
+  // sigue siendo HH:MM en 24 horas.
+  it("elige la hora en 12 horas y guarda el valor en 24", async () => {
     render(<MissingPersonReportForm onBack={jest.fn()} />);
 
     fireEvent.press(
@@ -323,12 +325,13 @@ describe("Selector de hora estándar", () => {
     );
     expect(screen.getByTestId("last-seen-time-picker")).toBeTruthy();
 
-    fireEvent.press(screen.getByRole("button", { name: "Hora 18" }));
-    fireEvent.press(
-      screen.getByRole("button", { name: "Minutos 30 de las 18" }),
-    );
+    fireEvent.press(screen.getByRole("button", { name: "Hora 06" }));
+    fireEvent.press(screen.getByRole("button", { name: "Minutos 30" }));
+    fireEvent.press(screen.getByRole("button", { name: "PM" }));
+    fireEvent.press(screen.getByRole("button", { name: "Confirmar la hora" }));
 
-    expect(screen.getByText("18:30")).toBeTruthy();
+    // Se muestra como la diría una persona…
+    expect(screen.getByText("06:30 PM")).toBeTruthy();
     expect(screen.queryByTestId("last-seen-time-picker")).toBeNull();
   });
 });
