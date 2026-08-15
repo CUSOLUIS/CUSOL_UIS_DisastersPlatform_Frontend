@@ -19,6 +19,9 @@ concurrency:
 env:
   FRONTEND_DIR: /home/dev/DesatreNaturalColombia/CUSOL_UIS_DisastersPlatform_Frontend
   COMPOSE_DIR: /home/dev/DesatreNaturalColombia/CUSOL_UIS_DisastersPlatform_Backend
+  # CHG-052: mismo lock que el deploy del backend — ambos runners tocan
+  # el mismo proyecto Compose y dos despliegues simultáneos chocaban.
+  DEPLOY_LOCK: /home/dev/.cusol-deploy.lock
 
 jobs:
   deploy:
@@ -37,14 +40,18 @@ jobs:
       - name: Reconstruir imagen y asegurar servicio arriba
         run: |
           cd "$COMPOSE_DIR"
-          docker compose build frontend
-          docker compose up -d --no-deps --wait frontend
+          flock -w 900 "$DEPLOY_LOCK" sh -c '
+            docker compose build frontend &&
+            docker compose up -d --no-deps --wait frontend
+          '
 
       - name: Sincronizar dependencias y reiniciar
         run: |
           cd "$COMPOSE_DIR"
-          docker compose exec -T frontend npm install --no-audit --no-fund
-          docker compose restart frontend
+          flock -w 900 "$DEPLOY_LOCK" sh -c '
+            docker compose exec -T frontend npm install --no-audit --no-fund &&
+            docker compose restart frontend
+          '
           container=$(docker compose ps -q frontend)
           for _ in $(seq 1 45); do
             state=$(docker inspect -f '{{.State.Health.Status}}' "$container")
