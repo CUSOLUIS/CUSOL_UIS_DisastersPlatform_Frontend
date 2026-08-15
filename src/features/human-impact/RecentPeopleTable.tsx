@@ -177,21 +177,21 @@ export function RecentPeopleTable({
           </Text>
         </View>
 
-        <TextInput
-          accessibilityLabel="Buscar en todas las personas publicables"
-          value={query}
-          onChangeText={updateQuery}
-          maxLength={100}
-          placeholder="Buscar persona o lugar"
-          placeholderTextColor={colors.inkDim}
-          style={[
-            styles.search,
-            viewportSized && styles.searchViewport,
-            compact && styles.searchCompact,
-          ]}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-        />
+        {/* CHG-048: la búsqueda vive solo en la ventana ampliada; la
+            transmisión en vivo queda limpia de controles de consulta. */}
+        {expanded && (
+          <TextInput
+            accessibilityLabel="Buscar en todas las personas publicables"
+            value={query}
+            onChangeText={updateQuery}
+            maxLength={100}
+            placeholder="Buscar persona o lugar"
+            placeholderTextColor={colors.inkDim}
+            style={[styles.search, compact && styles.searchCompact]}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+        )}
       </View>
 
       <ScrollView
@@ -749,12 +749,6 @@ const styles = StyleSheet.create({
   },
   searchCompact: {
     width: "100%",
-  },
-  searchViewport: {
-    width: 360,
-    height: 52,
-    paddingHorizontal: 17,
-    fontSize: 14,
   },
   filtersScroll: {
     flexGrow: 0,

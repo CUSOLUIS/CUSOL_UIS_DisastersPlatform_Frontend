@@ -688,6 +688,16 @@ describe("App universal", () => {
   it("filtra dinámicamente los registros por búsqueda y estado", async () => {
     render(<App dataSource={demoDataSource} />);
 
+    // CHG-048: la transmisión en vivo no ofrece búsqueda; la barra
+    // vive únicamente en la ventana ampliada.
+    await screen.findByText("Persona demo 1042");
+    expect(
+      screen.queryByLabelText("Buscar en todas las personas publicables"),
+    ).toBeNull();
+    fireEvent.press(
+      screen.getByRole("button", { name: "Abrir ventana con 20 filas por página" }),
+    );
+
     const search = await screen.findByLabelText(
       "Buscar en todas las personas publicables",
     );
@@ -718,6 +728,17 @@ describe("App universal", () => {
     );
 
     await waitFor(() => expect(getPage).toHaveBeenCalled());
+    // CHG-048: la búsqueda solo existe tras abrir la ventana ampliada.
+    fireEvent.press(
+      screen.getByRole("button", { name: "Abrir ventana con 20 filas por página" }),
+    );
+    await waitFor(() =>
+      expect(getPage.mock.calls.at(-1)?.[0]).toMatchObject({
+        limit: 20,
+        offset: 0,
+      }),
+    );
+
     const search = screen.getByLabelText(
       "Buscar en todas las personas publicables",
     );
@@ -730,16 +751,6 @@ describe("App universal", () => {
         offset: 0,
         statuses: ["missing"],
         q: "Mocoa",
-      }),
-    );
-
-    fireEvent.press(
-      screen.getByRole("button", { name: "Abrir ventana con 20 filas por página" }),
-    );
-    await waitFor(() =>
-      expect(getPage.mock.calls.at(-1)?.[0]).toMatchObject({
-        limit: 20,
-        offset: 0,
       }),
     );
   });
