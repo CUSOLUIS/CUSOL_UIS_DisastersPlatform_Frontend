@@ -1,69 +1,36 @@
-import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, fontFamilies } from "../../theme";
-import type { GeographicCenter } from "./webMercator";
-import {
-  getBrowserGeolocation,
-  requestVisitorLocation,
-} from "./visitorLocation";
+import { getBrowserGeolocation } from "./visitorLocation";
 
-// CHG-055: botón "mi ubicación" del mapa. Pide el permiso del
-// navegador y entrega la coordenada al lienzo para centrarse y marcar
-// al visitante; los errores se muestran junto al botón y desaparecen.
+// CHG-055/064: botón "mi ubicación" del mapa. El lienzo es dueño del
+// estado (hook de seguimiento); aquí solo se presenta el botón, el
+// spinner y el error. Sin geolocalización disponible no se ofrece.
 
 interface LocateMeControlProps {
-  onLocated: (center: GeographicCenter) => void;
-  locate?: () => Promise<GeographicCenter>;
+  onPress: () => void;
+  locating: boolean;
+  error: string | null;
+  available?: boolean;
 }
 
 export function LocateMeControl({
-  onLocated,
-  locate = requestVisitorLocation,
+  onPress,
+  locating,
+  error,
+  available = getBrowserGeolocation() !== null,
 }: LocateMeControlProps) {
-  const [locating, setLocating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const mounted = useRef(true);
-
-  useEffect(
-    () => () => {
-      mounted.current = false;
-    },
-    [],
-  );
-
-  // Sin geolocalización disponible (p. ej. nativo sin módulo) el botón
-  // no se ofrece.
-  if (getBrowserGeolocation() === null && locate === requestVisitorLocation) {
+  if (!available) {
     return null;
   }
-
-  const press = async () => {
-    setLocating(true);
-    setError(null);
-    try {
-      const center = await locate();
-      if (mounted.current) onLocated(center);
-    } catch (caught: unknown) {
-      if (mounted.current) {
-        setError(
-          caught instanceof Error
-            ? caught.message
-            : "No fue posible obtener tu ubicación.",
-        );
-      }
-    } finally {
-      if (mounted.current) setLocating(false);
-    }
-  };
 
   return (
     <View style={styles.shell}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Centrar el mapa en mi ubicación actual"
-        accessibilityHint="El navegador pedirá permiso para conocer tu ubicación"
+        accessibilityHint="El navegador pedirá permiso para conocer tu ubicación y el marcador te seguirá mientras la página esté abierta"
         disabled={locating}
-        onPress={() => void press()}
+        onPress={onPress}
         style={({ pressed }) => [
           styles.button,
           pressed && styles.buttonPressed,

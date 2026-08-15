@@ -18,6 +18,7 @@ import { HumanMapMarkerIcon } from "./HumanMapMarkerIcon";
 import { humanFeatureAccessibilityLabel } from "./humanStatusMeta";
 import { MapZoomControls } from "./MapZoomControls";
 import { LocateMeControl } from "./LocateMeControl";
+import { useVisitorLocationTracking } from "./useVisitorLocationTracking";
 import { MapMouseHint } from "./MapMouseHint";
 import { OsmAttribution } from "./OsmAttribution";
 import type {
@@ -73,8 +74,19 @@ export function OsmWebMapCanvas(props: OperationalMapCanvasProps) {
   const [tilesFailed, setTilesFailed] = useState(
     process.env.EXPO_PUBLIC_OSM_TILES_DISABLED === "true",
   );
-  const [visitorLocation, setVisitorLocation] =
-    useState<GeographicCenter | null>(null);
+  // CHG-064: el marcador sigue al visitante en vivo; se reanuda solo
+  // si el navegador recuerda el permiso concedido.
+  const {
+    location: visitorLocation,
+    activate: activateVisitorLocation,
+    locating: visitorLocating,
+    error: visitorLocationError,
+  } = useVisitorLocationTracking({
+    onCenter: (located) => {
+      setCenter(located);
+      setZoom((current) => Math.max(current, 14));
+    },
+  });
   const [previousLayer, setPreviousLayer] =
     useState<PreviousTileLayer | null>(null);
   const transition = useRef(new Animated.Value(1)).current;
@@ -277,12 +289,9 @@ export function OsmWebMapCanvas(props: OperationalMapCanvasProps) {
       />
 
       <LocateMeControl
-        onLocated={(located) => {
-          // CHG-055: centrar el mapa en el visitante y marcarlo.
-          setVisitorLocation(located);
-          setCenter(located);
-          setZoom((current) => Math.max(current, 14));
-        }}
+        onPress={() => void activateVisitorLocation()}
+        locating={visitorLocating}
+        error={visitorLocationError}
       />
 
       {markers.map(({ point, left, top }) => {

@@ -7,6 +7,7 @@ import { CategoryMarkerIcon } from "./CategoryMarkerIcon";
 import { HumanMapMarkerIcon } from "./HumanMapMarkerIcon";
 import { humanFeatureAccessibilityLabel } from "./humanStatusMeta";
 import { LocateMeControl } from "./LocateMeControl";
+import { useVisitorLocationTracking } from "./useVisitorLocationTracking";
 import { MapMouseHint } from "./MapMouseHint";
 import { MapZoomControls } from "./MapZoomControls";
 import type {
@@ -59,10 +60,18 @@ export function FallbackMapCanvas({
 }: OperationalMapCanvasProps) {
   const [zoom, setZoom] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
-  const [visitorLocation, setVisitorLocation] = useState<{
-    latitude: number;
-    longitude: number;
-  } | null>(null);
+  const {
+    location: visitorLocation,
+    activate: activateVisitorLocation,
+    locating: visitorLocating,
+    error: visitorLocationError,
+  } = useVisitorLocationTracking({
+    onCenter: () => {
+      // Lienzo neutro: el visitante se marca en el encuadre nacional.
+      setZoom(1);
+      setPanOffset({ x: 0, y: 0 });
+    },
+  });
   const projectedPoints = projectPoints(points, zoom);
   const changeZoom = (direction: 1 | -1) => {
     setZoom((current) => Math.max(1, Math.min(2.5, current + direction * 0.5)));
@@ -154,13 +163,9 @@ export function FallbackMapCanvas({
       />
 
       <LocateMeControl
-        onLocated={(located) => {
-          // CHG-055: en el lienzo neutro se marca al visitante dentro
-          // del encuadre nacional (sin teselas no hay centrado fino).
-          setVisitorLocation(located);
-          setZoom(1);
-          setPanOffset({ x: 0, y: 0 });
-        }}
+        onPress={() => void activateVisitorLocation()}
+        locating={visitorLocating}
+        error={visitorLocationError}
       />
 
       {projectedPoints.map(({ point, left, top }) => {
