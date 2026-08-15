@@ -118,3 +118,45 @@ describe("Reporte de persona perdida", () => {
     expect(submitReport).toHaveBeenCalledTimes(1);
   });
 });
+
+// CHG-073 — Listas cerradas y mini agenda: sin texto libre en sexo,
+// nacionalidad, tipo de documento ni fecha de nacimiento.
+describe("Listas cerradas del formulario de persona", () => {
+  it("permite elegir sexo, nacionalidad y tipo de documento solo de las listas", async () => {
+    render(<MissingPersonReportForm onBack={jest.fn()} />);
+
+    fireEvent.press(screen.getByRole("button", { name: "Sexo: Mujer" }));
+
+    fireEvent.press(screen.getByRole("button", { name: "Nacionalidad" }));
+    fireEvent.changeText(
+      screen.getByLabelText("Buscar nacionalidad"),
+      "colomb",
+    );
+    fireEvent.press(await screen.findByRole("button", { name: "Colombiana" }));
+    expect(screen.getByText("Colombiana")).toBeTruthy();
+
+    fireEvent.press(
+      screen.getByRole("button", { name: "Tipo de documento · privado" }),
+    );
+    fireEvent.press(
+      await screen.findByRole("button", { name: "Cédula de ciudadanía" }),
+    );
+    expect(screen.getByText("Cédula de ciudadanía")).toBeTruthy();
+  });
+
+  it("la fecha de nacimiento se elige en la mini agenda (año, mes y día)", async () => {
+    render(<MissingPersonReportForm onBack={jest.fn()} />);
+
+    fireEvent.press(
+      screen.getByRole("button", { name: "Elegir fecha de nacimiento" }),
+    );
+    expect(screen.getByTestId("birth-date-calendar")).toBeTruthy();
+
+    fireEvent.press(screen.getByRole("button", { name: "Año 1990" }));
+    fireEvent.press(screen.getByRole("button", { name: "Mes MAY de 1990" }));
+    fireEvent.press(screen.getByRole("button", { name: "Día 20" }));
+
+    expect(screen.getByText("1990-05-20")).toBeTruthy();
+    expect(screen.queryByTestId("birth-date-calendar")).toBeNull();
+  });
+});

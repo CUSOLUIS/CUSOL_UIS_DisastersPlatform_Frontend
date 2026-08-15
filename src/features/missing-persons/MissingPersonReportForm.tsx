@@ -19,6 +19,11 @@ import { ReportConsiderations } from "../reporting/ReportConsiderations";
 import { buildLastSeenQuery, parseDraftCoordinates } from "./geocoding";
 import { LastSeenLocationPicker } from "./LastSeenLocationPicker";
 import {
+  DOCUMENT_TYPE_OPTIONS,
+  NATIONALITY_OPTIONS,
+  SEX_OPTIONS,
+} from "./personFieldOptions";
+import {
   preparePhotosForUpload,
   totalSizeNotice,
 } from "./photoProcessing";
@@ -225,14 +230,14 @@ export function MissingPersonReportForm({
                 <FormField label="Nombres *" value={draft.firstNames} onChangeText={(value) => setField("firstNames", value)} autoComplete="name-given" />
                 <FormField label="Apellidos *" value={draft.lastNames} onChangeText={(value) => setField("lastNames", value)} autoComplete="name-family" />
                 <FormField label="Alias o nombre conocido" value={draft.aliases} onChangeText={(value) => setField("aliases", value)} />
-                <FormField label="Fecha de nacimiento" hint="AAAA-MM-DD" value={draft.birthDate} onChangeText={(value) => setField("birthDate", value)} />
+                <BirthDateField value={draft.birthDate} onChange={(value) => setField("birthDate", value)} />
                 <FormField label="Edad aproximada" value={draft.approximateAge} onChangeText={(value) => setField("approximateAge", value)} keyboardType="number-pad" />
-                <FormField label="Identidad de género" value={draft.genderIdentity} onChangeText={(value) => setField("genderIdentity", value)} />
-                <FormField label="Nacionalidad" value={draft.nationality} onChangeText={(value) => setField("nationality", value)} />
+                <ChoiceChipsField label="Sexo" options={SEX_OPTIONS} value={draft.genderIdentity} onChange={(value) => setField("genderIdentity", value)} />
+                <SelectListField label="Nacionalidad" options={NATIONALITY_OPTIONS} value={draft.nationality} onChange={(value) => setField("nationality", value)} searchable searchPlaceholder="Busca tu nacionalidad" />
               </FieldGrid>
               <PrivateFieldsLabel />
               <FieldGrid compact={compact}>
-                <FormField label="Tipo de documento · privado" value={draft.documentType} onChangeText={(value) => setField("documentType", value)} />
+                <SelectListField label="Tipo de documento · privado" options={DOCUMENT_TYPE_OPTIONS} value={draft.documentType} onChange={(value) => setField("documentType", value)} />
                 <FormField label="Número de documento · privado" value={draft.documentNumber} onChangeText={(value) => setField("documentNumber", value)} />
               </FieldGrid>
             </FormSection>
@@ -389,6 +394,26 @@ function validateDraft(draft: MissingPersonReportDraft, photos: SelectedPhoto[])
   if (draft.lastSeenTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(draft.lastSeenTime)) {
     errors.push("La hora debe usar el formato HH:MM de 24 horas.");
   }
+  // CHG-073: listas cerradas y nacimiento plausible (espejo del
+  // backend y de la base de datos).
+  if (draft.birthDate) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.birthDate)) {
+      errors.push("La fecha de nacimiento debe elegirse en el calendario.");
+    } else if (new Date(`${draft.birthDate}T23:59:59`).getTime() > Date.now()) {
+      errors.push("La fecha de nacimiento no puede estar en el futuro.");
+    } else if (draft.birthDate < "1900-01-01") {
+      errors.push("La fecha de nacimiento no puede ser anterior a 1900.");
+    }
+  }
+  if (draft.genderIdentity && !(SEX_OPTIONS as readonly string[]).includes(draft.genderIdentity)) {
+    errors.push("El sexo debe elegirse entre Hombre o Mujer.");
+  }
+  if (draft.nationality && !(NATIONALITY_OPTIONS as readonly string[]).includes(draft.nationality)) {
+    errors.push("La nacionalidad debe elegirse de la lista.");
+  }
+  if (draft.documentType && !(DOCUMENT_TYPE_OPTIONS as readonly string[]).includes(draft.documentType)) {
+    errors.push("El tipo de documento debe elegirse de la lista.");
+  }
   if (photos.length === 0) {
     errors.push("Adjunta al menos una fotografía permitida.");
   }
@@ -444,6 +469,279 @@ function FormField({ label, hint, multiline = false, ...inputProps }: FormFieldP
         style={[styles.fieldInput, multiline && styles.fieldInputMultiline]}
         {...inputProps}
       />
+    </View>
+  );
+}
+
+// CHG-073 — Campos de lista cerrada y mini agenda de fecha: nada de
+// texto libre en sexo, nacionalidad, tipo de documento ni nacimiento.
+
+function ChoiceChipsField({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: readonly string[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <View style={styles.field}>
+      <View style={styles.fieldLabelRow}>
+        <Text style={styles.fieldLabel}>{label}</Text>
+      </View>
+      <View style={styles.choiceRow}>
+        {options.map((option) => {
+          const selected = value === option;
+          return (
+            <Pressable
+              key={option}
+              accessibilityRole="button"
+              accessibilityLabel={`${label}: ${option}`}
+              accessibilityState={{ selected }}
+              onPress={() => onChange(selected ? "" : option)}
+              style={[styles.choiceChip, selected && styles.choiceChipActive]}
+            >
+              <Text style={[styles.choiceChipText, selected && styles.choiceChipTextActive]}>
+                {option}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function SelectListField({
+  label,
+  options,
+  value,
+  onChange,
+  searchable = false,
+  searchPlaceholder = "Busca en la lista",
+}: {
+  label: string;
+  options: readonly string[];
+  value: string;
+  onChange: (value: string) => void;
+  searchable?: boolean;
+  searchPlaceholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const normalized = query.trim().toLocaleLowerCase("es-CO");
+  const matches = normalized
+    ? options.filter((option) =>
+        option.toLocaleLowerCase("es-CO").includes(normalized),
+      )
+    : options;
+  return (
+    <View style={styles.field}>
+      <View style={styles.fieldLabelRow}>
+        <Text style={styles.fieldLabel}>{label}</Text>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ expanded: open }}
+        onPress={() => {
+          setOpen((current) => !current);
+          setQuery("");
+        }}
+        style={styles.fieldInput}
+      >
+        <View style={styles.selectValueRow}>
+          <Text style={value ? styles.selectValue : styles.selectPlaceholder} numberOfLines={1}>
+            {value || "Elegir de la lista"}
+          </Text>
+          <Text style={styles.selectCaret}>{open ? "▴" : "▾"}</Text>
+        </View>
+      </Pressable>
+      {open && (
+        <View style={styles.selectPanel}>
+          {searchable && (
+            <TextInput
+              accessibilityLabel={`Buscar ${label.toLocaleLowerCase("es-CO")}`}
+              value={query}
+              onChangeText={setQuery}
+              placeholder={searchPlaceholder}
+              placeholderTextColor="#4b586d"
+              style={styles.selectSearch}
+            />
+          )}
+          <ScrollView style={styles.selectScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+            {value !== "" && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Quitar ${label.toLocaleLowerCase("es-CO")}`}
+                onPress={() => {
+                  onChange("");
+                  setOpen(false);
+                }}
+                style={styles.selectOption}
+              >
+                <Text style={styles.selectClearText}>Quitar selección</Text>
+              </Pressable>
+            )}
+            {matches.map((option) => (
+              <Pressable
+                key={option}
+                accessibilityRole="button"
+                accessibilityLabel={option}
+                onPress={() => {
+                  onChange(option);
+                  setOpen(false);
+                }}
+                style={[styles.selectOption, option === value && styles.selectOptionActive]}
+              >
+                <Text style={styles.selectOptionText}>{option}</Text>
+              </Pressable>
+            ))}
+            {matches.length === 0 && (
+              <Text style={styles.selectEmpty}>Sin coincidencias en la lista.</Text>
+            )}
+          </ScrollView>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const MONTH_LABELS = [
+  "ENE", "FEB", "MAR", "ABR", "MAY", "JUN",
+  "JUL", "AGO", "SEP", "OCT", "NOV", "DIC",
+];
+const BIRTH_YEAR_MIN = 1900;
+
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+function BirthDateField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [year, setYear] = useState<number | null>(null);
+  const [month, setMonth] = useState<number | null>(null);
+  const currentYear = new Date().getFullYear();
+  const years: number[] = [];
+  for (let item = currentYear; item >= BIRTH_YEAR_MIN; item -= 1) {
+    years.push(item);
+  }
+  const pickDay = (day: number) => {
+    if (year === null || month === null) return;
+    const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    onChange(iso);
+    setOpen(false);
+  };
+  return (
+    <View style={styles.field}>
+      <View style={styles.fieldLabelRow}>
+        <Text style={styles.fieldLabel}>Fecha de nacimiento</Text>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Elegir fecha de nacimiento"
+        accessibilityState={{ expanded: open }}
+        onPress={() => {
+          setOpen((current) => !current);
+          setYear(null);
+          setMonth(null);
+        }}
+        style={styles.fieldInput}
+      >
+        <View style={styles.selectValueRow}>
+          <Text style={value ? styles.selectValue : styles.selectPlaceholder}>
+            {value || "Elegir en el calendario"}
+          </Text>
+          <Text style={styles.selectCaret}>{open ? "▴" : "📅"}</Text>
+        </View>
+      </Pressable>
+      {open && (
+        <View style={styles.selectPanel} testID="birth-date-calendar">
+          {year === null && (
+            <>
+              <Text style={styles.calendarStep}>ELIGE EL AÑO</Text>
+              <ScrollView style={styles.selectScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                <View style={styles.calendarGrid}>
+                  {years.map((option) => (
+                    <Pressable
+                      key={option}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Año ${option}`}
+                      onPress={() => setYear(option)}
+                      style={styles.calendarCell}
+                    >
+                      <Text style={styles.calendarCellText}>{option}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
+            </>
+          )}
+          {year !== null && month === null && (
+            <>
+              <Text style={styles.calendarStep}>ELIGE EL MES · {year}</Text>
+              <View style={styles.calendarGrid}>
+                {MONTH_LABELS.map((labelText, index) => (
+                  <Pressable
+                    key={labelText}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Mes ${labelText} de ${year}`}
+                    onPress={() => setMonth(index)}
+                    style={styles.calendarCell}
+                  >
+                    <Text style={styles.calendarCellText}>{labelText}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          )}
+          {year !== null && month !== null && (
+            <>
+              <Text style={styles.calendarStep}>
+                ELIGE EL DÍA · {MONTH_LABELS[month]} {year}
+              </Text>
+              <View style={styles.calendarGrid}>
+                {Array.from(
+                  { length: daysInMonth(year, month) },
+                  (_, index) => index + 1,
+                ).map((day) => (
+                  <Pressable
+                    key={day}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Día ${day}`}
+                    onPress={() => pickDay(day)}
+                    style={styles.calendarCellSmall}
+                  >
+                    <Text style={styles.calendarCellText}>{day}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          )}
+          {value !== "" && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Borrar fecha de nacimiento"
+              onPress={() => {
+                onChange("");
+                setOpen(false);
+              }}
+              style={styles.selectOption}
+            >
+              <Text style={styles.selectClearText}>Borrar fecha</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
     </View>
   );
 }
@@ -551,6 +849,29 @@ const styles = StyleSheet.create({
   fieldHint: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 8 },
   fieldInput: { minHeight: 48, paddingHorizontal: 13, paddingVertical: 11, borderWidth: 1, borderColor: "rgba(137,166,207,0.22)", borderRadius: 8, color: colors.ink, backgroundColor: "rgba(5,9,17,0.72)", fontSize: 12 },
   fieldInputMultiline: { minHeight: 98 },
+  // CHG-073: selectores de lista cerrada y mini agenda.
+  choiceRow: { flexDirection: "row", gap: 8 },
+  choiceChip: { flex: 1, minHeight: 48, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(137,166,207,0.22)", borderRadius: 8, backgroundColor: "rgba(5,9,17,0.72)" },
+  choiceChipActive: { borderColor: colors.cyan, backgroundColor: "rgba(81,229,255,0.1)" },
+  choiceChipText: { color: colors.inkSoft, fontSize: 12, fontWeight: "700" },
+  choiceChipTextActive: { color: colors.cyan },
+  selectValueRow: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  selectValue: { color: colors.ink, fontSize: 12, flexShrink: 1 },
+  selectPlaceholder: { color: "#4b586d", fontSize: 12 },
+  selectCaret: { color: colors.inkDim, fontSize: 12 },
+  selectPanel: { marginTop: 6, borderWidth: 1, borderColor: "rgba(137,166,207,0.28)", borderRadius: 8, backgroundColor: "rgba(7,11,20,0.98)", padding: 8, gap: 8 },
+  selectSearch: { minHeight: 40, paddingHorizontal: 11, borderWidth: 1, borderColor: "rgba(137,166,207,0.22)", borderRadius: 7, color: colors.ink, backgroundColor: "rgba(5,9,17,0.72)", fontSize: 12 },
+  selectScroll: { maxHeight: 210 },
+  selectOption: { paddingHorizontal: 11, paddingVertical: 10, borderRadius: 6 },
+  selectOptionActive: { backgroundColor: "rgba(81,229,255,0.1)" },
+  selectOptionText: { color: colors.ink, fontSize: 12 },
+  selectClearText: { color: colors.reported, fontSize: 12, fontWeight: "700" },
+  selectEmpty: { color: colors.inkDim, fontSize: 11, padding: 10 },
+  calendarStep: { color: colors.cyan, fontFamily: fontFamilies.mono, fontSize: 9, fontWeight: "800", letterSpacing: 1 },
+  calendarGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  calendarCell: { minWidth: 62, paddingVertical: 9, alignItems: "center", borderWidth: 1, borderColor: "rgba(137,166,207,0.18)", borderRadius: 6 },
+  calendarCellSmall: { minWidth: 40, paddingVertical: 8, alignItems: "center", borderWidth: 1, borderColor: "rgba(137,166,207,0.18)", borderRadius: 6 },
+  calendarCellText: { color: colors.ink, fontSize: 12 },
   privateLabel: { paddingHorizontal: 10, paddingVertical: 7, borderLeftWidth: 2, borderLeftColor: colors.deceased, backgroundColor: "rgba(135,150,255,0.06)" },
   privateLabelText: { color: colors.deceased, fontFamily: fontFamilies.mono, fontSize: 8, fontWeight: "700", letterSpacing: 0.5 },
   photoRules: { flexDirection: "row", alignItems: "center", gap: 14, padding: 15, borderWidth: 1, borderColor: "rgba(81,229,255,0.20)", borderRadius: 9, backgroundColor: "rgba(81,229,255,0.05)" },
