@@ -29,6 +29,7 @@ import { DatePickerField } from "../../components/DatePickerField";
 import { TimePickerField } from "../../components/TimePickerField";
 import { ReportConsiderations } from "../reporting/ReportConsiderations";
 import { FieldHelpTooltip } from "../../components/FieldHelpTooltip";
+import { InnerRouteHeader } from "../../components/InnerRouteHeader";
 import { RelatedEventField } from "./RelatedEventField";
 import {
   relatedEventsDataSource,
@@ -147,6 +148,8 @@ interface UnverifiedBuildingReportFormProps {
   // CHG-053: accesos para reportar con cuenta desde la leyenda.
   onRegister?: () => void;
   onLogin?: () => void;
+  // CHG-097: salida a la portada desde el navbar global.
+  onHome?: () => void;
   // CHG-078: fuente de sesión inyectable en pruebas.
   sessionSource?: SessionAccountSource;
   pickPhotos?: () => Promise<SelectedPhoto[]>;
@@ -178,6 +181,7 @@ export function UnverifiedBuildingReportForm({
   onBack,
   onRegister,
   onLogin,
+  onHome,
   sessionSource,
   pickPhotos = defaultPickPhotos,
   relatedEventsSource = relatedEventsDataSource,
@@ -271,7 +275,15 @@ export function UnverifiedBuildingReportForm({
       style={styles.root}
     >
       <SafeAreaView edges={["top"]} style={styles.safeArea}>
-        <View style={styles.header}>
+        {/* CHG-097: mismo navbar que la portada. */}
+        <InnerRouteHeader
+          onNavigateHome={onHome ?? onBack}
+          onLogin={onLogin ?? (() => undefined)}
+          onRegister={onRegister ?? (() => undefined)}
+          sessionSource={sessionSource}
+          session={session}
+        />
+        <View style={styles.header} testID="report-action-bar">
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Volver a la portada"
@@ -1121,10 +1133,11 @@ function formatBytes(bytes: number | null): string {
 const styles = StyleSheet.create({
   root: { flex: 1, minHeight: 700 },
   safeArea: { flex: 1 },
+  // CHG-097: barra secundaria bajo el navbar global.
   header: {
     width: "100%",
     maxWidth: contentMaxWidth,
-    minHeight: 76,
+    minHeight: 52,
     alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
@@ -1133,6 +1146,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderBottomWidth: 1,
     borderBottomColor: colors.line,
+    backgroundColor: "rgba(11,15,25,0.72)",
   },
   backButton: {
     flexDirection: "row",
@@ -1269,7 +1283,9 @@ const styles = StyleSheet.create({
     fontSize: 10,
     lineHeight: 16,
   },
-  sectionBody: { gap: 16, padding: 20 },
+  // CHG-097: mismo espaciado que el reporte de persona, para que los
+  // bloques de campo no queden pegados a la etiqueta siguiente.
+  sectionBody: { gap: 24, padding: 20 },
   fieldGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   fieldGridCompact: { flexDirection: "column" },
   field: { minWidth: 250, flex: 1, gap: 7 },

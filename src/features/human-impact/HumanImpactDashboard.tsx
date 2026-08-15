@@ -551,7 +551,10 @@ function FooterLink({
   );
 }
 
-function Header({
+// CHG-097: el encabezado de la plataforma se exporta para que las
+// rutas internas (formularios de reporte) monten el mismo navbar y no
+// aparezcan como una pantalla suelta sin identidad.
+export function Header({
   compact,
   narrow,
   stackedNavigation,

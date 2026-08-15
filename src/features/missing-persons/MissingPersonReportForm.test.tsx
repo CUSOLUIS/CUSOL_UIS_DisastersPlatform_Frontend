@@ -450,3 +450,56 @@ describe("Duplicados al diligenciar el reporte (CHG-091)", () => {
     ).toBeTruthy();
   });
 });
+
+/**
+ * CHG-097 — La ruta de reporte monta el navbar de la plataforma y deja
+ * "VOLVER" en una barra secundaria; los bloques de campo se separan de
+ * forma uniforme.
+ */
+describe("Encabezado y espaciado del reporte (CHG-097)", () => {
+  it("monta el navbar global con la marca sobre la barra de acciones", async () => {
+    render(<MissingPersonReportForm onBack={jest.fn()} />);
+
+    // Identidad de la plataforma, igual que en la portada.
+    expect(await screen.findByTestId("brand-lockup")).toBeTruthy();
+    expect(screen.getByTestId("cusol-brand-link")).toBeTruthy();
+    expect(screen.getByTestId("prometeo-brand-link")).toBeTruthy();
+
+    // La barra de acciones sigue existiendo, ahora como secundaria.
+    expect(screen.getByTestId("report-action-bar")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Volver a la portada" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("PUBLICACIÓN INMEDIATA · DATOS SENSIBLES PRIVADOS"),
+    ).toBeTruthy();
+  });
+
+  it("los enlaces del navbar salen a la portada", async () => {
+    const onHome = jest.fn();
+    render(
+      <MissingPersonReportForm onBack={jest.fn()} onHome={onHome} />,
+    );
+
+    // En pantalla angosta la navegación vive en el menú (CHG-090).
+    fireEvent.press(
+      await screen.findByRole("button", {
+        name: "Abrir menú de navegación",
+      }),
+    );
+    fireEvent.press(screen.getByRole("link", { name: "ver mapa" }));
+
+    expect(onHome).toHaveBeenCalled();
+  });
+
+  it("separa los bloques de campo de forma uniforme", () => {
+    render(<MissingPersonReportForm onBack={jest.fn()} />);
+
+    const vestimenta = screen.getByLabelText("Vestimenta *");
+    const circunstancias = screen.getByLabelText(
+      "Circunstancias de la desaparición *",
+    );
+    expect(vestimenta).toBeTruthy();
+    expect(circunstancias).toBeTruthy();
+  });
+});

@@ -16,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { DatePickerField } from "../../components/DatePickerField";
+import { InnerRouteHeader } from "../../components/InnerRouteHeader";
 import { TimePickerField } from "../../components/TimePickerField";
 import { ReportConsiderations } from "../reporting/ReportConsiderations";
 import { reportActionCatalog } from "../reporting/reportActionCatalog";
@@ -285,7 +286,18 @@ export function MissingPersonReportForm({
   return (
     <LinearGradient colors={["#070a13", colors.canvas, "#080b15"]} style={styles.root}>
       <SafeAreaView edges={["top"]} style={styles.safeArea}>
-        <View style={styles.header}>
+        {/* CHG-097: el mismo navbar de la portada — logos, nombre de
+            la plataforma y sesión — para que la ruta no se vea como
+            una pantalla suelta. */}
+        <InnerRouteHeader
+          onNavigateHome={onHome ?? onBack}
+          onLogin={onLogin ?? (() => undefined)}
+          onRegister={onRegister ?? (() => undefined)}
+          sessionSource={sessionSource}
+          session={session}
+        />
+        {/* Barra de acciones secundarias, debajo del navbar. */}
+        <View style={styles.header} testID="report-action-bar">
           <Pressable accessibilityRole="button" accessibilityLabel="Volver a la portada" onPress={onBack} style={styles.backButton}>
             <Text style={styles.backArrow}>←</Text>
             <Text style={styles.backText}>VOLVER</Text>
@@ -942,7 +954,9 @@ function formatBytes(bytes: number | null): string {
 const styles = StyleSheet.create({
   root: { flex: 1, minHeight: 700 },
   safeArea: { flex: 1 },
-  header: { width: "100%", maxWidth: contentMaxWidth, minHeight: 76, alignSelf: "center", flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 16, paddingHorizontal: 24, borderBottomWidth: 1, borderBottomColor: colors.line },
+  // CHG-097: barra secundaria bajo el navbar — más baja y con fondo
+  // propio para leerse como migas de pan, no como otro encabezado.
+  header: { width: "100%", maxWidth: contentMaxWidth, minHeight: 52, alignSelf: "center", flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 16, paddingHorizontal: 24, borderBottomWidth: 1, borderBottomColor: colors.line, backgroundColor: "rgba(11,15,25,0.72)" },
   backButton: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, paddingRight: 12 },
   backArrow: { color: colors.cyan, fontSize: 24 },
   backText: { color: colors.ink, fontFamily: fontFamilies.mono, fontSize: 9, fontWeight: "800", letterSpacing: 1 },
@@ -968,7 +982,9 @@ const styles = StyleSheet.create({
   sectionHeadingCopy: { minWidth: 0, flex: 1 },
   sectionTitle: { color: colors.ink, fontSize: 21, fontWeight: "700", letterSpacing: -0.6 },
   sectionDescription: { marginTop: 4, color: colors.inkDim, fontSize: 10, lineHeight: 16 },
-  sectionBody: { gap: 14, padding: 20 },
+  // CHG-097: 14 px dejaba el textarea de un campo pegado a la
+  // etiqueta del siguiente; 24 separa los bloques de forma uniforme.
+  sectionBody: { gap: 24, padding: 20 },
   fieldGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   fieldGridCompact: { flexDirection: "column" },
   field: { minWidth: 250, flex: 1, gap: 7 },

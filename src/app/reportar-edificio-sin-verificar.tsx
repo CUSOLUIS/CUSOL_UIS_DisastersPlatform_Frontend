@@ -10,6 +10,8 @@ export default function ReportUnverifiedBuildingRoute() {
   return (
     <UnverifiedBuildingReportForm
       onBack={safeBack}
+      // CHG-097: el navbar global sale a la portada.
+      onHome={() => router.replace("/")}
       onRegister={() => router.push("/registrarse")}
       onLogin={() => router.push("/iniciar-sesion")}
     />
