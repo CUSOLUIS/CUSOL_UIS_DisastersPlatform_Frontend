@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -12,7 +11,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
+import { LazyImage } from "../../components/LazyImage";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
+import { font } from "../../typography";
 import {
   CommunityContributionForm,
   type PickContributionPhotos,
@@ -474,18 +475,23 @@ function PersonCard({
   return (
     <View testID={`directory-person-card-${item.id}`} style={styles.card}>
       <View style={styles.cardTop}>
-        <View style={styles.personAvatar}>
-          {item.publicPhotoUrl ? (
-            <Image
-              accessibilityLabel={`Fotografía pública autorizada de ${item.displayName}`}
-              source={{ uri: item.publicPhotoUrl }}
-              resizeMode="cover"
-              style={styles.personPhoto}
-            />
-          ) : (
+        {/* CHG-090 (QA): la foto solo se descarga cuando la tarjeta se
+            acerca a la pantalla; hasta entonces ocupa su lugar el mismo
+            ícono de las personas sin fotografía. */}
+        {item.publicPhotoUrl ? (
+          <LazyImage
+            containerStyle={styles.personAvatar}
+            placeholder={<PersonIcon />}
+            accessibilityLabel={`Fotografía pública autorizada de ${item.displayName}`}
+            source={{ uri: item.publicPhotoUrl }}
+            resizeMode="cover"
+            style={styles.personPhoto}
+          />
+        ) : (
+          <View style={styles.personAvatar}>
             <PersonIcon />
-          )}
-        </View>
+          </View>
+        )}
         <View style={styles.cardTopCopy}>
           <View style={styles.cardMetaRow}>
             <Text style={styles.caseCode}>{item.publicCaseCode}</Text>
@@ -666,11 +672,13 @@ const styles = StyleSheet.create({
   searchButtonText: { color: "#07101b", fontFamily: fontFamilies.mono, fontSize: 15, fontWeight: "900", letterSpacing: 0.9 },
   searchButtonArrow: { color: "#07101b", fontSize: 22 },
   filterLine: { minHeight: 38, flexDirection: "row", alignItems: "center", gap: 10 },
-  filterLabel: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 8, fontWeight: "800", letterSpacing: 0.8 },
+  // CHG-090 (QA): tipografía por la escala legible, no en píxeles sueltos.
+  filterLabel: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: font(8), fontWeight: "800", letterSpacing: 0.8 },
   filters: { gap: 7 },
-  filter: { minHeight: 36, justifyContent: "center", paddingHorizontal: 12, borderWidth: 1, borderColor: colors.line, borderRadius: 999 },
+  // CHG-090 (QA): área táctil mínima de 44dp en los filtros.
+  filter: { minHeight: 44, justifyContent: "center", paddingHorizontal: 16, borderWidth: 1, borderColor: colors.line, borderRadius: 999 },
   filterSelected: { borderColor: "rgba(81,229,255,0.5)", backgroundColor: "rgba(81,229,255,0.07)" },
-  filterText: { color: colors.inkDim, fontSize: 10, fontWeight: "700" },
+  filterText: { color: colors.inkDim, fontSize: font(12), fontWeight: "700" },
   filterTextSelected: { color: colors.cyan },
   hint: { color: colors.inkDim, fontSize: 10, lineHeight: 16 },
   inlineError: { color: colors.reported },

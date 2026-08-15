@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
+  Animated,
+  Easing,
   Platform,
   StyleSheet,
   Text,
@@ -284,12 +285,9 @@ function DashboardLoader({
   }, [dataSource, refreshTick]);
 
   if (loadState.status === "loading") {
-    return (
-      <View style={styles.statePage} accessibilityLabel="Cargando situación humana">
-        <ActivityIndicator size="large" color={colors.cyan} />
-        <Text style={styles.stateText}>Preparando el panorama de situación…</Text>
-      </View>
-    );
+    // CHG-090 (QA): esqueleto de carga con la silueta de la portada en
+    // lugar de un spinner a pantalla vacía.
+    return <DashboardSkeleton />;
   }
 
   if (loadState.status === "error") {
@@ -330,6 +328,78 @@ function DashboardLoader({
     />
   );
 }
+
+// CHG-090 (QA) — Esqueleto de la portada durante la carga inicial:
+// franjas que imitan encabezado, misión y tarjetas, con pulso suave.
+function DashboardSkeleton() {
+  const pulse = useRef(new Animated.Value(0.35)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 0.7,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: Platform.OS !== "web",
+        }),
+        Animated.timing(pulse, {
+          toValue: 0.35,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: Platform.OS !== "web",
+        }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulse]);
+
+  const block = (extra: object) => [
+    skeletonStyles.block,
+    { opacity: pulse },
+    extra,
+  ];
+
+  return (
+    <View
+      style={skeletonStyles.page}
+      accessibilityLabel="Cargando situación humana"
+    >
+      <Animated.View style={block(skeletonStyles.header)} />
+      <View style={skeletonStyles.body}>
+        <Animated.View style={block(skeletonStyles.kicker)} />
+        <Animated.View style={block(skeletonStyles.titleOne)} />
+        <Animated.View style={block(skeletonStyles.titleTwo)} />
+        <Animated.View style={block(skeletonStyles.paragraph)} />
+        <Animated.View style={block(skeletonStyles.paragraphShort)} />
+        <View style={skeletonStyles.cards}>
+          <Animated.View style={block(skeletonStyles.card)} />
+          <Animated.View style={block(skeletonStyles.card)} />
+          <Animated.View style={block(skeletonStyles.card)} />
+        </View>
+      </View>
+      <Text style={skeletonStyles.caption}>
+        Preparando el panorama de situación…
+      </Text>
+    </View>
+  );
+}
+
+const skeletonStyles = StyleSheet.create({
+  page: { flex: 1, backgroundColor: colors.canvas },
+  block: { borderRadius: 10, backgroundColor: "rgba(137,166,207,0.16)" },
+  header: { height: 76, borderRadius: 0, marginBottom: 28 },
+  body: { flex: 1, width: "100%", maxWidth: 960, alignSelf: "center", paddingHorizontal: 24, gap: 14 },
+  kicker: { width: 240, height: 12 },
+  titleOne: { width: "55%", height: 44, marginTop: 10 },
+  titleTwo: { width: "75%", height: 44 },
+  paragraph: { width: "90%", height: 14, marginTop: 18 },
+  paragraphShort: { width: "62%", height: 14 },
+  cards: { flexDirection: "row", flexWrap: "wrap", gap: 14, marginTop: 30 },
+  card: { flexGrow: 1, flexBasis: "30%", minWidth: 180, height: 130, borderRadius: 14 },
+  caption: { padding: 18, textAlign: "center", color: colors.inkDim, fontSize: 12 },
+});
 
 const styles = StyleSheet.create({
   statePage: {

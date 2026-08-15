@@ -201,10 +201,18 @@ describe("App universal", () => {
     const onAbout = jest.fn();
     render(<App dataSource={demoDataSource} onAbout={onAbout} />);
 
+    // CHG-090: en pantallas angostas la navegación vive en el menú
+    // hamburguesa; se abre antes de usar los enlaces.
+    fireEvent.press(
+      await screen.findByRole("button", { name: "Abrir menú de navegación" }),
+    );
     const mapLink = await screen.findByRole("link", { name: "ver mapa" });
-    const aboutLink = screen.getByRole("link", { name: "quiénes somos" });
-    const dataLink = screen.getByRole("link", { name: "cifras y datos" });
-    const liveLink = screen.getByRole("link", { name: "transmisión en vivo" });
+    expect(screen.getByRole("link", { name: "inicio" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "quiénes somos" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "cifras y datos" })).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "transmisión en vivo" }),
+    ).toBeTruthy();
     const mapLinkStyle = StyleSheet.flatten(mapLink.props.style);
     const mapLinkTextStyle = StyleSheet.flatten(
       within(mapLink).getByText("VER MAPA").props.style,
@@ -226,10 +234,20 @@ describe("App universal", () => {
     expect(within(dataSection).getByText("ESCENARIO DE PRUEBA")).toBeTruthy();
     expect(screen.getByTestId("dashboard-live-transmission")).toBeTruthy();
 
+    // CHG-090: cada navegación cierra el menú; se reabre entre usos.
+    const openMenu = () =>
+      fireEvent.press(
+        screen.getByRole("button", { name: "Abrir menú de navegación" }),
+      );
     fireEvent.press(mapLink);
-    fireEvent.press(dataLink);
-    fireEvent.press(liveLink);
-    fireEvent.press(aboutLink);
+    openMenu();
+    fireEvent.press(screen.getByRole("link", { name: "cifras y datos" }));
+    openMenu();
+    fireEvent.press(
+      screen.getByRole("link", { name: "transmisión en vivo" }),
+    );
+    openMenu();
+    fireEvent.press(screen.getByRole("link", { name: "quiénes somos" }));
 
     expect(onAbout).toHaveBeenCalledTimes(1);
   });
@@ -322,8 +340,9 @@ describe("App universal", () => {
     ).toBe(0);
     expect(shouldStackReportActions(620)).toBe(false);
     expect(shouldStackReportActions(619)).toBe(true);
-    expect(getReportActionColumns(1380)).toBe(6);
-    expect(getReportActionColumns(1280)).toBe(6);
+    // CHG-090 (QA): máximo 3 columnas — grid 3x2 en escritorio.
+    expect(getReportActionColumns(1380)).toBe(3);
+    expect(getReportActionColumns(1280)).toBe(3);
     expect(getReportActionColumns(1279)).toBe(3);
     expect(getReportActionColumns(1080)).toBe(3);
     expect(getReportActionColumns(1079)).toBe(2);
@@ -406,18 +425,13 @@ describe("App universal", () => {
     expect(donationPointButton.props.accessibilityHint).toMatch(/entrega que reúne ayudas/i);
     expect(communityMealsButton.props.accessibilityHint).toMatch(/preparas alimentos/i);
     expect(temporaryShelterButton.props.accessibilityHint).toMatch(/espacio disponible/i);
-    expect(
-      screen.getByText(/recibe y administra ayudas/i),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(/punto que reúne ayudas para su traslado/i),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(/alimentos preparados con personas afectadas/i),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(/espacio temporal donde personas afectadas puedan dormir/i),
-    ).toBeTruthy();
+    // CHG-090 (QA): las tarjetas ya no pintan descripciones largas —
+    // solo ícono grande + título; el detalle vive en el hint accesible.
+    expect(screen.queryByText(/recibe y administra ayudas/i)).toBeNull();
+    expect(screen.getByText("Inscribir centro de acopio")).toBeTruthy();
+    expect(screen.getByText("Registrar punto de recolección")).toBeTruthy();
+    expect(screen.getByText("Ofrecer comida comunitaria")).toBeTruthy();
+    expect(screen.getByText("Ofrecer alojamiento temporal")).toBeTruthy();
     const showMoreButton = screen.getByRole("button", {
       name: "Ver más contenido",
     });

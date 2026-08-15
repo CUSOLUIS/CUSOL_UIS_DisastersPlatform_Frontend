@@ -242,6 +242,8 @@ export function shouldStackReportActions(width: number): boolean {
 }
 
 export function getReportActionColumns(width: number): ReportActionColumns {
+  // CHG-090 (QA): máximo 3 columnas — grid 3x2 en escritorio para dar
+  // respiración y mayor área de clic; nunca 6 tarjetas comprimidas.
   if (width < 620) {
     return 1;
   }
@@ -250,22 +252,15 @@ export function getReportActionColumns(width: number): ReportActionColumns {
     return 2;
   }
 
-  if (width < 1280) {
-    return 3;
-  }
-
-  return 6;
+  return 3;
 }
 
 function ReportAction({
   accessibilityHint,
   accessibilityLabel,
-  code,
   columns,
   compact,
-  description,
   icon,
-  meta,
   onPress,
   testID,
   title,
@@ -323,14 +318,9 @@ function ReportAction({
           {icon}
         </View>
         <View style={[styles.reportActionCopy, dense && styles.reportActionCopyDense]}>
-          <Text
-            style={[
-              styles.reportActionCode,
-              dense && styles.reportActionCodeDense,
-            ]}
-          >
-            {code}
-          </Text>
+          {/* CHG-090 (QA): solo ícono grande + título claro — sin
+              subcategoría ni descripción, para asimilación rápida
+              bajo estrés. */}
           <Text
             style={[
               styles.reportActionTitle,
@@ -340,17 +330,8 @@ function ReportAction({
           >
             {title}
           </Text>
-          <Text
-            style={[
-              styles.reportActionDescription,
-              dense && styles.reportActionDescriptionDense,
-            ]}
-          >
-            {description}
-          </Text>
         </View>
         <View style={[styles.reportActionEnd, dense && styles.reportActionEndDense]}>
-          {!compact && !dense && <Text style={styles.reportActionMeta}>{meta}</Text>}
           <Text style={styles.reportActionArrow}>→</Text>
         </View>
       </View>
@@ -643,12 +624,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#1b7787",
   },
   reportActionDense: {
-    minHeight: 188,
+    minHeight: 150,
     flexDirection: "column",
     alignItems: "flex-start",
-    gap: 7,
-    paddingHorizontal: 13,
-    paddingVertical: 12,
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
   },
   reportActionCompact: {
     minHeight: 160,
@@ -668,9 +649,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.48)",
   },
   reportActionIconDense: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
   reportActionIconCompact: {
     width: 52,
@@ -717,9 +698,9 @@ const styles = StyleSheet.create({
   },
   reportActionTitleDense: {
     marginTop: 4,
-    fontSize: 17,
-    letterSpacing: -0.4,
-    lineHeight: 19,
+    fontSize: 21,
+    letterSpacing: -0.5,
+    lineHeight: 25,
   },
   reportActionDescription: {
     maxWidth: 460,

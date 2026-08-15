@@ -24,6 +24,7 @@ import {
 } from "../../components/FadeInImage";
 import { useReducedMotion } from "../../hooks/useReducedMotion";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
+import { font } from "../../typography";
 import type { AuthenticatedAccount } from "../auth/types";
 import { HumanitarianSearchPanel } from "../humanitarian-directory/HumanitarianSearchPanel";
 import { MySpacePanel } from "../my-space/MySpacePanel";
@@ -198,6 +199,29 @@ export function HumanImpactDashboard({
   const dataRef = useRef<View>(null);
   const liveRef = useRef<View>(null);
   const scrollPosition = useRef(0);
+  // CHG-090 (QA): estado "activo" del menú según la sección visible.
+  const sectionTops = useRef<Record<string, number>>({});
+  const [activeSection, setActiveSection] = useState<
+    "home" | "map" | "data" | "live"
+  >("home");
+
+  const registerSectionTop = (id: string) => (event: {
+    nativeEvent: { layout: { y: number } };
+  }) => {
+    sectionTops.current[id] = event.nativeEvent.layout.y;
+  };
+
+  const resolveActiveSection = (offset: number) => {
+    const anchor = offset + headerHeight + 80;
+    const tops = sectionTops.current;
+    let next: "home" | "map" | "data" | "live" = "home";
+    (["map", "data", "live"] as const).forEach((id) => {
+      if (tops[id] !== undefined && anchor >= tops[id]) {
+        next = id;
+      }
+    });
+    setActiveSection((current) => (current === next ? current : next));
+  };
   const reducedMotion = useReducedMotion();
 
   const scrollToSection = (
@@ -219,6 +243,9 @@ export function HumanImpactDashboard({
   };
 
   const showMap = () => scrollToSection(mapRef);
+  const showHome = () => {
+    scrollRef.current?.scrollTo({ y: 0, animated: !reducedMotion });
+  };
 
   return (
     <LinearGradient
@@ -233,6 +260,8 @@ export function HumanImpactDashboard({
           compact={compact}
           narrow={narrowHeader}
           stackedNavigation={stackedNavigation}
+          activeSection={activeSection}
+          onNavigateHome={showHome}
           onNavigateMap={showMap}
           onNavigateAbout={onAbout}
           onNavigateData={() => scrollToSection(dataRef)}
@@ -262,6 +291,7 @@ export function HumanImpactDashboard({
           contentContainerStyle={styles.scrollContent}
           onScroll={(event) => {
             scrollPosition.current = event.nativeEvent.contentOffset.y;
+            resolveActiveSection(scrollPosition.current);
           }}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
@@ -330,6 +360,7 @@ export function HumanImpactDashboard({
 
             <View
               ref={mapRef}
+              onLayout={registerSectionTop("map")}
               testID="dashboard-operational-map"
               style={styles.fullWidth}
             >
@@ -350,6 +381,7 @@ export function HumanImpactDashboard({
 
             <View
               ref={dataRef}
+              onLayout={registerSectionTop("data")}
               testID="dashboard-data-and-figures"
               style={styles.dataSection}
             >
@@ -380,6 +412,7 @@ export function HumanImpactDashboard({
 
             <View
               ref={liveRef}
+              onLayout={registerSectionTop("live")}
               testID="dashboard-live-transmission"
               style={[
                 styles.liveSection,
@@ -518,6 +551,8 @@ function Header({
   compact,
   narrow,
   stackedNavigation,
+  activeSection,
+  onNavigateHome,
   onNavigateMap,
   onNavigateAbout,
   onNavigateData,
@@ -533,6 +568,8 @@ function Header({
   compact: boolean;
   narrow: boolean;
   stackedNavigation: boolean;
+  activeSection: "home" | "map" | "data" | "live";
+  onNavigateHome: () => void;
   onNavigateMap: () => void;
   onNavigateAbout: () => void;
   onNavigateData: () => void;
@@ -546,6 +583,13 @@ function Header({
   onOpenMySpace: () => void;
 }) {
   const reducedMotion = useReducedMotion();
+  // CHG-090 (QA): en pantallas angostas la navegación vive en un menú
+  // hamburguesa desplegable en lugar del scroll horizontal.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const navigateAnd = (navigate: () => void) => () => {
+    setMenuOpen(false);
+    navigate();
+  };
 
   return (
     <View style={styles.headerShell}>
@@ -615,6 +659,8 @@ function Header({
 
           {!stackedNavigation && (
             <HeaderNavigation
+              activeSection={activeSection}
+              onNavigateHome={onNavigateHome}
               onNavigateMap={onNavigateMap}
               onNavigateAbout={onNavigateAbout}
               onNavigateData={onNavigateData}
@@ -622,6 +668,27 @@ function Header({
             />
           )}
 
+          {stackedNavigation && (
+            <Pressable
+              testID="header-menu-toggle"
+              accessibilityRole="button"
+              accessibilityLabel={
+                menuOpen
+                  ? "Cerrar menú de navegación"
+                  : "Abrir menú de navegación"
+              }
+              accessibilityState={{ expanded: menuOpen }}
+              onPress={() => setMenuOpen((current) => !current)}
+              style={({ pressed }) => [
+                styles.menuToggle,
+                pressed && styles.authButtonPressed,
+              ]}
+            >
+              <Text style={styles.menuToggleIcon}>
+                {menuOpen ? "✕" : "☰"}
+              </Text>
+            </Pressable>
+          )}
           <View
             style={[
               styles.authActions,
@@ -738,22 +805,18 @@ function Header({
           </View>
         </View>
 
-        {stackedNavigation && (
-          <ScrollView
-            horizontal
-            accessibilityLabel="Navegación principal"
-            contentContainerStyle={styles.headerNavigationScrollContent}
-            showsHorizontalScrollIndicator={false}
-            style={styles.headerNavigationScroll}
-          >
+        {stackedNavigation && menuOpen && (
+          <View testID="header-menu-panel" style={styles.menuPanel}>
             <HeaderNavigation
               stacked
-              onNavigateMap={onNavigateMap}
-              onNavigateAbout={onNavigateAbout}
-              onNavigateData={onNavigateData}
-              onNavigateLive={onNavigateLive}
+              activeSection={activeSection}
+              onNavigateHome={navigateAnd(onNavigateHome)}
+              onNavigateMap={navigateAnd(onNavigateMap)}
+              onNavigateAbout={navigateAnd(onNavigateAbout)}
+              onNavigateData={navigateAnd(onNavigateData)}
+              onNavigateLive={navigateAnd(onNavigateLive)}
             />
-          </ScrollView>
+          </View>
         )}
       </View>
     </View>
@@ -762,22 +825,29 @@ function Header({
 
 function HeaderNavigation({
   stacked = false,
+  activeSection,
+  onNavigateHome,
   onNavigateMap,
   onNavigateAbout,
   onNavigateData,
   onNavigateLive,
 }: {
   stacked?: boolean;
+  activeSection: "home" | "map" | "data" | "live";
+  onNavigateHome: () => void;
   onNavigateMap: () => void;
   onNavigateAbout: () => void;
   onNavigateData: () => void;
   onNavigateLive: () => void;
 }) {
+  // CHG-090 (QA): Inicio explícito primero, herramientas de acción en
+  // el medio y "Quiénes somos" al final.
   const items = [
-    { id: "map", label: "VER MAPA", hint: "Baja al mapa operativo", onPress: onNavigateMap },
-    { id: "about", label: "QUIÉNES SOMOS", hint: "Abre la página institucional", onPress: onNavigateAbout },
-    { id: "data", label: "CIFRAS Y DATOS", hint: "Baja al resumen de cifras", onPress: onNavigateData },
-    { id: "live", label: "TRANSMISIÓN EN VIVO", hint: "Baja a las personas agregadas recientemente", onPress: onNavigateLive },
+    { id: "home", label: "INICIO", hint: "Vuelve al comienzo de la portada", onPress: onNavigateHome, active: activeSection === "home" },
+    { id: "map", label: "VER MAPA", hint: "Baja al mapa operativo", onPress: onNavigateMap, active: activeSection === "map" },
+    { id: "data", label: "CIFRAS Y DATOS", hint: "Baja al resumen de cifras", onPress: onNavigateData, active: activeSection === "data" },
+    { id: "live", label: "TRANSMISIÓN EN VIVO", hint: "Baja a las personas agregadas recientemente", onPress: onNavigateLive, active: activeSection === "live" },
+    { id: "about", label: "QUIÉNES SOMOS", hint: "Abre la página institucional", onPress: onNavigateAbout, active: false },
   ];
 
   return (
@@ -795,12 +865,14 @@ function HeaderNavigation({
 }
 
 function HeaderNavigationLink({
+  active = false,
   hint,
   id,
   label,
   onPress,
   stacked,
 }: {
+  active?: boolean;
   hint: string;
   id: string;
   label: string;
@@ -815,6 +887,7 @@ function HeaderNavigationLink({
       accessibilityRole="link"
       accessibilityLabel={label.toLocaleLowerCase("es-CO")}
       accessibilityHint={hint}
+      accessibilityState={{ selected: active }}
       onBlur={() => setFocused(false)}
       onFocus={() => setFocused(true)}
       onPress={onPress}
@@ -824,6 +897,7 @@ function HeaderNavigationLink({
       }: PressableStateCallbackType & { hovered?: boolean }) => [
         styles.headerNavigationLink,
         (focused || hovered) && styles.headerNavigationLinkInteractive,
+        active && styles.headerNavigationLinkActive,
         pressed && styles.headerNavigationLinkPressed,
       ]}
     >
@@ -831,6 +905,7 @@ function HeaderNavigationLink({
         style={[
           styles.headerNavigationText,
           !stacked && styles.headerNavigationTextDesktop,
+          active && styles.headerNavigationTextActive,
         ]}
       >
         {label}
@@ -1243,7 +1318,38 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
   },
-  headerNavigationStacked: { flexGrow: 0, flexShrink: 0 },
+  headerNavigationStacked: {
+    flexGrow: 0,
+    flexShrink: 0,
+    width: "100%",
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 4,
+  },
+  // CHG-090 (QA): estado activo del enlace de navegación.
+  headerNavigationLinkActive: {
+    borderColor: "rgba(81,229,255,0.55)",
+    backgroundColor: "rgba(81,229,255,0.10)",
+  },
+  headerNavigationTextActive: { color: colors.cyan },
+  // CHG-090 (QA): menú hamburguesa en pantallas angostas.
+  menuToggle: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.lineStrong,
+    borderRadius: 8,
+    backgroundColor: "rgba(81,229,255,0.04)",
+  },
+  menuToggleIcon: { color: colors.cyan, fontSize: 18, lineHeight: 22 },
+  menuPanel: {
+    width: "100%",
+    paddingHorizontal: 4,
+    paddingBottom: 10,
+    gap: 4,
+  },
   headerNavigationScroll: { width: "100%", flexGrow: 0 },
   headerNavigationScrollContent: {
     minWidth: "100%",
@@ -1338,21 +1444,23 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     color: colors.ink,
     fontFamily: fontFamilies.mono,
-    fontSize: 8,
+    fontSize: font(11),
     fontWeight: "800",
     letterSpacing: 0.6,
   },
   loginButton: { minHeight: 38, alignItems: "center", justifyContent: "center", paddingHorizontal: 15, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 7, backgroundColor: "rgba(81,229,255,0.04)" },
   registerButton: { minHeight: 38, alignItems: "center", justifyContent: "center", paddingHorizontal: 16, borderWidth: 1, borderColor: colors.cyan, borderRadius: 7, backgroundColor: colors.cyan },
-  authButtonCompact: { minHeight: 36, paddingHorizontal: 9 },
-  authButtonNarrow: { minHeight: 34, paddingHorizontal: 6 },
+  // CHG-090 (QA): área táctil mínima de 44dp también en móvil.
+  authButtonCompact: { minHeight: 44, paddingHorizontal: 12 },
+  authButtonNarrow: { minHeight: 44, paddingHorizontal: 9 },
   authButtonPressed: { opacity: 0.72, transform: [{ scale: 0.985 }] },
-  loginButtonText: { color: colors.cyan, fontFamily: fontFamilies.mono, fontSize: 8, fontWeight: "800", letterSpacing: 0.7 },
-  registerButtonText: { color: "#06101a", fontFamily: fontFamilies.mono, fontSize: 8, fontWeight: "900", letterSpacing: 0.7 },
-  authButtonTextNarrow: { fontSize: 7, letterSpacing: 0.35 },
+  loginButtonText: { color: colors.cyan, fontFamily: fontFamilies.mono, fontSize: font(11), fontWeight: "800", letterSpacing: 0.7 },
+  registerButtonText: { color: "#06101a", fontFamily: fontFamilies.mono, fontSize: font(11), fontWeight: "900", letterSpacing: 0.7 },
+  authButtonTextNarrow: { fontSize: font(10), letterSpacing: 0.35 },
   scrollContent: { flexGrow: 1 },
   content: { width: "100%", maxWidth: contentMaxWidth, alignSelf: "center", gap: 16, paddingHorizontal: 24 },
-  contentCompact: { paddingHorizontal: 8 },
+  // CHG-090 (QA): padding lateral consistente en móvil.
+  contentCompact: { paddingHorizontal: 20 },
   dataSection: { width: "100%", gap: 16 },
   entryHero: {
     width: "100%",
@@ -1410,7 +1518,7 @@ const styles = StyleSheet.create({
   scrollCueLabel: {
     color: colors.cyan,
     fontFamily: fontFamilies.mono,
-    fontSize: 8,
+    fontSize: font(11),
     fontWeight: "800",
     letterSpacing: 1.5,
   },
@@ -1424,23 +1532,26 @@ const styles = StyleSheet.create({
   hero: { minHeight: 610, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 54, marginBottom: 24 },
   situationIntro: { minHeight: 430, marginBottom: 0, paddingTop: 34, paddingHorizontal: 22, borderLeftWidth: 1, borderLeftColor: "rgba(81,229,255,0.25)" },
   heroStacked: { flexDirection: "column", alignItems: "stretch", gap: 40, paddingTop: 12 },
-  heroCompact: { minHeight: 0, flexDirection: "column", alignItems: "stretch", justifyContent: "flex-start", gap: 34 },
+  // CHG-090 (QA): más aire entre el bloque de misión y el directorio.
+  heroCompact: { minHeight: 0, flexDirection: "column", alignItems: "stretch", justifyContent: "flex-start", gap: 44 },
   heroCopy: { zIndex: 2, flex: 1 },
   signalLabel: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 },
   signalLine: { width: 28, height: 1, backgroundColor: colors.cyan },
   signalText: { color: colors.cyan, fontFamily: fontFamilies.mono, fontSize: 10, fontWeight: "700", letterSpacing: 1.4 },
-  signalTextNarrow: { fontSize: 8, letterSpacing: 0.8 },
+  signalTextNarrow: { fontSize: font(10), letterSpacing: 0.8 },
   heroTitle: { color: colors.ink, fontSize: 118, fontWeight: "700", letterSpacing: -9, lineHeight: 96 },
   heroTitleAccent: { color: colors.cyan },
   heroTitleCompact: { fontSize: 70, letterSpacing: -5, lineHeight: 61 },
   heroTitleMissionWide: { fontSize: 108, letterSpacing: -8, lineHeight: 92 },
   heroTitleMissionCompact: { fontSize: 52, letterSpacing: -3.8, lineHeight: 54 },
   heroTitleMissionNarrow: { fontSize: 41, letterSpacing: -3, lineHeight: 44 },
-  heroDescription: { maxWidth: 660, marginTop: 28, color: colors.inkSoft, fontSize: 16, lineHeight: 27 },
+  // CHG-090 (QA): tono más claro para asegurar el contraste AA sobre
+  // el fondo azul marino, y cuerpo un punto más grande.
+  heroDescription: { maxWidth: 660, marginTop: 28, color: "#b9c5da", fontSize: 17, lineHeight: 28 },
   tags: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 24 },
   tag: { paddingHorizontal: 11, paddingVertical: 8, borderWidth: 1, borderColor: colors.line, borderRadius: 5, backgroundColor: "rgba(16, 25, 40, 0.42)" },
   tagActive: { borderColor: "rgba(67, 231, 173, 0.28)" },
-  tagText: { color: colors.inkSoft, fontFamily: fontFamilies.mono, fontSize: 8, letterSpacing: 0.8 },
+  tagText: { color: colors.inkSoft, fontFamily: fontFamilies.mono, fontSize: font(11), letterSpacing: 0.8 },
   tagTextActive: { color: colors.alive },
   notice: { minHeight: 54, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: "rgba(255, 207, 102, 0.28)", borderRadius: 9, backgroundColor: "rgba(255, 207, 102, 0.07)" },
   staleNotice: { borderColor: "rgba(255, 103, 136, 0.30)", backgroundColor: "rgba(255, 103, 136, 0.08)" },
@@ -1451,12 +1562,12 @@ const styles = StyleSheet.create({
   primaryMetricTablet: { minHeight: 440 },
   metricHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
   metricIcon: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255, 207, 102, 0.24)", borderRadius: 8, backgroundColor: "rgba(255, 207, 102, 0.06)" },
-  metricHeaderText: { color: colors.inkSoft, fontFamily: fontFamilies.mono, fontSize: 9, fontWeight: "700", letterSpacing: 1.2 },
+  metricHeaderText: { color: colors.inkSoft, fontFamily: fontFamilies.mono, fontSize: font(11), fontWeight: "700", letterSpacing: 1.2 },
   primaryMetricCopy: { zIndex: 2 },
   metricCodeRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 9, marginBottom: 7 },
   metricCode: { marginBottom: 7, color: "#927e52", fontFamily: fontFamilies.mono, fontSize: 10, letterSpacing: 1.3 },
   metricCodeInline: { marginBottom: 0 },
-  testScenarioLabel: { paddingHorizontal: 6, paddingVertical: 3, borderWidth: 1, borderColor: "rgba(137,166,207,0.18)", borderRadius: 4, backgroundColor: "rgba(137,166,207,0.05)", color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 7, fontWeight: "700", letterSpacing: 0.7 },
+  testScenarioLabel: { paddingHorizontal: 6, paddingVertical: 3, borderWidth: 1, borderColor: "rgba(137,166,207,0.18)", borderRadius: 4, backgroundColor: "rgba(137,166,207,0.05)", color: colors.inkSoft, fontFamily: fontFamilies.mono, fontSize: font(11), fontWeight: "700", letterSpacing: 0.7 },
   primaryValue: { color: colors.missing, fontSize: 210, fontWeight: "700", letterSpacing: -14, lineHeight: 188 },
   primaryValueCompact: { fontSize: 96, letterSpacing: -6, lineHeight: 88 },
   primaryLabel: { marginBottom: 10, color: colors.ink, fontSize: 64, fontWeight: "500", letterSpacing: -3.2 },
@@ -1505,7 +1616,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     color: colors.cyan,
     fontFamily: fontFamilies.mono,
-    fontSize: 8,
+    fontSize: font(11),
     fontWeight: "800",
     letterSpacing: 1.3,
   },
@@ -1519,10 +1630,10 @@ const styles = StyleSheet.create({
   },
   footerAlliance: {
     marginTop: 18,
-    color: colors.inkDim,
+    color: colors.inkSoft,
     fontFamily: fontFamilies.mono,
-    fontSize: 8,
-    lineHeight: 14,
+    fontSize: font(11),
+    lineHeight: 18,
     letterSpacing: 0.75,
   },
   footerNavigation: { flexDirection: "row", gap: 64 },
@@ -1530,9 +1641,9 @@ const styles = StyleSheet.create({
   footerColumn: { minWidth: 150 },
   footerColumnTitle: {
     marginBottom: 13,
-    color: colors.inkDim,
+    color: colors.inkSoft,
     fontFamily: fontFamilies.mono,
-    fontSize: 8,
+    fontSize: font(11),
     fontWeight: "800",
     letterSpacing: 1.1,
   },
@@ -1552,7 +1663,7 @@ const styles = StyleSheet.create({
   footerNoticeLabel: {
     color: colors.missing,
     fontFamily: fontFamilies.mono,
-    fontSize: 8,
+    fontSize: font(11),
     fontWeight: "800",
     letterSpacing: 1,
   },
@@ -1567,9 +1678,9 @@ const styles = StyleSheet.create({
   },
   footerBottomCompact: { flexDirection: "column", gap: 8 },
   footerMeta: {
-    color: "#465267",
+    color: "#8996ad",
     fontFamily: fontFamilies.mono,
-    fontSize: 7,
+    fontSize: font(11),
     letterSpacing: 0.75,
   },
 });
