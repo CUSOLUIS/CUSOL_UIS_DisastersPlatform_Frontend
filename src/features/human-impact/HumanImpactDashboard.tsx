@@ -1068,6 +1068,10 @@ function BrandIcon({ compact, narrow }: { compact: boolean; narrow: boolean }) {
   return (
     <FadeInImage
       testID="cusol-brand-logo"
+      // CHG-068: ambos logos del encabezado aparecen a la vez, despacio
+      // y entrando desde la izquierda.
+      group="header-brand-logos"
+      slideFrom="left"
       source={cusolUisLogo}
       resizeMode="contain"
       style={[
@@ -1092,6 +1096,8 @@ function PrometeoIcon({ compact, narrow }: { compact: boolean; narrow: boolean }
     >
       <FadeInImage
         testID="prometeo-brand-logo"
+        group="header-brand-logos"
+        slideFrom="left"
         accessibilityIgnoresInvertColors
         source={prometeoLogo}
         resizeMode="contain"

@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Animated, type ImageProps } from "react-native";
 import { useReducedMotion } from "../hooks/useReducedMotion";
 
@@ -6,24 +6,119 @@ import { useReducedMotion } from "../hooks/useReducedMotion";
 // con un fundido al terminar, en lugar de pintarse a pedazos. Con
 // "reducir movimiento" activo aparece de una vez, pero igualmente solo
 // cuando ya cargó completa.
+// CHG-068: imágenes de un mismo `group` esperan a que TODAS carguen y
+// aparecen a la vez, despacio y entrando desde el mismo lado.
 
-export function FadeInImage({ style, onLoad, ...props }: ImageProps) {
+interface RevealGroup {
+  members: Set<symbol>;
+  loaded: Set<symbol>;
+  started: boolean;
+  starters: Map<symbol, () => void>;
+}
+
+const revealGroups = new Map<string, RevealGroup>();
+
+function groupFor(name: string): RevealGroup {
+  let group = revealGroups.get(name);
+  if (!group) {
+    group = {
+      members: new Set(),
+      loaded: new Set(),
+      started: false,
+      starters: new Map(),
+    };
+    revealGroups.set(name, group);
+  }
+  return group;
+}
+
+function leaveGroup(name: string, member: symbol) {
+  const group = revealGroups.get(name);
+  if (!group) return;
+  group.members.delete(member);
+  group.loaded.delete(member);
+  group.starters.delete(member);
+  if (group.members.size === 0) revealGroups.delete(name);
+}
+
+function markLoaded(name: string, member: symbol) {
+  const group = groupFor(name);
+  group.loaded.add(member);
+  // El grupo arranca una única vez, cuando ya no falta ninguna; si una
+  // imagen llega tarde (remontaje), se anima sola al cargar.
+  if (group.started || group.loaded.size < group.members.size) {
+    if (group.started) group.starters.get(member)?.();
+    return;
+  }
+  group.started = true;
+  group.starters.forEach((start) => start());
+}
+
+export const FADE_IN_IMAGE_DURATION_MS = 900;
+const SLIDE_DISTANCE = 18;
+
+interface FadeInImageProps extends ImageProps {
+  // Nombre de grupo: todas las imágenes con el mismo nombre aparecen
+  // sincronizadas cuando la última termina de cargar.
+  group?: string;
+  // Lado desde el que entra la imagen; el fundido puro no desliza.
+  slideFrom?: "left" | "right";
+}
+
+export function FadeInImage({
+  style,
+  onLoad,
+  group,
+  slideFrom,
+  ...props
+}: FadeInImageProps) {
   const opacity = useRef(new Animated.Value(0)).current;
+  const slide = useRef(
+    new Animated.Value(
+      slideFrom ? (slideFrom === "left" ? -SLIDE_DISTANCE : SLIDE_DISTANCE) : 0,
+    ),
+  ).current;
   const reducedMotion = useReducedMotion();
+  const member = useMemo(() => Symbol("fade-in-image"), []);
+
+  const startReveal = useRef(() => undefined as void);
+  startReveal.current = () => {
+    if (reducedMotion) {
+      opacity.setValue(1);
+      slide.setValue(0);
+      return;
+    }
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: FADE_IN_IMAGE_DURATION_MS,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slide, {
+        toValue: 0,
+        duration: FADE_IN_IMAGE_DURATION_MS,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  useEffect(() => {
+    if (!group) return;
+    const joined = groupFor(group);
+    joined.members.add(member);
+    joined.starters.set(member, () => startReveal.current());
+    return () => leaveGroup(group, member);
+  }, [group, member]);
 
   return (
     <Animated.Image
       {...props}
-      style={[style, { opacity }]}
+      style={[style, { opacity, transform: [{ translateX: slide }] }]}
       onLoad={(event) => {
-        if (reducedMotion) {
-          opacity.setValue(1);
+        if (group) {
+          markLoaded(group, member);
         } else {
-          Animated.timing(opacity, {
-            toValue: 1,
-            duration: 320,
-            useNativeDriver: true,
-          }).start();
+          startReveal.current();
         }
         onLoad?.(event);
       }}

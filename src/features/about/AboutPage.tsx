@@ -89,9 +89,9 @@ export function AboutPage({ onBack }: AboutPageProps) {
                 style={styles.identityPlate}
               >
                 <View style={styles.identitySurface}>
-                  <FadeInImage accessibilityLabel="Logo de CUSOL UIS" resizeMode="contain" source={cusolLogo} style={styles.heroLogo} />
+                  <FadeInImage accessibilityLabel="Logo de CUSOL UIS" group="about-brand-logos" slideFrom="left" resizeMode="contain" source={cusolLogo} style={styles.heroLogo} />
                   <View style={styles.prometeoCircle}>
-                    <FadeInImage accessibilityLabel="Logo de Prometeo UIS" resizeMode="contain" source={prometeoLogo} style={styles.prometeoLogo} />
+                    <FadeInImage accessibilityLabel="Logo de Prometeo UIS" group="about-brand-logos" slideFrom="left" resizeMode="contain" source={prometeoLogo} style={styles.prometeoLogo} />
                   </View>
                 </View>
               </LinearGradient>
