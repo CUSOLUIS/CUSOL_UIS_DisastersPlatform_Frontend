@@ -63,6 +63,8 @@ export interface AuthenticatedAccount {
   id: string;
   displayName: string;
   email: string;
+  // CHG-083: teléfono del perfil para precargar formularios.
+  phone?: string | null;
   assignedRole: AccountRole;
   status: "active";
   sessionExpiresAt: string;

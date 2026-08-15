@@ -10,6 +10,8 @@ export default function ReportMissingPersonRoute() {
   return (
     <MissingPersonReportForm
       onBack={safeBack}
+      // CHG-083: la constancia siempre sale hacia la portada.
+      onHome={() => router.replace("/")}
       onRegister={() => router.push("/registrarse")}
       onLogin={() => router.push("/iniciar-sesion")}
     />

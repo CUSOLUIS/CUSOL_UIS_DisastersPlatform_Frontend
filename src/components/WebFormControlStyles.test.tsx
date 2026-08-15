@@ -23,7 +23,10 @@ describe("WebFormControlStyles", () => {
   });
 
   it("inyecta una única etiqueta de estilos global en web", () => {
-    const element = WebFormControlStyles();
+    const element = WebFormControlStyles() as unknown as {
+      type: string;
+      props: { id: string; children: string };
+    };
     expect(element?.type).toBe("style");
     expect(element?.props.id).toBe("cusol-form-controls");
     expect(element?.props.children).toBe(webFormControlCss);

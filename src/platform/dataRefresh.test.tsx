@@ -49,9 +49,12 @@ describe("sonda de la señal de cambios en App", () => {
     const heard = jest.fn();
     const unsubscribe = subscribeToDataRefresh(heard);
     const signals = ["a", "a", "b"];
-    const fetchSignal = jest.fn(
-      async () => signals[Math.min(fetchSignal.mock.calls.length - 1, 2)],
-    );
+    let reads = 0;
+    const fetchSignal = jest.fn(async () => {
+      const signal = signals[Math.min(reads, 2)];
+      reads += 1;
+      return signal;
+    });
 
     render(
       <App

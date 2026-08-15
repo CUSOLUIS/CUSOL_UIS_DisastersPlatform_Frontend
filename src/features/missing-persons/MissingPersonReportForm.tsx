@@ -1,6 +1,6 @@
 import * as DocumentPicker from "expo-document-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -91,6 +91,8 @@ interface MissingPersonReportFormProps {
   onLogin?: () => void;
   // CHG-078: fuente de sesión inyectable en pruebas.
   sessionSource?: SessionAccountSource;
+  // CHG-083: salida explícita de la constancia hacia la portada.
+  onHome?: () => void;
   pickPhotos?: () => Promise<SelectedPhoto[]>;
   submitReport?: (
     draft: MissingPersonReportDraft,
@@ -124,6 +126,7 @@ export function MissingPersonReportForm({
   onBack,
   onRegister,
   onLogin,
+  onHome,
   sessionSource,
   pickPhotos = defaultPickPhotos,
   submitReport = defaultSubmitReport,
@@ -142,7 +145,32 @@ export function MissingPersonReportForm({
   const [selectingPhotos, setSelectingPhotos] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [receipt, setReceipt] = useState<MissingPersonReportReceipt | null>(null);
+  // CHG-083: campos con error para el resaltado inline y scroll.
+  const [invalidFields, setInvalidFields] = useState<Set<string>>(
+    () => new Set(),
+  );
   const idempotencyKeyRef = useRef<string | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const sectionOffsets = useRef<Record<string, number>>({});
+
+  const registerSection = (code: string, y: number) => {
+    sectionOffsets.current[code] = y;
+  };
+
+  // CHG-083: con sesión activa se precargan (editables) los datos del
+  // reportante desde el perfil, solo sobre campos aún vacíos.
+  useEffect(() => {
+    if (session.status !== "authenticated") {
+      return;
+    }
+    const { displayName, email, phone } = session.account;
+    setDraft((current) => ({
+      ...current,
+      reporterName: current.reporterName || displayName,
+      reporterEmail: current.reporterEmail || email,
+      reporterPhone: current.reporterPhone || (phone ?? ""),
+    }));
+  }, [session]);
 
   const setField = <Key extends keyof MissingPersonReportDraft>(
     key: Key,
@@ -164,9 +192,23 @@ export function MissingPersonReportForm({
   };
 
   const submit = async () => {
-    const errors = validateDraft(draft, photos);
-    setFormErrors(errors);
-    if (errors.length > 0) {
+    const issues = collectDraftIssues(draft, photos);
+    setFormErrors(
+      issues
+        .map((issue) => issue.message)
+        .filter((message) => message.length > 0),
+    );
+    setInvalidFields(new Set(issues.map((issue) => issue.field)));
+    if (issues.length > 0) {
+      // CHG-083: scroll suave a la sección del primer campo con error.
+      const section = FIELD_SECTIONS[issues[0].field];
+      const offset = section ? sectionOffsets.current[section] : undefined;
+      if (offset !== undefined) {
+        scrollRef.current?.scrollTo({
+          y: Math.max(0, offset - 16),
+          animated: true,
+        });
+      }
       return;
     }
 
@@ -194,7 +236,7 @@ export function MissingPersonReportForm({
   };
 
   if (receipt) {
-    return <ReportConfirmation receipt={receipt} onBack={onBack} />;
+    return <ReportConfirmation receipt={receipt} onHome={onHome ?? onBack} />;
   }
 
   return (
@@ -211,7 +253,7 @@ export function MissingPersonReportForm({
           </View>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={[styles.content, compact && styles.contentCompact]}>
             <View style={styles.intro}>
               <Text style={styles.overline}>MISSING PERSON / NEW REPORT</Text>
@@ -236,10 +278,10 @@ export function MissingPersonReportForm({
 
             <PrivacyNotice />
 
-            <FormSection code="01" title="Datos de la persona" description="Identificación básica. Los campos marcados con * son obligatorios.">
+            <FormSection code="01" title="Datos de la persona" description="Identificación básica. Los campos marcados con * son obligatorios." onPosition={registerSection}>
               <FieldGrid compact={compact}>
-                <FormField label="Nombres *" value={draft.firstNames} onChangeText={(value) => setField("firstNames", value)} autoComplete="name-given" />
-                <FormField label="Apellidos *" value={draft.lastNames} onChangeText={(value) => setField("lastNames", value)} autoComplete="name-family" />
+                <FormField label="Nombres *" invalid={invalidFields.has("firstNames")} value={draft.firstNames} onChangeText={(value) => setField("firstNames", value)} autoComplete="name-given" />
+                <FormField label="Apellidos *" invalid={invalidFields.has("lastNames")} value={draft.lastNames} onChangeText={(value) => setField("lastNames", value)} autoComplete="name-family" />
                 <FormField label="Alias o nombre conocido" value={draft.aliases} onChangeText={(value) => setField("aliases", value)} />
                 <BirthDateField value={draft.birthDate} onChange={(value) => setField("birthDate", value)} />
                 <FormField label="Edad aproximada" value={draft.approximateAge} onChangeText={(value) => setField("approximateAge", value)} keyboardType="number-pad" />
@@ -253,14 +295,14 @@ export function MissingPersonReportForm({
               </FieldGrid>
             </FormSection>
 
-            <FormSection code="02" title="Última vez que fue vista" description="Escribe la dirección o el lugar donde fue vista por última vez.">
+            <FormSection code="02" title="Última vez que fue vista" description="Escribe la dirección o el lugar donde fue vista por última vez." onPosition={registerSection}>
               <FieldGrid compact={compact}>
-                <FormField label="Fecha *" hint="AAAA-MM-DD" value={draft.lastSeenDate} onChangeText={(value) => setField("lastSeenDate", value)} />
-                <FormField label="Hora aproximada" hint="HH:MM" value={draft.lastSeenTime} onChangeText={(value) => setField("lastSeenTime", value)} />
-                <FormField label="Departamento *" value={draft.department} onChangeText={(value) => setField("department", value)} />
-                <FormField label="Municipio *" value={draft.municipality} onChangeText={(value) => setField("municipality", value)} />
+                <FormField label="Fecha *" invalid={invalidFields.has("lastSeenDate")} hint="AAAA-MM-DD" value={draft.lastSeenDate} onChangeText={(value) => setField("lastSeenDate", value)} />
+                <FormField label="Hora aproximada" invalid={invalidFields.has("lastSeenTime")} hint="HH:MM" value={draft.lastSeenTime} onChangeText={(value) => setField("lastSeenTime", value)} />
+                <FormField label="Departamento *" invalid={invalidFields.has("department")} value={draft.department} onChangeText={(value) => setField("department", value)} />
+                <FormField label="Municipio *" invalid={invalidFields.has("municipality")} value={draft.municipality} onChangeText={(value) => setField("municipality", value)} />
               </FieldGrid>
-              <FormField label="Dirección *" hint="Dirección o lugar de referencia donde fue vista" value={draft.lastSeenArea} onChangeText={(value) => setField("lastSeenArea", value)} />
+              <FormField label="Dirección *" invalid={invalidFields.has("lastSeenArea")} hint="Dirección o lugar de referencia donde fue vista" value={draft.lastSeenArea} onChangeText={(value) => setField("lastSeenArea", value)} />
               <LastSeenLocationPicker
                 addressQuery={buildLastSeenQuery(draft)}
                 value={parseDraftCoordinates(draft.lastSeenLatitude, draft.lastSeenLongitude)}
@@ -272,11 +314,11 @@ export function MissingPersonReportForm({
                   }))
                 }
               />
-              <FormField label="Vestimenta *" multiline value={draft.clothingDescription} onChangeText={(value) => setField("clothingDescription", value)} />
-              <FormField label="Circunstancias de la desaparición *" multiline value={draft.circumstances} onChangeText={(value) => setField("circumstances", value)} />
+              <FormField label="Vestimenta *" invalid={invalidFields.has("clothingDescription")} multiline value={draft.clothingDescription} onChangeText={(value) => setField("clothingDescription", value)} />
+              <FormField label="Circunstancias de la desaparición *" invalid={invalidFields.has("circumstances")} multiline value={draft.circumstances} onChangeText={(value) => setField("circumstances", value)} />
             </FormSection>
 
-            <FormSection code="03" title="Características físicas" description="Agrega detalles visuales que permitan reconocer a la persona.">
+            <FormSection code="03" title="Características físicas" description="Agrega detalles visuales que permitan reconocer a la persona." onPosition={registerSection}>
               <FieldGrid compact={compact}>
                 <FormField label="Estatura aproximada (cm)" value={draft.heightCm} onChangeText={(value) => setField("heightCm", value)} keyboardType="number-pad" />
                 <FormField label="Contextura" value={draft.build} onChangeText={(value) => setField("build", value)} />
@@ -290,18 +332,18 @@ export function MissingPersonReportForm({
               <FormField label="Información médica relevante · privada" multiline value={draft.medicalInformation} onChangeText={(value) => setField("medicalInformation", value)} />
             </FormSection>
 
-            <FormSection code="04" title="Datos del reportante" description="Esta información es privada y se usa únicamente para verificar el reporte.">
+            <FormSection code="04" title="Datos del reportante" description="Esta información es privada y se usa únicamente para verificar el reporte." onPosition={registerSection}>
               <FieldGrid compact={compact}>
-                <FormField label="Nombre completo *" value={draft.reporterName} onChangeText={(value) => setField("reporterName", value)} autoComplete="name" />
-                <FormField label="Relación con la persona *" value={draft.reporterRelationship} onChangeText={(value) => setField("reporterRelationship", value)} />
-                <FormField label="Teléfono privado" value={draft.reporterPhone} onChangeText={(value) => setField("reporterPhone", value)} keyboardType="phone-pad" autoComplete="tel" />
-                <FormField label="Correo privado" value={draft.reporterEmail} onChangeText={(value) => setField("reporterEmail", value)} keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
+                <FormField label="Nombre completo *" invalid={invalidFields.has("reporterName")} value={draft.reporterName} onChangeText={(value) => setField("reporterName", value)} autoComplete="name" />
+                <FormField label="Relación con la persona *" invalid={invalidFields.has("reporterRelationship")} value={draft.reporterRelationship} onChangeText={(value) => setField("reporterRelationship", value)} />
+                <FormField label="Teléfono privado" invalid={invalidFields.has("reporterPhone")} value={draft.reporterPhone} onChangeText={(value) => setField("reporterPhone", value)} keyboardType="phone-pad" autoComplete="tel" />
+                <FormField label="Correo privado" invalid={invalidFields.has("reporterEmail")} value={draft.reporterEmail} onChangeText={(value) => setField("reporterEmail", value)} keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
                 <FormField label="Número de denuncia o radicado" value={draft.officialReportNumber} onChangeText={(value) => setField("officialReportNumber", value)} />
               </FieldGrid>
               <Text style={styles.fieldHint}>Debes ingresar al menos teléfono o correo.</Text>
             </FormSection>
 
-            <FormSection code="05" title="Fotografías" description="Adjunta imágenes recientes y claras de la persona.">
+            <FormSection code="05" title="Fotografías" description="Adjunta imágenes recientes y claras de la persona." onPosition={registerSection}>
               <View style={styles.photoRules}>
                 <PhotoIcon />
                 <View style={styles.photoRulesCopy}>
@@ -341,7 +383,7 @@ export function MissingPersonReportForm({
               </View>
             </FormSection>
 
-            <FormSection code="06" title="Confirmaciones" description="Lee y confirma antes de preparar el reporte.">
+            <FormSection code="06" title="Confirmaciones" description="Lee y confirma antes de preparar el reporte." onPosition={registerSection}>
               <ConsentCheckbox checked={draft.truthConfirmed} label="Confirmo que la información es veraz según mi conocimiento." onPress={() => setField("truthConfirmed", !draft.truthConfirmed)} />
               <ConsentCheckbox checked={draft.photoAuthorizationConfirmed} label="Confirmo que tengo autorización para compartir estas fotografías." onPress={() => setField("photoAuthorizationConfirmed", !draft.photoAuthorizationConfirmed)} />
             </FormSection>
@@ -369,8 +411,26 @@ export function MissingPersonReportForm({
   );
 }
 
-function validateDraft(draft: MissingPersonReportDraft, photos: SelectedPhoto[]): string[] {
-  const errors: string[] = [];
+// CHG-083 — Cada regla produce campo + mensaje: el banner general se
+// conserva y además se resalta el campo exacto y se hace scroll al
+// primero con error.
+export type ReportIssueField =
+  | keyof MissingPersonReportDraft
+  | "photos"
+  | "confirmations";
+
+export interface DraftIssue {
+  field: ReportIssueField;
+  message: string;
+}
+
+export function collectDraftIssues(
+  draft: MissingPersonReportDraft,
+  photos: SelectedPhoto[],
+): DraftIssue[] {
+  const issues: DraftIssue[] = [];
+  const push = (field: ReportIssueField, message: string) =>
+    issues.push({ field, message });
   const requiredFields: Array<[keyof MissingPersonReportDraft, string]> = [
     ["firstNames", "Ingresa los nombres de la persona."],
     ["lastNames", "Ingresa los apellidos de la persona."],
@@ -386,56 +446,80 @@ function validateDraft(draft: MissingPersonReportDraft, photos: SelectedPhoto[])
 
   requiredFields.forEach(([field, message]) => {
     if (typeof draft[field] === "string" && draft[field].trim().length === 0) {
-      errors.push(message);
+      push(field, message);
     }
   });
 
   if (!draft.reporterPhone.trim() && !draft.reporterEmail.trim()) {
-    errors.push("Ingresa al menos un teléfono o correo de contacto privado.");
+    push("reporterPhone", "Ingresa al menos un teléfono o correo de contacto privado.");
+    push("reporterEmail", "");
   }
   if (draft.reporterEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.reporterEmail)) {
-    errors.push("El correo del reportante no tiene un formato válido.");
+    push("reporterEmail", "El correo del reportante no tiene un formato válido.");
   }
   if (draft.lastSeenDate && !/^\d{4}-\d{2}-\d{2}$/.test(draft.lastSeenDate)) {
-    errors.push("La fecha de última visualización debe usar AAAA-MM-DD.");
+    push("lastSeenDate", "La fecha de última visualización debe usar AAAA-MM-DD.");
   } else if (draft.lastSeenDate && new Date(`${draft.lastSeenDate}T23:59:59`).getTime() > Date.now()) {
-    errors.push("La fecha de última visualización no puede estar en el futuro.");
+    push("lastSeenDate", "La fecha de última visualización no puede estar en el futuro.");
   }
   if (draft.lastSeenTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(draft.lastSeenTime)) {
-    errors.push("La hora debe usar el formato HH:MM de 24 horas.");
+    push("lastSeenTime", "La hora debe usar el formato HH:MM de 24 horas.");
   }
   // CHG-073: listas cerradas y nacimiento plausible (espejo del
   // backend y de la base de datos).
   if (draft.birthDate) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.birthDate)) {
-      errors.push("La fecha de nacimiento debe elegirse en el calendario.");
+      push("birthDate", "La fecha de nacimiento debe elegirse en el calendario.");
     } else if (new Date(`${draft.birthDate}T23:59:59`).getTime() > Date.now()) {
-      errors.push("La fecha de nacimiento no puede estar en el futuro.");
+      push("birthDate", "La fecha de nacimiento no puede estar en el futuro.");
     } else if (draft.birthDate < "1900-01-01") {
-      errors.push("La fecha de nacimiento no puede ser anterior a 1900.");
+      push("birthDate", "La fecha de nacimiento no puede ser anterior a 1900.");
     }
   }
   if (draft.genderIdentity && !(SEX_OPTIONS as readonly string[]).includes(draft.genderIdentity)) {
-    errors.push("El sexo debe elegirse entre Hombre o Mujer.");
+    push("genderIdentity", "El sexo debe elegirse entre Hombre o Mujer.");
   }
   if (draft.nationality && !(NATIONALITY_OPTIONS as readonly string[]).includes(draft.nationality)) {
-    errors.push("La nacionalidad debe elegirse de la lista.");
+    push("nationality", "La nacionalidad debe elegirse de la lista.");
   }
   if (draft.documentType && !(DOCUMENT_TYPE_OPTIONS as readonly string[]).includes(draft.documentType)) {
-    errors.push("El tipo de documento debe elegirse de la lista.");
+    push("documentType", "El tipo de documento debe elegirse de la lista.");
   }
   if (photos.length === 0) {
-    errors.push("Adjunta al menos una fotografía permitida.");
+    push("photos", "Adjunta al menos una fotografía permitida.");
   }
   if (!draft.truthConfirmed || !draft.photoAuthorizationConfirmed) {
-    errors.push("Debes aceptar las dos confirmaciones.");
+    push("confirmations", "Debes aceptar las dos confirmaciones.");
   }
-  return errors;
+  return issues;
 }
 
-function FormSection({ code, title, description, children }: { code: string; title: string; description: string; children: React.ReactNode }) {
+// Sección (01..06) a la que pertenece cada campo, para el scroll.
+const FIELD_SECTIONS: Record<string, string> = {
+  firstNames: "01", lastNames: "01", aliases: "01", birthDate: "01",
+  approximateAge: "01", genderIdentity: "01", nationality: "01",
+  documentType: "01", documentNumber: "01",
+  lastSeenDate: "02", lastSeenTime: "02", department: "02",
+  municipality: "02", lastSeenArea: "02", clothingDescription: "02",
+  circumstances: "02",
+  heightCm: "03", build: "03", skinTone: "03", hairDescription: "03",
+  eyeDescription: "03", distinctiveMarks: "03",
+  additionalDescription: "03", medicalInformation: "03",
+  reporterName: "04", reporterRelationship: "04", reporterPhone: "04",
+  reporterEmail: "04", officialReportNumber: "04",
+  photos: "05",
+  confirmations: "06", truthConfirmed: "06",
+  photoAuthorizationConfirmed: "06",
+};
+
+
+
+function FormSection({ code, title, description, children, onPosition }: { code: string; title: string; description: string; children: React.ReactNode; onPosition?: (code: string, y: number) => void }) {
   return (
-    <View style={styles.section}>
+    <View
+      style={styles.section}
+      onLayout={(event) => onPosition?.(code, event.nativeEvent.layout.y)}
+    >
       <View style={styles.sectionHeading}>
         <Text style={styles.sectionCode}>{code}</Text>
         <View style={styles.sectionHeadingCopy}>
@@ -461,13 +545,15 @@ type FormFieldProps = {
   keyboardType?: "default" | "number-pad" | "phone-pad" | "email-address";
   autoCapitalize?: "none" | "sentences" | "words";
   autoComplete?: "name" | "name-given" | "name-family" | "email" | "tel";
+  // CHG-083: resaltado inline del campo con error.
+  invalid?: boolean;
 };
 
-function FormField({ label, hint, multiline = false, ...inputProps }: FormFieldProps) {
+function FormField({ label, hint, multiline = false, invalid = false, ...inputProps }: FormFieldProps) {
   return (
     <View style={[styles.field, multiline && styles.fieldWide]}>
       <View style={styles.fieldLabelRow}>
-        <Text style={styles.fieldLabel}>{label}</Text>
+        <Text style={[styles.fieldLabel, invalid && styles.fieldLabelInvalid]}>{label}</Text>
         {hint && <Text style={styles.fieldHint}>{hint}</Text>}
       </View>
       <TextInput
@@ -476,7 +562,7 @@ function FormField({ label, hint, multiline = false, ...inputProps }: FormFieldP
         placeholderTextColor="#4b586d"
         multiline={multiline}
         textAlignVertical={multiline ? "top" : "center"}
-        style={[styles.fieldInput, multiline && styles.fieldInputMultiline]}
+        style={[styles.fieldInput, multiline && styles.fieldInputMultiline, invalid && styles.fieldInputInvalid]}
         {...inputProps}
       />
     </View>
@@ -785,7 +871,7 @@ function ConsentCheckbox({ checked, label, onPress }: { checked: boolean; label:
   );
 }
 
-function ReportConfirmation({ receipt, onBack }: { receipt: MissingPersonReportReceipt; onBack: () => void }) {
+function ReportConfirmation({ receipt, onHome }: { receipt: MissingPersonReportReceipt; onHome: () => void }) {
   return (
     <LinearGradient colors={["#071119", colors.canvas]} style={[styles.root, styles.confirmationRoot]}>
       <View style={styles.confirmationCard}>
@@ -798,7 +884,7 @@ function ReportConfirmation({ receipt, onBack }: { receipt: MissingPersonReportR
           <Text style={styles.receiptValue}>{receipt.publicCaseCode}</Text>
           <Text style={styles.reviewStatus}>PUBLICADO</Text>
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Volver a la portada" onPress={onBack} style={styles.submitButton}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Volver a la portada" onPress={onHome} style={styles.submitButton}>
           <Text style={styles.submitButtonText}>VOLVER A LA PORTADA</Text>
         </Pressable>
       </View>
@@ -859,6 +945,9 @@ const styles = StyleSheet.create({
   fieldHint: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 8 },
   fieldInput: { minHeight: 48, paddingHorizontal: 13, paddingVertical: 11, borderWidth: 1, borderColor: "rgba(137,166,207,0.22)", borderRadius: 8, color: colors.ink, backgroundColor: "rgba(5,9,17,0.72)", fontSize: 12 },
   fieldInputMultiline: { minHeight: 98 },
+  // CHG-083: resaltado del campo con error.
+  fieldInputInvalid: { borderColor: colors.reported, backgroundColor: "rgba(255,103,136,0.06)" },
+  fieldLabelInvalid: { color: colors.reported },
   // CHG-073: selectores de lista cerrada y mini agenda.
   choiceRow: { flexDirection: "row", gap: 8 },
   choiceChip: { flex: 1, minHeight: 48, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(137,166,207,0.22)", borderRadius: 8, backgroundColor: "rgba(5,9,17,0.72)" },

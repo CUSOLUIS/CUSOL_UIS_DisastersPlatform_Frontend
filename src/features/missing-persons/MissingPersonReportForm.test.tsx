@@ -1,4 +1,6 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react-native";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
+import { colors } from "../../theme";
 import { MissingPersonReportForm } from "./MissingPersonReportForm";
 import { MAX_PHOTO_BYTES, validateAndMergePhotos } from "./photoValidation";
 import type { SelectedPhoto } from "./reportTypes";
@@ -80,6 +82,74 @@ describe("Reporte de persona perdida", () => {
     ).toBeNull();
   });
 
+  // CHG-083 — Precarga editable, resaltado inline y salida a portada.
+  it("precarga (editable) los datos del reportante desde la sesión", async () => {
+    const sessionSource = {
+      getCurrentAccount: jest.fn().mockResolvedValue({
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+        displayName: "Laura Gómez",
+        email: "laura@example.com",
+        phone: "+57 3001234567",
+        assignedRole: "user" as const,
+        status: "active" as const,
+        sessionExpiresAt: "2026-08-16T10:00:00Z",
+      }),
+    };
+    render(
+      <MissingPersonReportForm
+        onBack={jest.fn()}
+        sessionSource={sessionSource}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText("Nombre completo *").props.value,
+      ).toBe("Laura Gómez"),
+    );
+    expect(screen.getByLabelText("Correo privado").props.value).toBe(
+      "laura@example.com",
+    );
+    expect(screen.getByLabelText("Teléfono privado").props.value).toBe(
+      "+57 3001234567",
+    );
+
+    // Sigue siendo editable para este reporte.
+    fireEvent.changeText(
+      screen.getByLabelText("Nombre completo *"),
+      "Otra Persona",
+    );
+    expect(
+      screen.getByLabelText("Nombre completo *").props.value,
+    ).toBe("Otra Persona");
+  });
+
+  it("resalta los campos con error al intentar publicar", () => {
+    render(<MissingPersonReportForm onBack={jest.fn()} />);
+
+    fireEvent.press(screen.getByRole("button", { name: "Publicar reporte" }));
+
+    // El banner general se conserva…
+    expect(screen.getByText("Revisa el reporte antes de continuar")).toBeTruthy();
+    expect(
+      screen.getByText(/al menos un teléfono o correo de contacto privado/),
+    ).toBeTruthy();
+    // …y además el par teléfono/correo queda resaltado en rojo.
+    const phoneStyle = StyleSheet.flatten(
+      screen.getByLabelText("Teléfono privado").props.style,
+    );
+    const emailStyle = StyleSheet.flatten(
+      screen.getByLabelText("Correo privado").props.style,
+    );
+    expect(phoneStyle.borderColor).toBe(colors.reported);
+    expect(emailStyle.borderColor).toBe(colors.reported);
+    // Un campo opcional sin error no se resalta.
+    const aliasStyle = StyleSheet.flatten(
+      screen.getByLabelText("Alias o nombre conocido").props.style,
+    );
+    expect(aliasStyle.borderColor).not.toBe(colors.reported);
+  });
+
   it("explica formatos, límites y privacidad", () => {
     render(<MissingPersonReportForm onBack={jest.fn()} />);
 
@@ -147,9 +217,11 @@ describe("Reporte de persona perdida", () => {
       status: "published",
       receivedAt: "2026-08-12T20:00:00.000Z",
     });
+    const onHome = jest.fn();
     render(
       <MissingPersonReportForm
         onBack={jest.fn()}
+        onHome={onHome}
         pickPhotos={async () => [validPhoto]}
         submitReport={submitReport}
       />,
@@ -180,6 +252,12 @@ describe("Reporte de persona perdida", () => {
     expect(screen.getByText("DEMO-987654")).toBeTruthy();
     expect(screen.getByText("PUBLICADO")).toBeTruthy();
     expect(submitReport).toHaveBeenCalledTimes(1);
+
+    // CHG-083: VOLVER A LA PORTADA navega a la ruta principal.
+    fireEvent.press(
+      screen.getByRole("button", { name: "Volver a la portada" }),
+    );
+    expect(onHome).toHaveBeenCalledTimes(1);
   });
 });
 
