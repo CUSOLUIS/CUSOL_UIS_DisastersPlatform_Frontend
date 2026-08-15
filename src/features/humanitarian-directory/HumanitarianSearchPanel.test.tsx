@@ -237,7 +237,7 @@ it("muestra el total de coincidencias en la pista y renombra el botón", async (
     />,
   );
 
-  expect(screen.getByText("VER RESULTADOS")).toBeTruthy();
+  expect(screen.getByText("RESULTADOS")).toBeTruthy();
   expect(
     screen.getByText("Las coincidencias se abrirán en una ventana independiente."),
   ).toBeTruthy();

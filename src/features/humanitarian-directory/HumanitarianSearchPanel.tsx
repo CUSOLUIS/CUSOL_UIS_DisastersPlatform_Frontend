@@ -268,7 +268,7 @@ export function HumanitarianSearchPanel({
           onPress={() => void search()}
           style={styles.searchButton}
         >
-          <Text style={styles.searchButtonText}>VER RESULTADOS</Text>
+          <Text style={styles.searchButtonText}>RESULTADOS</Text>
           <Text style={styles.searchButtonArrow}>→</Text>
         </Pressable>
       </View>
@@ -617,8 +617,8 @@ const styles = StyleSheet.create({
   clearButton: { width: 36, height: 36, alignItems: "center", justifyContent: "center", borderRadius: 18, backgroundColor: "rgba(137,166,207,0.10)" },
   clearText: { color: colors.inkSoft, fontSize: 24, lineHeight: 25 },
   searchButton: { minHeight: 58, minWidth: 118, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingHorizontal: 18, borderRadius: 10, backgroundColor: colors.cyan },
-  searchButtonText: { color: "#07101b", fontFamily: fontFamilies.mono, fontSize: 10, fontWeight: "900", letterSpacing: 0.7 },
-  searchButtonArrow: { color: "#07101b", fontSize: 18 },
+  searchButtonText: { color: "#07101b", fontFamily: fontFamilies.mono, fontSize: 15, fontWeight: "900", letterSpacing: 0.9 },
+  searchButtonArrow: { color: "#07101b", fontSize: 22 },
   filterLine: { minHeight: 38, flexDirection: "row", alignItems: "center", gap: 10 },
   filterLabel: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 8, fontWeight: "800", letterSpacing: 0.8 },
   filters: { gap: 7 },
