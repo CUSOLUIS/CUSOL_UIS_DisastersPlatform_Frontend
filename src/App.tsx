@@ -7,6 +7,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { AppDownloadPromo } from "./components/AppDownloadPromo";
 import { authDataSource } from "./features/auth/dataSource";
 import type { AuthDataSource, AuthenticatedAccount } from "./features/auth/types";
 import { HumanImpactDashboard } from "./features/human-impact/HumanImpactDashboard";
@@ -123,6 +124,9 @@ export function App({
         sessionAccount={sessionAccount}
         onLogout={logout}
       />
+      {/* CHG-065: anuncio de descarga de la app (10 s, una vez por
+          sesión del navegador; solo en web). */}
+      <AppDownloadPromo />
     </SafeAreaProvider>
   );
 }

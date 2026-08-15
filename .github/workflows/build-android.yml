@@ -1,0 +1,80 @@
+# CHG-065 — APK de Android construido en cada push a main y publicado
+# en el VPS de producción para descarga directa. El APK apunta a la API
+# real (cusoldisasterplatform.com), así que cada push reconstruye la
+# app con los cambios nuevos de la plataforma.
+#
+# El build corre en un runner hospedado de GitHub (x86_64 con Android
+# SDK y Java preinstalados: la Raspberry Pi arm64 no puede compilar
+# Android). El job de publicación corre en el runner del VPS y deja el
+# archivo en /home/cusol01/downloads para que nginx lo sirva en
+# /descargas/cusol-disasters.apk.
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+env:
+  EXPO_PUBLIC_API_BASE_URL: https://cusoldisasterplatform.com
+  EXPO_PUBLIC_OPERATIONAL_MAP_DATA_MODE: api
+  EXPO_PUBLIC_MISSING_PERSON_DATA_MODE: api
+  EXPO_PUBLIC_ADMIN_DATA_MODE: demo
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Instalar dependencias
+        run: npm ci --no-audit --no-fund
+
+      - name: Generar proyecto nativo de Android
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Compilar APK de release
+        run: cd android && ./gradlew assembleRelease --no-daemon
+
+      - name: Publicar artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: cusol-disasters-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 14
+          if-no-files-found: error
+
+  publish-vps:
+    needs: build
+    runs-on: [self-hosted, disasters-frontend-prod]
+    timeout-minutes: 10
+    steps:
+      - name: Descargar artefacto
+        uses: actions/download-artifact@v4
+        with:
+          name: cusol-disasters-apk
+          path: apk
+
+      - name: Dejar el APK disponible para descarga
+        run: |
+          mkdir -p /home/cusol01/downloads
+          install -m 0644 apk/app-release.apk \
+            /home/cusol01/downloads/cusol-disasters.apk
+          ls -la /home/cusol01/downloads/
