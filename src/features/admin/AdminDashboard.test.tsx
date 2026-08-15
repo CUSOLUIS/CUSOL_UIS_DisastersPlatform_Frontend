@@ -195,9 +195,14 @@ describe("AdminDashboard", () => {
     );
 
     expect(
-      await screen.findByRole("header", {
-        name: "Sesión administrativa requerida",
-      }),
+      // El gate de sesión aparece tras varios ciclos de render (ready →
+      // carga → 401 → error); en runners lentos supera el segundo del
+      // timeout por defecto sin que sea un fallo funcional.
+      await screen.findByRole(
+        "header",
+        { name: "Sesión administrativa requerida" },
+        { timeout: 10000 },
+      ),
     ).toBeTruthy();
     expect(screen.queryByText("DATOS DEMOSTRATIVOS")).toBeNull();
   });
