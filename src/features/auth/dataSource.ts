@@ -5,6 +5,7 @@ import type {
   AccountSessionInput,
   AuthDataSource,
   AuthenticatedAccount,
+  EmailVerificationResult,
 } from "./types";
 
 const configuredApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.replace(
@@ -77,6 +78,34 @@ async function login(input: AccountSessionInput): Promise<AuthenticatedAccount> 
   return (await response.json()) as AuthenticatedAccount;
 }
 
+async function verifyEmail(token: string): Promise<EmailVerificationResult> {
+  if (apiBaseUrl === undefined) {
+    throw new Error(
+      "Configura EXPO_PUBLIC_API_BASE_URL para verificar el correo desde un dispositivo móvil.",
+    );
+  }
+
+  const response = await fetch(`${apiBaseUrl}/api/v1/auth/email-verifications`, {
+    method: "POST",
+    credentials: "include",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      response.status === 400
+        ? "El enlace de verificación es inválido, venció o ya fue utilizado."
+        : await readProblem(
+            response,
+            `La verificación respondió con estado ${response.status}.`,
+          ),
+    );
+  }
+
+  return (await response.json()) as EmailVerificationResult;
+}
+
 async function getCurrentAccount(
   signal?: AbortSignal,
 ): Promise<AuthenticatedAccount> {
@@ -127,6 +156,7 @@ async function logout(): Promise<void> {
 export const authDataSource: AuthDataSource = {
   register,
   login,
+  verifyEmail,
   getCurrentAccount,
   logout,
 };

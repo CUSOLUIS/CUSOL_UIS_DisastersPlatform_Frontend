@@ -7,6 +7,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { authDataSource } from "./features/auth/dataSource";
+import type { AuthDataSource, AuthenticatedAccount } from "./features/auth/types";
 import { HumanImpactDashboard } from "./features/human-impact/HumanImpactDashboard";
 import { humanImpactDataSource } from "./features/human-impact/dataSource";
 import type {
@@ -50,6 +52,8 @@ interface AppProps {
   onLogin?: () => void;
   onRegister?: () => void;
   onAbout?: () => void;
+  // CHG-051: origen de la sesión (inyectable en pruebas).
+  authSource?: AuthDataSource;
 }
 
 export function App({
@@ -68,7 +72,36 @@ export function App({
   onLogin = () => undefined,
   onRegister = () => undefined,
   onAbout = () => undefined,
+  authSource = authDataSource,
 }: AppProps) {
+  // CHG-051: la sesión activa (si existe) se muestra en el encabezado
+  // y puede cerrarse desde ahí. Sin sesión, el encabezado conserva los
+  // accesos de iniciar sesión y registro.
+  const [sessionAccount, setSessionAccount] =
+    useState<AuthenticatedAccount | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    authSource
+      .getCurrentAccount()
+      .then((account) => {
+        if (mounted) setSessionAccount(account);
+      })
+      .catch(() => {
+        if (mounted) setSessionAccount(null);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [authSource]);
+
+  const logout = () => {
+    void authSource
+      .logout()
+      .catch(() => undefined)
+      .finally(() => setSessionAccount(null));
+  };
+
   return (
     <SafeAreaProvider>
       <DashboardLoader
@@ -87,6 +120,8 @@ export function App({
         onLogin={onLogin}
         onRegister={onRegister}
         onAbout={onAbout}
+        sessionAccount={sessionAccount}
+        onLogout={logout}
       />
     </SafeAreaProvider>
   );
@@ -108,6 +143,8 @@ function DashboardLoader({
   onLogin,
   onRegister,
   onAbout,
+  sessionAccount,
+  onLogout,
 }: {
   dataSource: HumanImpactDataSource;
   mapDataSource: OperationalMapDataSource;
@@ -124,6 +161,8 @@ function DashboardLoader({
   onLogin: () => void;
   onRegister: () => void;
   onAbout: () => void;
+  sessionAccount: AuthenticatedAccount | null;
+  onLogout: () => void;
 }) {
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
 
@@ -236,6 +275,8 @@ function DashboardLoader({
       onLogin={onLogin}
       onRegister={onRegister}
       onAbout={onAbout}
+      account={sessionAccount}
+      onLogout={onLogout}
     />
   );
 }

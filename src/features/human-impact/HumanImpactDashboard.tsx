@@ -21,6 +21,7 @@ import cusolUisLogo from "../../assets/cusol-uis-logo-enhanced.png";
 import prometeoLogo from "../../assets/prometeo-logo-hd.png";
 import { useReducedMotion } from "../../hooks/useReducedMotion";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
+import type { AuthenticatedAccount } from "../auth/types";
 import { HumanitarianSearchPanel } from "../humanitarian-directory/HumanitarianSearchPanel";
 import type {
   CommunityContributionDataSource,
@@ -58,6 +59,9 @@ interface HumanImpactDashboardProps {
   onLogin: () => void;
   onRegister: () => void;
   onAbout: () => void;
+  // CHG-051: sesión activa visible en el encabezado, con cierre.
+  account?: AuthenticatedAccount | null;
+  onLogout?: () => void;
 }
 
 const numberFormatter = new Intl.NumberFormat("es-CO");
@@ -165,6 +169,8 @@ export function HumanImpactDashboard({
   onLogin,
   onRegister,
   onAbout,
+  account = null,
+  onLogout = () => undefined,
 }: HumanImpactDashboardProps) {
   const { height, width } = useWindowDimensions();
   const tablet = shouldStackPriorityLayout(width);
@@ -228,6 +234,8 @@ export function HumanImpactDashboard({
           }
           onLogin={onLogin}
           onRegister={onRegister}
+          account={account}
+          onLogout={onLogout}
         />
 
         <ScrollView
@@ -497,6 +505,8 @@ function Header({
   onNavigateLive,
   onLogin,
   onRegister,
+  account,
+  onLogout,
 }: {
   compact: boolean;
   narrow: boolean;
@@ -507,6 +517,8 @@ function Header({
   onNavigateLive: () => void;
   onLogin: () => void;
   onRegister: () => void;
+  account: AuthenticatedAccount | null;
+  onLogout: () => void;
 }) {
   const reducedMotion = useReducedMotion();
 
@@ -586,36 +598,84 @@ function Header({
               narrow && styles.authActionsNarrow,
             ]}
           >
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Iniciar sesión"
-              onPress={onLogin}
-              style={({ pressed }) => [
-                styles.loginButton,
-                compact && styles.authButtonCompact,
-                narrow && styles.authButtonNarrow,
-                pressed && styles.authButtonPressed,
-              ]}
-            >
-              <Text style={[styles.loginButtonText, narrow && styles.authButtonTextNarrow]}>
-                INICIAR SESIÓN
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Registrarse"
-              onPress={onRegister}
-              style={({ pressed }) => [
-                styles.registerButton,
-                compact && styles.authButtonCompact,
-                narrow && styles.authButtonNarrow,
-                pressed && styles.authButtonPressed,
-              ]}
-            >
-              <Text style={[styles.registerButtonText, narrow && styles.authButtonTextNarrow]}>
-                REGISTRARSE
-              </Text>
-            </Pressable>
+            {account ? (
+              // CHG-051: con sesión activa el encabezado muestra la
+              // cuenta y permite cerrarla.
+              <>
+                <View
+                  testID="session-account-chip"
+                  accessibilityLabel={`Sesión activa de ${account.displayName}`}
+                  style={[
+                    styles.sessionChip,
+                    narrow && styles.sessionChipNarrow,
+                  ]}
+                >
+                  <View style={styles.sessionDot} />
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.sessionChipText,
+                      narrow && styles.authButtonTextNarrow,
+                    ]}
+                  >
+                    {account.displayName.toLocaleUpperCase("es-CO")}
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Cerrar sesión"
+                  onPress={onLogout}
+                  style={({ pressed }) => [
+                    styles.loginButton,
+                    compact && styles.authButtonCompact,
+                    narrow && styles.authButtonNarrow,
+                    pressed && styles.authButtonPressed,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.loginButtonText,
+                      narrow && styles.authButtonTextNarrow,
+                    ]}
+                  >
+                    CERRAR SESIÓN
+                  </Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Iniciar sesión"
+                  onPress={onLogin}
+                  style={({ pressed }) => [
+                    styles.loginButton,
+                    compact && styles.authButtonCompact,
+                    narrow && styles.authButtonNarrow,
+                    pressed && styles.authButtonPressed,
+                  ]}
+                >
+                  <Text style={[styles.loginButtonText, narrow && styles.authButtonTextNarrow]}>
+                    INICIAR SESIÓN
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Registrarse"
+                  onPress={onRegister}
+                  style={({ pressed }) => [
+                    styles.registerButton,
+                    compact && styles.authButtonCompact,
+                    narrow && styles.authButtonNarrow,
+                    pressed && styles.authButtonPressed,
+                  ]}
+                >
+                  <Text style={[styles.registerButtonText, narrow && styles.authButtonTextNarrow]}>
+                    REGISTRARSE
+                  </Text>
+                </Pressable>
+              </>
+            )}
           </View>
         </View>
 
@@ -1157,6 +1217,34 @@ const styles = StyleSheet.create({
   authActions: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 9 },
   authActionsCompact: { gap: 6 },
   authActionsNarrow: { gap: 4 },
+  // CHG-051: chip de sesión activa en el encabezado.
+  sessionChip: {
+    maxWidth: 200,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "rgba(67,231,173,0.34)",
+    borderRadius: 8,
+    backgroundColor: "rgba(67,231,173,0.08)",
+  },
+  sessionChipNarrow: { maxWidth: 130, paddingHorizontal: 8 },
+  sessionDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.alive,
+  },
+  sessionChipText: {
+    flexShrink: 1,
+    color: colors.ink,
+    fontFamily: fontFamilies.mono,
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+  },
   loginButton: { minHeight: 38, alignItems: "center", justifyContent: "center", paddingHorizontal: 15, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 7, backgroundColor: "rgba(81,229,255,0.04)" },
   registerButton: { minHeight: 38, alignItems: "center", justifyContent: "center", paddingHorizontal: 16, borderWidth: 1, borderColor: colors.cyan, borderRadius: 7, backgroundColor: colors.cyan },
   authButtonCompact: { minHeight: 36, paddingHorizontal: 9 },

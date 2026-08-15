@@ -61,9 +61,18 @@ export interface AuthenticatedAccount {
   sessionExpiresAt: string;
 }
 
+// CHG-051: verificar el correo activa la cuenta e inicia la sesión de
+// bienvenida (el gateway materializa la cookie).
+export interface EmailVerificationResult {
+  status: "active";
+  verifiedAt: string;
+  account: AuthenticatedAccount;
+}
+
 export interface AuthDataSource {
   register(input: AccountRegistrationInput): Promise<AccountRegistrationReceipt>;
   login(input: AccountSessionInput): Promise<AuthenticatedAccount>;
+  verifyEmail(token: string): Promise<EmailVerificationResult>;
   getCurrentAccount(signal?: AbortSignal): Promise<AuthenticatedAccount>;
   logout(): Promise<void>;
 }

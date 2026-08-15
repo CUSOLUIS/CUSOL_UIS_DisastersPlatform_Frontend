@@ -1141,3 +1141,80 @@ describe("App universal", () => {
     expect(withBuildings.items).toHaveLength(10);
   });
 });
+
+// CHG-051 — Sesión visible en el encabezado con cierre.
+
+describe("Sesión en el encabezado", () => {
+  const sessionAccount = {
+    id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+    displayName: "Ana Rojas",
+    email: "ana.rojas@example.com",
+    assignedRole: "user" as const,
+    status: "active" as const,
+    sessionExpiresAt: "2100-01-01T00:00:00Z",
+  };
+
+  const authSourceWithSession = (logout = jest.fn()) => ({
+    register: jest.fn(),
+    login: jest.fn(),
+    verifyEmail: jest.fn(),
+    getCurrentAccount: jest.fn().mockResolvedValue(sessionAccount),
+    logout,
+  });
+
+  it("muestra la cuenta activa y reemplaza los accesos de autenticación", async () => {
+    render(
+      <App dataSource={demoDataSource} authSource={authSourceWithSession()} />,
+    );
+
+    expect(await screen.findByTestId("session-account-chip")).toBeTruthy();
+    expect(screen.getByText("ANA ROJAS")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Cerrar sesión" }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "Iniciar sesión" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Registrarse" }),
+    ).toBeNull();
+  });
+
+  it("cierra la sesión y restaura iniciar sesión y registro", async () => {
+    const logout = jest.fn().mockResolvedValue(undefined);
+    render(
+      <App
+        dataSource={demoDataSource}
+        authSource={authSourceWithSession(logout)}
+      />,
+    );
+
+    fireEvent.press(
+      await screen.findByRole("button", { name: "Cerrar sesión" }),
+    );
+
+    expect(logout).toHaveBeenCalledTimes(1);
+    expect(
+      await screen.findByRole("button", { name: "Iniciar sesión" }),
+    ).toBeTruthy();
+    expect(screen.queryByTestId("session-account-chip")).toBeNull();
+  });
+
+  it("sin sesión el encabezado conserva los accesos de autenticación", async () => {
+    const authSource = {
+      register: jest.fn(),
+      login: jest.fn(),
+      verifyEmail: jest.fn(),
+      getCurrentAccount: jest
+        .fn()
+        .mockRejectedValue(new Error("Tu sesión está ausente.")),
+      logout: jest.fn(),
+    };
+    render(<App dataSource={demoDataSource} authSource={authSource} />);
+
+    expect(
+      await screen.findByRole("button", { name: "Iniciar sesión" }),
+    ).toBeTruthy();
+    expect(screen.queryByTestId("session-account-chip")).toBeNull();
+  });
+});
