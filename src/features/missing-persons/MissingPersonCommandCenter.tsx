@@ -10,7 +10,12 @@ import {
   useWindowDimensions,
 } from "react-native";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
+import {
+  reportActionCatalog,
+  type ReportActionCopy,
+} from "../reporting/reportActionCatalog";
 import { colors, fontFamilies } from "../../theme";
+import { font } from "../../typography";
 import type {
   MissingPersonPublicRecord,
   MissingPersonSearchDataSource,
@@ -158,11 +163,7 @@ export function ReportActions({
     >
       <ReportAction
         testID="report-missing-person-action"
-        accessibilityLabel="Reportar persona perdida"
-        code="PERSONA · REPORTE CIUDADANO"
-        title="Reportar persona perdida"
-        description="Registra información y fotos para iniciar su verificación."
-        meta="ABRIR REPORTE"
+        action={reportActionCatalog["missing-person"]}
         icon={<PersonAlertIcon />}
         compact={compact}
         columns={columns}
@@ -170,12 +171,7 @@ export function ReportActions({
       />
       <ReportAction
         testID="report-unverified-building-action"
-        accessibilityLabel="Reportar edificio sin verificar"
-        accessibilityHint="Informa un edificio cuya búsqueda no ha terminado y donde aún no se puede descartar presencia humana"
-        code="EDIFICIO · BÚSQUEDA PENDIENTE"
-        title="Reportar edificio sin verificar"
-        description="Informa un edificio donde la búsqueda sigue pendiente."
-        meta="ABRIR REPORTE"
+        action={reportActionCatalog["unverified-building"]}
         icon={<BuildingSearchIcon />}
         compact={compact}
         columns={columns}
@@ -183,12 +179,7 @@ export function ReportActions({
       />
       <ReportAction
         testID="register-collection-center-action"
-        accessibilityLabel="Inscribir centro de acopio"
-        accessibilityHint="Registra un lugar que recibe, clasifica y almacena ayudas y que deberá ser revisado antes de publicarse"
-        code="AYUDA · RECEPCIÓN Y ALMACENAMIENTO"
-        title="Inscribir centro de acopio"
-        description="Registra un lugar que recibe y administra ayudas."
-        meta="INICIAR REGISTRO"
+        action={reportActionCatalog["collection-center"]}
         icon={<CollectionCenterIcon />}
         compact={compact}
         columns={columns}
@@ -196,12 +187,7 @@ export function ReportActions({
       />
       <ReportAction
         testID="register-donation-point-action"
-        accessibilityLabel="Registrar punto de recolección"
-        accessibilityHint="Registra un punto comunitario de entrega que reúne ayudas para trasladarlas posteriormente"
-        code="AYUDA · ENTREGA COMUNITARIA"
-        title="Registrar punto de recolección"
-        description="Informa un punto que reúne ayudas para su traslado."
-        meta="INICIAR REGISTRO"
+        action={reportActionCatalog["donation-point"]}
         icon={<DonationPointIcon />}
         compact={compact}
         columns={columns}
@@ -209,12 +195,7 @@ export function ReportActions({
       />
       <ReportAction
         testID="offer-community-meals-action"
-        accessibilityLabel="Ofrecer comida comunitaria"
-        accessibilityHint="Informa que preparas alimentos y deseas compartirlos con personas afectadas durante la emergencia"
-        code="AYUDA · ALIMENTACIÓN SOLIDARIA"
-        title="Ofrecer comida comunitaria"
-        description="Comparte alimentos preparados con personas afectadas."
-        meta="INICIAR OFERTA"
+        action={reportActionCatalog["community-meals"]}
         icon={<CommunityMealIcon />}
         compact={compact}
         columns={columns}
@@ -222,12 +203,7 @@ export function ReportActions({
       />
       <ReportAction
         testID="offer-temporary-shelter-action"
-        accessibilityLabel="Ofrecer alojamiento temporal"
-        accessibilityHint="Informa que tienes un espacio disponible para que personas afectadas puedan dormir temporalmente"
-        code="AYUDA · ALOJAMIENTO SOLIDARIO"
-        title="Ofrecer alojamiento temporal"
-        description="Ofrece un espacio temporal donde personas afectadas puedan dormir."
-        meta="INICIAR OFERTA"
+        action={reportActionCatalog["temporary-shelter"]}
         icon={<TemporaryShelterIcon />}
         compact={compact}
         columns={columns}
@@ -256,26 +232,19 @@ export function getReportActionColumns(width: number): ReportActionColumns {
 }
 
 function ReportAction({
-  accessibilityHint,
-  accessibilityLabel,
+  action,
   columns,
   compact,
   icon,
   onPress,
   testID,
-  title,
 }: {
-  accessibilityHint?: string;
-  accessibilityLabel: string;
-  code: string;
+  action: ReportActionCopy;
   columns: ReportActionColumns;
   compact: boolean;
-  description: string;
   icon: ReactNode;
-  meta: string;
   onPress: () => void;
   testID: string;
-  title: string;
 }) {
   const dense = columns === 3 || columns === 6;
 
@@ -283,8 +252,8 @@ function ReportAction({
     <Pressable
       testID={testID}
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityHint={accessibilityHint}
+      accessibilityLabel={action.title}
+      accessibilityHint={action.hint}
       onPress={onPress}
       style={({ pressed }) => [
         styles.reportAction,
@@ -318,9 +287,17 @@ function ReportAction({
           {icon}
         </View>
         <View style={[styles.reportActionCopy, dense && styles.reportActionCopyDense]}>
-          {/* CHG-090 (QA): solo ícono grande + título claro — sin
-              subcategoría ni descripción, para asimilación rápida
-              bajo estrés. */}
+          {/* CHG-090 (QA): categoría e ícono grande con título claro. El
+              propósito no se pinta aquí — espera en la leyenda del
+              formulario, ya sin la prisa de la portada. */}
+          <Text
+            style={[
+              styles.reportActionCode,
+              dense && styles.reportActionCodeDense,
+            ]}
+          >
+            {action.category}
+          </Text>
           <Text
             style={[
               styles.reportActionTitle,
@@ -328,7 +305,7 @@ function ReportAction({
               compact && styles.reportActionTitleCompact,
             ]}
           >
-            {title}
+            {action.title}
           </Text>
         </View>
         <View style={[styles.reportActionEnd, dense && styles.reportActionEndDense]}>
@@ -671,17 +648,19 @@ const styles = StyleSheet.create({
     width: "100%",
     paddingRight: 10,
   },
+  // CHG-090 (QA): la categoria vuelve a la tarjeta, ya en la escala
+  // legible y con mas contraste sobre la superficie clara.
   reportActionCode: {
-    color: "#42616a",
+    color: "#2f4a52",
     fontFamily: fontFamilies.mono,
-    fontSize: 9,
+    fontSize: font(11),
     fontWeight: "800",
     letterSpacing: 0.8,
   },
   reportActionCodeDense: {
-    fontSize: 7,
-    letterSpacing: 0.55,
-    lineHeight: 10,
+    fontSize: font(11),
+    letterSpacing: 0.5,
+    lineHeight: 15,
   },
   reportActionTitle: {
     marginTop: 5,
@@ -702,18 +681,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     lineHeight: 25,
   },
-  reportActionDescription: {
-    maxWidth: 460,
-    marginTop: 9,
-    color: "#40545f",
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  reportActionDescriptionDense: {
-    marginTop: 6,
-    fontSize: 10,
-    lineHeight: 14,
-  },
   reportActionEnd: {
     flexShrink: 0,
     alignItems: "flex-end",
@@ -725,12 +692,5 @@ const styles = StyleSheet.create({
     top: 12,
     right: 12,
     alignSelf: "auto",
-  },
-  reportActionMeta: {
-    color: "#245e6b",
-    fontFamily: fontFamilies.mono,
-    fontSize: 7,
-    fontWeight: "800",
-    letterSpacing: 1,
   },
 });

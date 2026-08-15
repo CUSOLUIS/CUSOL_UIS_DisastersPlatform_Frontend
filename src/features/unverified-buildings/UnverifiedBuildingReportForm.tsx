@@ -28,6 +28,7 @@ import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { DatePickerField } from "../../components/DatePickerField";
 import { TimePickerField } from "../../components/TimePickerField";
 import { ReportConsiderations } from "../reporting/ReportConsiderations";
+import { reportActionCatalog } from "../reporting/reportActionCatalog";
 import {
   useSessionAccount,
   type SessionAccountSource,
@@ -299,6 +300,7 @@ export function UnverifiedBuildingReportForm({
             </View>
 
             <ReportConsiderations
+              purpose={reportActionCatalog["unverified-building"].purpose}
               considerations={[
                 "Si hay una emergencia activa llama primero a la línea 123: este reporte no despacha equipos de rescate.",
                 "El equipo revisa cada reporte antes de que aparezca en el mapa; no confirma presencia de personas ni evalúa la seguridad estructural.",

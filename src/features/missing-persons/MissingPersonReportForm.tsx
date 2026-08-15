@@ -18,6 +18,7 @@ import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { DatePickerField } from "../../components/DatePickerField";
 import { TimePickerField } from "../../components/TimePickerField";
 import { ReportConsiderations } from "../reporting/ReportConsiderations";
+import { reportActionCatalog } from "../reporting/reportActionCatalog";
 import {
   useSessionAccount,
   type SessionAccountSource,
@@ -268,6 +269,7 @@ export function MissingPersonReportForm({
             </View>
 
             <ReportConsiderations
+              purpose={reportActionCatalog["missing-person"].purpose}
               considerations={[
                 "Documento, información médica y datos de contacto del reportante son privados y se guardan cifrados; las fotografías no se publican y solo las ve el equipo.",
                 "La información debe ser veraz y de buena fe. Este reporte no reemplaza la denuncia ante la Fiscalía o la Policía Nacional.",

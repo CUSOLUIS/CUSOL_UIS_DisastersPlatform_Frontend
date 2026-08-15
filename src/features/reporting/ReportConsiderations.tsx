@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, fontFamilies } from "../../theme";
+import { font } from "../../typography";
 import type { SessionAccountState } from "../auth/useSessionAccount";
 
 // CHG-053: leyenda superior de los formularios de reporte ciudadano.
@@ -12,6 +13,7 @@ import type { SessionAccountState } from "../auth/useSessionAccount";
 
 interface ReportConsiderationsProps {
   considerations: string[];
+  purpose?: string;
   onRegister?: () => void;
   onLogin?: () => void;
   session?: SessionAccountState;
@@ -19,6 +21,7 @@ interface ReportConsiderationsProps {
 
 export function ReportConsiderations({
   considerations,
+  purpose,
   onRegister,
   onLogin,
   session,
@@ -30,6 +33,14 @@ export function ReportConsiderations({
       style={styles.panel}
     >
       <Text style={styles.title}>ANTES DE ENVIAR ESTE REPORTE</Text>
+      {/* CHG-090 (QA): el propósito de la acción, que antes saturaba su
+          tarjeta en la portada, abre aquí la leyenda: el usuario ya
+          eligió y puede leer sin la prisa de la pantalla anterior. */}
+      {purpose && (
+        <Text testID="report-purpose" style={styles.purpose}>
+          {purpose}
+        </Text>
+      )}
       <View style={styles.list}>
         {considerations.map((consideration) => (
           <View key={consideration} style={styles.item}>
@@ -111,21 +122,30 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "rgba(81,229,255,0.045)",
   },
+  // CHG-090 (QA): tipografía por la escala legible.
   title: {
     color: colors.cyan,
     fontFamily: fontFamilies.mono,
-    fontSize: 9,
+    fontSize: font(11),
     fontWeight: "800",
     letterSpacing: 1.1,
   },
+  // El propósito encabeza la leyenda: manda sobre las consideraciones,
+  // así que va más grande y más claro que la lista.
+  purpose: {
+    color: colors.ink,
+    fontSize: font(15),
+    fontWeight: "600",
+    lineHeight: 22,
+  },
   list: { gap: 8 },
   item: { flexDirection: "row", gap: 8 },
-  bullet: { color: colors.cyan, fontSize: 11, lineHeight: 17 },
+  bullet: { color: colors.cyan, fontSize: font(12), lineHeight: 19 },
   itemText: {
     flex: 1,
     color: colors.inkSoft,
-    fontSize: 11,
-    lineHeight: 17,
+    fontSize: font(12),
+    lineHeight: 19,
   },
   accountNote: {
     gap: 8,

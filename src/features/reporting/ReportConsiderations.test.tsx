@@ -6,6 +6,7 @@
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react-native";
 import { ReportConsiderations } from "./ReportConsiderations";
+import { reportActionCatalog } from "./reportActionCatalog";
 
 afterEach(cleanup);
 
@@ -145,4 +146,24 @@ it("sin sesión conserva los accesos de registro e inicio de sesión", () => {
       name: "Iniciar sesión para reportar con cuenta",
     }),
   ).toBeTruthy();
+});
+
+/**
+ * CHG-090 (QA) — El propósito de la acción se mudó de la tarjeta de la
+ * portada a la cabecera de esta leyenda.
+ */
+it("encabeza la leyenda con el propósito de la acción", () => {
+  const { purpose } = reportActionCatalog["missing-person"];
+  render(
+    <ReportConsiderations considerations={CONSIDERATIONS} purpose={purpose} />,
+  );
+
+  expect(screen.getByTestId("report-purpose")).toBeTruthy();
+  expect(screen.getByText(purpose)).toBeTruthy();
+});
+
+it("omite el propósito cuando la acción no declara uno", () => {
+  render(<ReportConsiderations considerations={CONSIDERATIONS} />);
+
+  expect(screen.queryByTestId("report-purpose")).toBeNull();
 });

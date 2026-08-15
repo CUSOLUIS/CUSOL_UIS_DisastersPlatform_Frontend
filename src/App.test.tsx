@@ -425,9 +425,18 @@ describe("App universal", () => {
     expect(donationPointButton.props.accessibilityHint).toMatch(/entrega que reúne ayudas/i);
     expect(communityMealsButton.props.accessibilityHint).toMatch(/preparas alimentos/i);
     expect(temporaryShelterButton.props.accessibilityHint).toMatch(/espacio disponible/i);
-    // CHG-090 (QA): las tarjetas ya no pintan descripciones largas —
-    // solo ícono grande + título; el detalle vive en el hint accesible.
+    // CHG-090 (QA): la tarjeta conserva categoría y título, pero ya no
+    // pinta el propósito: ese texto espera en la leyenda del formulario.
     expect(screen.queryByText(/recibe y administra ayudas/i)).toBeNull();
+    expect(
+      screen.queryByText(/clasifica y almacena ayudas/i),
+    ).toBeNull();
+    expect(screen.getByText("AYUDA · RECEPCIÓN Y ALMACENAMIENTO")).toBeTruthy();
+    expect(screen.getByText("AYUDA · ENTREGA COMUNITARIA")).toBeTruthy();
+    expect(screen.getByText("AYUDA · ALIMENTACIÓN SOLIDARIA")).toBeTruthy();
+    expect(screen.getByText("AYUDA · ALOJAMIENTO SOLIDARIO")).toBeTruthy();
+    expect(screen.getByText("PERSONA · REPORTE CIUDADANO")).toBeTruthy();
+    expect(screen.getByText("EDIFICIO · BÚSQUEDA PENDIENTE")).toBeTruthy();
     expect(screen.getByText("Inscribir centro de acopio")).toBeTruthy();
     expect(screen.getByText("Registrar punto de recolección")).toBeTruthy();
     expect(screen.getByText("Ofrecer comida comunitaria")).toBeTruthy();
