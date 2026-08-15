@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
 import { LazyImage } from "../../components/LazyImage";
+import { resolvePublicMediaUrl } from "../media/publicMediaUrl";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { font } from "../../typography";
 import {
@@ -529,12 +530,12 @@ function PersonCard({
         {/* CHG-090 (QA): la foto solo se descarga cuando la tarjeta se
             acerca a la pantalla; hasta entonces ocupa su lugar el mismo
             ícono de las personas sin fotografía. */}
-        {item.publicPhotoUrl ? (
+        {resolvePublicMediaUrl(item.publicPhotoUrl) ? (
           <LazyImage
             containerStyle={styles.personAvatar}
             placeholder={<PersonIcon />}
             accessibilityLabel={`Fotografía pública autorizada de ${item.displayName}`}
-            source={{ uri: item.publicPhotoUrl }}
+            source={{ uri: resolvePublicMediaUrl(item.publicPhotoUrl)! }}
             resizeMode="cover"
             style={styles.personPhoto}
           />

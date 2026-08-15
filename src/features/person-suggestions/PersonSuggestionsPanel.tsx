@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 import { LazyImage } from "../../components/LazyImage";
+import { resolvePublicMediaUrl } from "../media/publicMediaUrl";
 import { colors, fontFamilies } from "../../theme";
 import { font } from "../../typography";
 import type { PersonSuggestion } from "./types";
@@ -65,12 +66,12 @@ export function PersonSuggestionsPanel({
           style={styles.card}
         >
           <View style={styles.cardMain}>
-            {item.publicPhotoUrl ? (
+            {resolvePublicMediaUrl(item.publicPhotoUrl) ? (
               <LazyImage
                 containerStyle={styles.avatar}
                 placeholder={<SuggestionPersonIcon />}
                 accessibilityLabel={`Fotografía pública autorizada de ${item.displayName}`}
-                source={{ uri: item.publicPhotoUrl }}
+                source={{ uri: resolvePublicMediaUrl(item.publicPhotoUrl)! }}
                 resizeMode="cover"
                 style={styles.photo}
               />
