@@ -6,13 +6,18 @@
     "version": "0.1.0",
     "orientation": "default",
     "userInterfaceStyle": "dark",
+    "icon": "./src/assets/app-icon.png",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "co.edu.uis.cusol.disasters"
     },
     "android": {
       "package": "co.edu.uis.cusol.disasters",
-      "predictiveBackGestureEnabled": true
+      "predictiveBackGestureEnabled": true,
+      "adaptiveIcon": {
+        "foregroundImage": "./src/assets/app-icon-foreground.png",
+        "backgroundColor": "#050710"
+      }
     },
     "web": {
       "bundler": "metro",
