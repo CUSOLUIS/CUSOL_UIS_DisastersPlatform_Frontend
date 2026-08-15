@@ -64,6 +64,8 @@ interface HumanImpactDashboardProps {
   onLogin: () => void;
   onRegister: () => void;
   onAbout: () => void;
+  // CHG-091: deep link ?buscar= hacia el buscador del directorio.
+  initialDirectorySearch?: string;
   // CHG-051: sesión activa visible en el encabezado, con cierre.
   account?: AuthenticatedAccount | null;
   onLogout?: () => void;
@@ -165,6 +167,7 @@ export function HumanImpactDashboard({
   peopleRecordsDataSource,
   humanitarianDirectoryDataSource,
   communityContributionDataSource,
+  initialDirectorySearch,
   onReportMissingPerson,
   onReportUnverifiedBuilding,
   onRegisterCollectionCenter,
@@ -341,6 +344,7 @@ export function HumanImpactDashboard({
                     compact={compact}
                     dataSource={humanitarianDirectoryDataSource}
                     contributionDataSource={communityContributionDataSource}
+                    initialQuery={initialDirectorySearch}
                   />
                 </View>
               </View>

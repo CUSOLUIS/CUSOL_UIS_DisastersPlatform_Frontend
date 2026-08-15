@@ -19,6 +19,11 @@ import { DatePickerField } from "../../components/DatePickerField";
 import { TimePickerField } from "../../components/TimePickerField";
 import { ReportConsiderations } from "../reporting/ReportConsiderations";
 import { reportActionCatalog } from "../reporting/reportActionCatalog";
+import { personSuggestionsDataSource } from "../person-suggestions/dataSource";
+import { PersonSuggestionsPanel } from "../person-suggestions/PersonSuggestionsPanel";
+import { usePersonSuggestions } from "../person-suggestions/usePersonSuggestions";
+import type { PersonSuggestionsDataSource } from "../person-suggestions/types";
+import { normalizeSearchValue } from "./dataSource";
 import {
   useSessionAccount,
   type SessionAccountSource,
@@ -97,6 +102,9 @@ interface MissingPersonReportFormProps {
   // CHG-083: salida explícita de la constancia hacia la portada.
   onHome?: () => void;
   pickPhotos?: () => Promise<SelectedPhoto[]>;
+  // CHG-091: aviso de posibles duplicados al escribir el nombre.
+  suggestionsDataSource?: PersonSuggestionsDataSource;
+  onOpenExistingCase?: (publicCaseCode: string) => void;
   submitReport?: (
     draft: MissingPersonReportDraft,
     photos: SelectedPhoto[],
@@ -132,6 +140,8 @@ export function MissingPersonReportForm({
   onHome,
   sessionSource,
   pickPhotos = defaultPickPhotos,
+  suggestionsDataSource = personSuggestionsDataSource,
+  onOpenExistingCase,
   submitReport = defaultSubmitReport,
 }: MissingPersonReportFormProps) {
   const { width } = useWindowDimensions();
@@ -154,6 +164,21 @@ export function MissingPersonReportForm({
   );
   const idempotencyKeyRef = useRef<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
+  // CHG-091: aviso de posibles duplicados mientras se escribe el
+  // nombre. Descartar el aviso lo silencia para ese par exacto de
+  // nombres; si el nombre cambia, vuelve a evaluarse.
+  const [dismissedDuplicatesKey, setDismissedDuplicatesKey] = useState<
+    string | null
+  >(null);
+  const duplicatesKey = normalizeSearchValue(
+    `${draft.firstNames} ${draft.lastNames}`,
+  );
+  const duplicateSuggestions = usePersonSuggestions({
+    dataSource: suggestionsDataSource,
+    firstName: draft.firstNames,
+    lastName: draft.lastNames,
+    enabled: dismissedDuplicatesKey !== duplicatesKey && receipt === null,
+  });
   const sectionOffsets = useRef<Record<string, number>>({});
 
   const registerSection = (code: string, y: number) => {
@@ -286,6 +311,18 @@ export function MissingPersonReportForm({
               <FieldGrid compact={compact}>
                 <FormField label="Nombres *" invalid={invalidFields.has("firstNames")} value={draft.firstNames} onChangeText={(value) => setField("firstNames", value)} autoComplete="name-given" />
                 <FormField label="Apellidos *" invalid={invalidFields.has("lastNames")} value={draft.lastNames} onChangeText={(value) => setField("lastNames", value)} autoComplete="name-family" />
+                {duplicateSuggestions.status === "ready" && (
+                  <PersonSuggestionsPanel
+                    items={duplicateSuggestions.items}
+                    actions={{
+                      mode: "duplicates",
+                      onSamePerson: (item) =>
+                        onOpenExistingCase?.(item.publicCaseCode),
+                      onDismiss: () =>
+                        setDismissedDuplicatesKey(duplicatesKey),
+                    }}
+                  />
+                )}
                 <FormField label="Alias o nombre conocido" value={draft.aliases} onChangeText={(value) => setField("aliases", value)} />
                 <DatePickerField label="Fecha de nacimiento" accessibilityLabel="Elegir fecha de nacimiento" clearAccessibilityLabel="Borrar fecha de nacimiento" testID="birth-date-calendar" value={draft.birthDate} onChange={(value) => setField("birthDate", value)} />
                 <FormField label="Edad aproximada" value={draft.approximateAge} onChangeText={(value) => setField("approximateAge", value)} keyboardType="number-pad" />

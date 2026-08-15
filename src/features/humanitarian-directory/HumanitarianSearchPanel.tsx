@@ -19,6 +19,10 @@ import {
   type PickContributionPhotos,
 } from "./CommunityContributionForm";
 import { PersonNoveltyPanel } from "./PersonNoveltyPanel";
+import { personSuggestionsDataSource } from "../person-suggestions/dataSource";
+import { PersonSuggestionsPanel } from "../person-suggestions/PersonSuggestionsPanel";
+import { usePersonSuggestions } from "../person-suggestions/usePersonSuggestions";
+import type { PersonSuggestionsDataSource } from "../person-suggestions/types";
 import type {
   AidLocationDirectoryCard,
   CommunityContributionDataSource,
@@ -113,6 +117,8 @@ export function HumanitarianSearchPanel({
   dataSource,
   pickPhotos,
   fetchNovelties,
+  suggestionsDataSource = personSuggestionsDataSource,
+  initialQuery,
 }: {
   compact: boolean;
   contributionDataSource: CommunityContributionDataSource;
@@ -120,6 +126,10 @@ export function HumanitarianSearchPanel({
   pickPhotos?: PickContributionPhotos;
   // CHG-077: inyectable en pruebas; por defecto usa la API real.
   fetchNovelties?: FetchPersonNovelties;
+  // CHG-091: sugerencias difusas mientras se escribe.
+  suggestionsDataSource?: PersonSuggestionsDataSource;
+  // CHG-091: deep link ?buscar= — precarga y ejecuta la búsqueda.
+  initialQuery?: string;
 }) {
   const [kind, setKind] = useState<HumanitarianDirectoryKind>("missing_person");
   const [filter, setFilter] = useState<DirectoryFilter>("all");
@@ -167,16 +177,18 @@ export function HumanitarianSearchPanel({
     };
   }, [dataSource, filter, kind, query]);
 
-  const search = async () => {
-    const trimmedQuery = query.trim();
+  const runSearch = async (term: string, keepTargets = false) => {
+    const trimmedQuery = term.trim();
     if (trimmedQuery.length < 2) {
       setInlineError("Escribe al menos 2 caracteres para buscar.");
       return;
     }
 
     setInlineError(null);
-    setContributionTarget(null);
-    setDetailTarget(null);
+    if (!keepTargets) {
+      setContributionTarget(null);
+      setDetailTarget(null);
+    }
     setWindowVisible(true);
     setSearchState({ status: "loading" });
 
@@ -193,6 +205,26 @@ export function HumanitarianSearchPanel({
       });
     }
   };
+
+  const search = async () => runSearch(query);
+
+  // CHG-091: sugerencias bajo el input (solo personas, 3+ caracteres,
+  // y nunca mientras la ventana de resultados está abierta).
+  const suggestions = usePersonSuggestions({
+    dataSource: suggestionsDataSource,
+    query,
+    enabled: kind === "missing_person" && !windowVisible,
+  });
+
+  // CHG-091: el deep link ?buscar= aterriza directo en la búsqueda.
+  useEffect(() => {
+    const term = initialQuery?.trim();
+    if (term && term.length >= 2) {
+      setQuery(term);
+      void runSearch(term);
+    }
+    // Solo al montar o si cambia el parámetro de la URL.
+  }, [initialQuery]);
 
   const closeWindow = () => {
     setWindowVisible(false);
@@ -283,6 +315,25 @@ export function HumanitarianSearchPanel({
           <Text style={styles.searchButtonArrow}>→</Text>
         </Pressable>
       </View>
+
+      {suggestions.status === "ready" && (
+        <PersonSuggestionsPanel
+          items={suggestions.items}
+          actions={{
+            mode: "search",
+            onOpenDetail: (item) => {
+              setDetailTarget(item);
+              setWindowVisible(true);
+              void runSearch(query, true);
+            },
+            onContribute: (item) => {
+              setContributionTarget(item);
+              setWindowVisible(true);
+              void runSearch(query, true);
+            },
+          }}
+        />
+      )}
 
       <View style={styles.filterLine}>
         <Text style={styles.filterLabel}>FILTROS</Text>

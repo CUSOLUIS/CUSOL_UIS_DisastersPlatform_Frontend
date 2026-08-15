@@ -319,3 +319,106 @@ it("muestra el total de coincidencias en la pista y renombra el botón", async (
   ).toBeTruthy();
   jest.useRealTimers();
 });
+
+/**
+ * CHG-091 — Sugerencias bajo el buscador de personas: aparecen al
+ * escribir 3+ caracteres y sus acciones abren la ventana en la ficha o
+ * en el aporte de novedad.
+ */
+describe("Sugerencias del buscador (CHG-091)", () => {
+  const SUGGESTION = {
+    kind: "missing_person" as const,
+    id: "persona-demo-1",
+    publicCaseCode: "MP-2026-DEMO01",
+    displayName: "Camila Rueda (caso demo)",
+    status: "missing" as const,
+    approximateAge: 34,
+    lastSeenAt: "2026-08-10T18:30:00Z",
+    lastSeenArea: "Sector Café Madrid",
+    municipality: "Bucaramanga",
+    department: "Santander",
+    publicPhotoUrl: null,
+    source: { name: "Demo", sourceType: "citizen" as const, url: null },
+    updatedAt: "2026-08-12T10:00:00Z",
+    dataClassification: "demonstrative" as const,
+    similarity: 0.62,
+  };
+
+  const suggestionsDataSource = {
+    transport: "fixture" as const,
+    autocomplete: jest.fn().mockResolvedValue({
+      items: [SUGGESTION],
+      query: "Kamila",
+      generatedAt: "2026-08-15T12:00:00Z",
+    }),
+    checkDuplicates: jest.fn().mockResolvedValue({
+      items: [],
+      firstName: "",
+      lastName: "",
+      generatedAt: "2026-08-15T12:00:00Z",
+    }),
+  };
+
+  it("muestra coincidencias al escribir y abre la ficha desde la sugerencia", async () => {
+    render(
+      <HumanitarianSearchPanel
+        compact={false}
+        dataSource={humanitarianDirectoryDataSource}
+        contributionDataSource={contributionDataSource}
+        suggestionsDataSource={suggestionsDataSource}
+        fetchNovelties={async (personId) => ({
+          personId,
+          publicStatus: "missing" as const,
+          items: [],
+          total: 0,
+        })}
+      />,
+    );
+
+    fireEvent.changeText(
+      screen.getByLabelText(
+        "Buscar persona desaparecida por cualquier dato público",
+      ),
+      "Kamila",
+    );
+
+    expect(await screen.findByText("COINCIDENCIAS REGISTRADAS")).toBeTruthy();
+    expect(screen.getByText("Camila Rueda (caso demo)")).toBeTruthy();
+    expect(suggestionsDataSource.autocomplete).toHaveBeenCalledWith(
+      "Kamila",
+      expect.anything(),
+    );
+
+    fireEvent.press(
+      screen.getByRole("button", {
+        name: "Ver ficha completa de Camila Rueda (caso demo)",
+      }),
+    );
+
+    // La ventana de resultados se abre directamente en el detalle.
+    expect(
+      await screen.findByText("Novedades de la persona"),
+    ).toBeTruthy();
+  });
+
+  it("el deep link ?buscar= precarga el texto y abre los resultados", async () => {
+    render(
+      <HumanitarianSearchPanel
+        compact={false}
+        dataSource={humanitarianDirectoryDataSource}
+        contributionDataSource={contributionDataSource}
+        suggestionsDataSource={suggestionsDataSource}
+        initialQuery="MP-2026-DEMO01"
+      />,
+    );
+
+    expect(
+      await screen.findByText("Coincidencias de personas"),
+    ).toBeTruthy();
+    expect(
+      screen.getByLabelText(
+        "Buscar persona desaparecida por cualquier dato público",
+      ).props.value,
+    ).toBe("MP-2026-DEMO01");
+  });
+});

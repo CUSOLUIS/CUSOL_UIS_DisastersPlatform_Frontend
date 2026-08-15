@@ -1,8 +1,11 @@
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { App } from "../App";
 
 export default function HomeRoute() {
   const router = useRouter();
+  // CHG-091: ?buscar=<texto> aterriza directo en la búsqueda del
+  // directorio (lo usa "Es la misma persona" del aviso de duplicados).
+  const { buscar } = useLocalSearchParams<{ buscar?: string }>();
 
   return (
     <App
@@ -13,6 +16,7 @@ export default function HomeRoute() {
       onReportUnverifiedBuilding={() =>
         router.push("/reportar-edificio-sin-verificar")
       }
+      initialDirectorySearch={typeof buscar === "string" ? buscar : undefined}
     />
   );
 }

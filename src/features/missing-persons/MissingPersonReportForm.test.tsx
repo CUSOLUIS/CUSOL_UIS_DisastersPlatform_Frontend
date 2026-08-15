@@ -332,3 +332,118 @@ describe("Selector de hora estándar", () => {
     expect(screen.queryByTestId("last-seen-time-picker")).toBeNull();
   });
 });
+
+/**
+ * CHG-091 — Aviso de posibles duplicados al escribir Nombres/Apellidos:
+ * consulta con debounce, descarte por par de nombres y salida hacia el
+ * caso existente.
+ */
+describe("Duplicados al diligenciar el reporte (CHG-091)", () => {
+  const SUGGESTION = {
+    kind: "missing_person" as const,
+    id: "persona-demo-1",
+    publicCaseCode: "MP-2026-DEMO01",
+    displayName: "Camila Rueda (caso demo)",
+    status: "missing" as const,
+    approximateAge: 34,
+    lastSeenAt: "2026-08-10T18:30:00Z",
+    lastSeenArea: "Sector Café Madrid",
+    municipality: "Bucaramanga",
+    department: "Santander",
+    publicPhotoUrl: null,
+    source: { name: "Demo", sourceType: "citizen" as const, url: null },
+    updatedAt: "2026-08-12T10:00:00Z",
+    dataClassification: "demonstrative" as const,
+    similarity: 0.77,
+  };
+
+  function makeSuggestionsSource(items = [SUGGESTION]) {
+    return {
+      transport: "fixture" as const,
+      autocomplete: jest.fn().mockResolvedValue({
+        items,
+        query: "",
+        generatedAt: "2026-08-15T12:00:00Z",
+      }),
+      checkDuplicates: jest.fn().mockResolvedValue({
+        items,
+        firstName: "",
+        lastName: "",
+        generatedAt: "2026-08-15T12:00:00Z",
+      }),
+    };
+  }
+
+  it("muestra el aviso con los datos del caso y sale hacia él", async () => {
+    const suggestionsDataSource = makeSuggestionsSource();
+    const onOpenExistingCase = jest.fn();
+    render(
+      <MissingPersonReportForm
+        onBack={jest.fn()}
+        suggestionsDataSource={suggestionsDataSource}
+        onOpenExistingCase={onOpenExistingCase}
+      />,
+    );
+
+    fireEvent.changeText(
+      screen.getByLabelText("Nombres *"),
+      "Kamila",
+    );
+    fireEvent.changeText(
+      screen.getByLabelText("Apellidos *"),
+      "Rueda",
+    );
+
+    expect(
+      await screen.findByText("¿YA ESTÁ REPORTADA? REVISA ANTES DE CONTINUAR"),
+    ).toBeTruthy();
+    expect(screen.getByText("MP-2026-DEMO01")).toBeTruthy();
+    expect(screen.getByText("Desaparecida")).toBeTruthy();
+    await waitFor(() =>
+      expect(suggestionsDataSource.checkDuplicates).toHaveBeenCalledWith(
+        "Kamila",
+        "Rueda",
+        expect.anything(),
+      ),
+    );
+
+    fireEvent.press(
+      screen.getByRole("button", {
+        name: "Es la misma persona: abrir el caso de Camila Rueda (caso demo)",
+      }),
+    );
+    expect(onOpenExistingCase).toHaveBeenCalledWith("MP-2026-DEMO01");
+  });
+
+  it("descartar el aviso lo silencia para ese par de nombres", async () => {
+    const suggestionsDataSource = makeSuggestionsSource();
+    render(
+      <MissingPersonReportForm
+        onBack={jest.fn()}
+        suggestionsDataSource={suggestionsDataSource}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText("Nombres *"), "Kamila");
+    fireEvent.changeText(screen.getByLabelText("Apellidos *"), "Rueda");
+    await screen.findByText("¿YA ESTÁ REPORTADA? REVISA ANTES DE CONTINUAR");
+
+    fireEvent.press(
+      screen.getByRole("button", {
+        name: "No es la persona, continuar con el reporte",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.queryByText("¿YA ESTÁ REPORTADA? REVISA ANTES DE CONTINUAR"),
+      ).toBeNull(),
+    );
+
+    // Cambiar el nombre reevalúa: el descarte era solo para ese par.
+    fireEvent.changeText(screen.getByLabelText("Nombres *"), "Balentina");
+    expect(
+      await screen.findByText("¿YA ESTÁ REPORTADA? REVISA ANTES DE CONTINUAR"),
+    ).toBeTruthy();
+  });
+});
