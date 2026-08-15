@@ -197,6 +197,9 @@ export function RecentPeopleTable({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        // El ScrollView trae flexGrow: 1 por defecto; sin esto absorbe
+        // el alto sobrante de la sección y estira los chips (CHG-045).
+        style={styles.filtersScroll}
         contentContainerStyle={[
           styles.filters,
           viewportSized && styles.filtersViewport,
@@ -308,9 +311,44 @@ export function RecentPeopleTable({
         )}
 
         {loadState.status === "success" && visiblePeople.length === 0 && (
-          <Text style={styles.empty} accessibilityRole="alert">
-            No hay personas publicables que coincidan con la consulta.
-          </Text>
+          <>
+            {/* CHG-045: filas de espera para que la tabla recién
+                estrenada no se vea vacía; son decorativas y el aviso
+                accesible sigue siendo el texto de abajo. */}
+            {!compact &&
+              Array.from({ length: 5 }, (_, index) => (
+                <View
+                  key={`placeholder-${index}`}
+                  testID={`recent-record-placeholder-${index + 1}`}
+                  style={[styles.row, viewportSized && styles.rowViewport]}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                >
+                  <View style={styles.personColumn}>
+                    <View style={[styles.placeholderBar, styles.placeholderBarWide]} />
+                    <View style={[styles.placeholderBar, styles.placeholderBarNarrow]} />
+                  </View>
+                  <View style={styles.statusColumn}>
+                    <View style={[styles.placeholderBar, styles.placeholderBarNarrow]} />
+                  </View>
+                  <View style={styles.locationColumn}>
+                    <View style={styles.placeholderBar} />
+                  </View>
+                  <View style={styles.eventColumn}>
+                    <View style={styles.placeholderBar} />
+                  </View>
+                  <View style={styles.sourceColumn}>
+                    <View style={[styles.placeholderBar, styles.placeholderBarWide]} />
+                  </View>
+                  <View style={styles.dateColumn}>
+                    <View style={[styles.placeholderBar, styles.placeholderBarNarrow]} />
+                  </View>
+                </View>
+              ))}
+            <Text style={styles.empty} accessibilityRole="alert">
+              No hay personas publicables que coincidan con la consulta.
+            </Text>
+          </>
         )}
       </View>
 
@@ -711,7 +749,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 17,
     fontSize: 14,
   },
+  filtersScroll: {
+    flexGrow: 0,
+  },
   filters: {
+    alignItems: "center",
     gap: 8,
     paddingTop: 22,
     paddingBottom: 4,
@@ -964,6 +1006,21 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
     color: colors.inkSoft,
     textAlign: "center",
+  },
+  // CHG-045: barras tenues del estado de espera de la tabla vacía.
+  placeholderBar: {
+    height: 8,
+    maxWidth: 150,
+    alignSelf: "stretch",
+    marginVertical: 3,
+    borderRadius: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+  },
+  placeholderBarWide: {
+    maxWidth: 190,
+  },
+  placeholderBarNarrow: {
+    maxWidth: 90,
   },
   staleNotice: {
     marginTop: 12,
