@@ -27,6 +27,10 @@ import type { SelectedPhoto } from "../missing-persons/reportTypes";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { ReportConsiderations } from "../reporting/ReportConsiderations";
 import {
+  useSessionAccount,
+  type SessionAccountSource,
+} from "../auth/useSessionAccount";
+import {
   createBuildingReportIdempotencyKey,
   submitUnverifiedBuildingReport,
   type SubmitBuildingReportOptions,
@@ -132,6 +136,8 @@ interface UnverifiedBuildingReportFormProps {
   // CHG-053: accesos para reportar con cuenta desde la leyenda.
   onRegister?: () => void;
   onLogin?: () => void;
+  // CHG-078: fuente de sesión inyectable en pruebas.
+  sessionSource?: SessionAccountSource;
   pickPhotos?: () => Promise<SelectedPhoto[]>;
   submitReport?: (
     draft: UnverifiedBuildingReportDraft,
@@ -159,11 +165,14 @@ export function UnverifiedBuildingReportForm({
   onBack,
   onRegister,
   onLogin,
+  sessionSource,
   pickPhotos = defaultPickPhotos,
   submitReport = submitUnverifiedBuildingReport,
 }: UnverifiedBuildingReportFormProps) {
   const { width } = useWindowDimensions();
   const compact = width < 760;
+  // CHG-078: la leyenda reconoce la sesión activa.
+  const session = useSessionAccount(sessionSource);
   const [draft, setDraft] = useState(initialUnverifiedBuildingDraft);
   const [photos, setPhotos] = useState<SelectedPhoto[]>([]);
   const [photoErrors, setPhotoErrors] = useState<string[]>([]);
@@ -296,6 +305,7 @@ export function UnverifiedBuildingReportForm({
               ]}
               onRegister={onRegister}
               onLogin={onLogin}
+              session={session}
             />
 
             <SafetyNotice />

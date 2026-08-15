@@ -61,3 +61,88 @@ it("ofrece registrarse e iniciar sesión cuando hay navegación", () => {
   expect(onRegister).toHaveBeenCalledTimes(1);
   expect(onLogin).toHaveBeenCalledTimes(1);
 });
+
+// CHG-078 — Con sesión activa la leyenda deja de ofrecer registro e
+// inicio de sesión y confirma la asociación del reporte a la cuenta.
+
+const ACCOUNT = {
+  id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+  displayName: "Laura Gómez",
+  email: "laura@example.com",
+  assignedRole: "user" as const,
+  status: "active" as const,
+  sessionExpiresAt: "2026-08-16T10:00:00Z",
+};
+
+it("con sesión activa oculta los botones y confirma la asociación", () => {
+  render(
+    <ReportConsiderations
+      considerations={CONSIDERATIONS}
+      onRegister={jest.fn()}
+      onLogin={jest.fn()}
+      session={{ status: "authenticated", account: ACCOUNT }}
+    />,
+  );
+
+  expect(
+    screen.getByText("SESIÓN ACTIVA · REPORTANDO CON TU CUENTA"),
+  ).toBeTruthy();
+  expect(
+    screen.getByText(/quedará asociado automáticamente a la cuenta\s+de Laura Gómez/),
+  ).toBeTruthy();
+  expect(
+    screen.queryByText("REPORTAR CON CUENTA TIENE VENTAJAS"),
+  ).toBeNull();
+  expect(
+    screen.queryByRole("button", {
+      name: "Registrarme para reportar con cuenta",
+    }),
+  ).toBeNull();
+  expect(
+    screen.queryByRole("button", {
+      name: "Iniciar sesión para reportar con cuenta",
+    }),
+  ).toBeNull();
+});
+
+it("mientras la sesión se resuelve no muestra el bloque de cuenta", () => {
+  render(
+    <ReportConsiderations
+      considerations={CONSIDERATIONS}
+      onRegister={jest.fn()}
+      onLogin={jest.fn()}
+      session={{ status: "resolving", account: null }}
+    />,
+  );
+
+  expect(
+    screen.queryByText("REPORTAR CON CUENTA TIENE VENTAJAS"),
+  ).toBeNull();
+  expect(
+    screen.queryByText("SESIÓN ACTIVA · REPORTANDO CON TU CUENTA"),
+  ).toBeNull();
+  // Las consideraciones del reporte siguen visibles.
+  expect(screen.getByText("ANTES DE ENVIAR ESTE REPORTE")).toBeTruthy();
+});
+
+it("sin sesión conserva los accesos de registro e inicio de sesión", () => {
+  render(
+    <ReportConsiderations
+      considerations={CONSIDERATIONS}
+      onRegister={jest.fn()}
+      onLogin={jest.fn()}
+      session={{ status: "anonymous", account: null }}
+    />,
+  );
+
+  expect(
+    screen.getByRole("button", {
+      name: "Registrarme para reportar con cuenta",
+    }),
+  ).toBeTruthy();
+  expect(
+    screen.getByRole("button", {
+      name: "Iniciar sesión para reportar con cuenta",
+    }),
+  ).toBeTruthy();
+});

@@ -1,21 +1,27 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, fontFamilies } from "../../theme";
+import type { SessionAccountState } from "../auth/useSessionAccount";
 
 // CHG-053: leyenda superior de los formularios de reporte ciudadano.
 // Reúne las consideraciones del reporte y explica el beneficio de
 // reportar con cuenta: notificaciones sobre el avance y mayor
 // prioridad de revisión que los reportes anónimos.
+// CHG-078: con sesión activa los accesos de registro/inicio de sesión
+// desaparecen y se confirma que el reporte quedará asociado a la
+// cuenta; mientras la sesión se resuelve no se muestra el bloque.
 
 interface ReportConsiderationsProps {
   considerations: string[];
   onRegister?: () => void;
   onLogin?: () => void;
+  session?: SessionAccountState;
 }
 
 export function ReportConsiderations({
   considerations,
   onRegister,
   onLogin,
+  session,
 }: ReportConsiderationsProps) {
   return (
     <View
@@ -33,17 +39,33 @@ export function ReportConsiderations({
         ))}
       </View>
 
-      <View style={styles.accountNote}>
-        <Text style={styles.accountTitle}>REPORTAR CON CUENTA TIENE VENTAJAS</Text>
-        <Text style={styles.accountText}>
-          Puedes enviar este reporte de forma anónima, pero si te
-          registras o inicias sesión antes de enviarlo podrás recibir
-          notificaciones sobre su avance, y los reportes y comentarios
-          hechos con cuenta tienen mayor prioridad de revisión que los
-          anónimos.
-        </Text>
-        {(onRegister || onLogin) && (
-          <View style={styles.accountActions}>
+      {session?.status === "authenticated" ? (
+        <View
+          style={styles.accountNote}
+          accessibilityLabel="Sesión activa: el reporte quedará asociado a tu cuenta"
+        >
+          <Text style={styles.accountTitle}>
+            SESIÓN ACTIVA · REPORTANDO CON TU CUENTA
+          </Text>
+          <Text style={styles.accountText}>
+            Este reporte quedará asociado automáticamente a la cuenta
+            de {session.account.displayName}: recibirás notificaciones
+            sobre su avance y tiene mayor prioridad de revisión que los
+            reportes anónimos.
+          </Text>
+        </View>
+      ) : session?.status === "resolving" ? null : (
+        <View style={styles.accountNote}>
+          <Text style={styles.accountTitle}>REPORTAR CON CUENTA TIENE VENTAJAS</Text>
+          <Text style={styles.accountText}>
+            Puedes enviar este reporte de forma anónima, pero si te
+            registras o inicias sesión antes de enviarlo podrás recibir
+            notificaciones sobre su avance, y los reportes y comentarios
+            hechos con cuenta tienen mayor prioridad de revisión que los
+            anónimos.
+          </Text>
+          {(onRegister || onLogin) && (
+            <View style={styles.accountActions}>
             {onRegister && (
               <Pressable
                 accessibilityRole="button"
@@ -72,9 +94,10 @@ export function ReportConsiderations({
                 </Text>
               </Pressable>
             )}
-          </View>
-        )}
-      </View>
+            </View>
+          )}
+        </View>
+      )}
     </View>
   );
 }
