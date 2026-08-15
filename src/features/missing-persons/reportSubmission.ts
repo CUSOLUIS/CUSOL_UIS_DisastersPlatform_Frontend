@@ -164,6 +164,9 @@ export async function submitMissingPersonReport(
 
   const response = await fetch(`${requestBaseUrl}/api/v1/missing-person-reports`, {
     method: "POST",
+    // CHG-054: la cookie de sesión (si existe) vincula el reporte a la
+    // cuenta para notificaciones y prioridad; sin sesión sigue anónimo.
+    credentials: "include",
     headers: {
       Accept: "application/json",
       "Idempotency-Key": options.idempotencyKey ?? createIdempotencyKey(),

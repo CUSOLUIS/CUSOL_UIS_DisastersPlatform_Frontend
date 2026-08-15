@@ -150,6 +150,9 @@ export async function submitUnverifiedBuildingReport(
     `${requestBaseUrl}/api/v1/unverified-building-reports`,
     {
       method: "POST",
+      // CHG-054: la cookie de sesión (si existe) vincula el reporte a
+      // la cuenta; sin sesión sigue siendo anónimo.
+      credentials: "include",
       headers: {
         Accept: "application/json",
         "Idempotency-Key":
