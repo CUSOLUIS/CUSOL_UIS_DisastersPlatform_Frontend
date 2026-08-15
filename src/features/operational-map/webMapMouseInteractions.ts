@@ -30,15 +30,17 @@ export function bindWebMapMouseInteractions(
   let pinchScaleDelta = 0;
   let pinchMidpoint: { x: number; y: number } | null = null;
   let pinching = false;
+  let singlePanLast: { x: number; y: number } | null = null;
   const previousCursor = element.style.cursor;
   const previousTouchAction = element.style.touchAction;
   const dragButtons = callbacks.dragButtons ?? [0, 2];
   const touchGestures = callbacks.touchGestures ?? true;
   element.style.cursor = "grab";
   if (touchGestures) {
-    // Un dedo puede seguir desplazando la página. Dos dedos no activan el
-    // pinch-zoom del navegador: el controlador los reserva para el mapa.
-    element.style.touchAction = "pan-x pan-y";
+    // CHG-050: el mapa consume TODOS los gestos táctiles que nacen en
+    // él: un dedo panea el mapa (nunca la página) y dos hacen
+    // pinch-zoom sin activar los gestos del navegador.
+    element.style.touchAction = "none";
   }
 
   const preventContextMenu = (event: Event) => {
@@ -130,8 +132,22 @@ export function bindWebMapMouseInteractions(
   };
 
   const startPinch = (event: TouchEvent) => {
-    if (!touchGestures || event.touches.length !== 2) return;
+    if (!touchGestures) return;
 
+    // CHG-050: un solo dedo inicia el paneo del mapa, salvo que el
+    // toque nazca en un control interactivo (marcadores, zoom): ahí no
+    // se intercepta para que el tap siga funcionando.
+    if (event.touches.length === 1) {
+      const touch = event.touches[0];
+      singlePanLast = isInteractiveTarget(event.target)
+        ? null
+        : { x: touch.clientX, y: touch.clientY };
+      return;
+    }
+
+    if (event.touches.length !== 2) return;
+
+    singlePanLast = null;
     const metrics = touchMetrics(event.touches);
     pinchDistance = metrics.distance;
     pinchScaleDelta = 0;
@@ -142,7 +158,23 @@ export function bindWebMapMouseInteractions(
   };
 
   const movePinch = (event: TouchEvent) => {
-    if (!touchGestures || !pinching || event.touches.length !== 2) return;
+    if (!touchGestures) return;
+
+    if (!pinching && event.touches.length === 1 && singlePanLast) {
+      const touch = event.touches[0];
+      const deltaX = touch.clientX - singlePanLast.x;
+      const deltaY = touch.clientY - singlePanLast.y;
+      singlePanLast = { x: touch.clientX, y: touch.clientY };
+      if (deltaX !== 0 || deltaY !== 0) {
+        callbacks.onPanBy(deltaX, deltaY);
+      }
+      // El gesto es del mapa: la página jamás se desplaza con él.
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
+    if (!pinching || event.touches.length !== 2) return;
 
     const metrics = touchMetrics(event.touches);
     if (
@@ -186,7 +218,14 @@ export function bindWebMapMouseInteractions(
   };
 
   const finishPinch = (event: TouchEvent) => {
-    if (!touchGestures || !pinching) return;
+    if (!touchGestures) return;
+
+    if (!pinching) {
+      if (event.touches.length === 0) {
+        singlePanLast = null;
+      }
+      return;
+    }
 
     event.preventDefault();
     event.stopPropagation();
@@ -202,10 +241,21 @@ export function bindWebMapMouseInteractions(
     pinchScaleDelta = 0;
     pinchMidpoint = null;
     pinching = false;
+    // CHG-050: si queda un dedo apoyado tras el pellizco, continúa
+    // como paneo de un dedo sin salto.
+    if (event.touches.length === 1) {
+      const touch = event.touches[0];
+      singlePanLast = { x: touch.clientX, y: touch.clientY };
+    } else {
+      singlePanLast = null;
+    }
   };
 
   const cancelPinch = (event: TouchEvent) => {
-    if (!touchGestures || !pinching) return;
+    if (!touchGestures) return;
+
+    singlePanLast = null;
+    if (!pinching) return;
 
     event.preventDefault();
     event.stopPropagation();

@@ -23,7 +23,7 @@ describe("Respaldo web OpenStreetMap", () => {
     expect(screen.getByText("OPENSTREETMAP · SIN CLAVE")).toBeTruthy();
     expect(
       screen.getByLabelText(
-        "Controles del mapa: mantén clic izquierdo o derecho y arrastra para desplazar; usa la rueda o dos dedos para acercar o alejar",
+        "Controles del mapa: arrastra con el mouse o con un dedo para desplazar; usa la rueda o el pellizco de dos dedos para acercar o alejar",
       ),
     ).toBeTruthy();
     expect(

@@ -5,10 +5,10 @@ export function MapMouseHint() {
   return (
     <View
       accessible
-      accessibilityLabel="Controles del mapa: mantén clic izquierdo o derecho y arrastra para desplazar; usa la rueda o dos dedos para acercar o alejar"
+      accessibilityLabel="Controles del mapa: arrastra con el mouse o con un dedo para desplazar; usa la rueda o el pellizco de dos dedos para acercar o alejar"
       style={styles.hint}
     >
-      <Text style={styles.text}>ARRASTRA · RUEDA / 2 DEDOS = ZOOM</Text>
+      <Text style={styles.text}>ARRASTRA CON 1 DEDO · RUEDA / PELLIZCO = ZOOM</Text>
     </View>
   );
 }

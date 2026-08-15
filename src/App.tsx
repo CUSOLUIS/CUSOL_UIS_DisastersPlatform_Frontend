@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Platform,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { HumanImpactDashboard } from "./features/human-impact/HumanImpactDashboard";
 import { humanImpactDataSource } from "./features/human-impact/dataSource";
@@ -120,6 +126,33 @@ function DashboardLoader({
   onAbout: () => void;
 }) {
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
+
+  // CHG-050: en web la página jamás se desplaza horizontalmente (en
+  // móvil un ancho desbordado permitía sacar toda la app hacia los
+  // lados); el scroll de la app es solo vertical.
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") {
+      return;
+    }
+    const html = document.documentElement;
+    const body = document.body;
+    const previous = {
+      htmlOverflowX: html.style.overflowX,
+      bodyOverflowX: body.style.overflowX,
+      htmlMaxWidth: html.style.maxWidth,
+      bodyMaxWidth: body.style.maxWidth,
+    };
+    html.style.overflowX = "hidden";
+    body.style.overflowX = "hidden";
+    html.style.maxWidth = "100%";
+    body.style.maxWidth = "100%";
+    return () => {
+      html.style.overflowX = previous.htmlOverflowX;
+      body.style.overflowX = previous.bodyOverflowX;
+      html.style.maxWidth = previous.htmlMaxWidth;
+      body.style.maxWidth = previous.bodyMaxWidth;
+    };
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();

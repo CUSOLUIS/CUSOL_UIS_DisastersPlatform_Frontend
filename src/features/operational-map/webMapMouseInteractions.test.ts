@@ -132,7 +132,8 @@ describe("Interacciones web del mapa", () => {
       { onPanBy, onZoomBy },
     );
 
-    expect(element.style.touchAction).toBe("pan-x pan-y");
+    // CHG-050: el mapa consume todos los gestos táctiles propios.
+    expect(element.style.touchAction).toBe("none");
 
     const singleTouch = touchEvent([{ clientX: 100, clientY: 100 }]);
     dispatch("touchstart", singleTouch);
@@ -198,6 +199,52 @@ describe("Interacciones web del mapa", () => {
       expect.any(Function),
       true,
     );
+  });
+
+  it("panea el mapa con un solo dedo sin desplazar la página", () => {
+    const { element, dispatch } = createInteractiveElement();
+    const onPanBy = jest.fn();
+    const onZoomBy = jest.fn();
+    bindWebMapMouseInteractions(
+      element as unknown as Parameters<typeof bindWebMapMouseInteractions>[0],
+      { onPanBy, onZoomBy },
+    );
+
+    // El tap inicial no se intercepta (los marcadores siguen tocables).
+    const start = touchEvent([{ clientX: 100, clientY: 100 }]);
+    dispatch("touchstart", start);
+    expect(start.preventDefault).not.toHaveBeenCalled();
+
+    // El movimiento panea el mapa y bloquea el desplazamiento de la
+    // página en cualquier dirección.
+    const moveRight = touchEvent([{ clientX: 140, clientY: 90 }]);
+    dispatch("touchmove", moveRight);
+    expect(onPanBy).toHaveBeenLastCalledWith(40, -10);
+    expect(moveRight.preventDefault).toHaveBeenCalledTimes(1);
+
+    const moveLeft = touchEvent([{ clientX: 110, clientY: 130 }]);
+    dispatch("touchmove", moveLeft);
+    expect(onPanBy).toHaveBeenLastCalledWith(-30, 40);
+    expect(onZoomBy).not.toHaveBeenCalled();
+
+    const end = touchEvent([]);
+    dispatch("touchend", end);
+
+    // Sin dedo apoyado no hay paneo fantasma.
+    onPanBy.mockClear();
+    dispatch("touchmove", touchEvent([{ clientX: 200, clientY: 200 }]));
+    expect(onPanBy).not.toHaveBeenCalled();
+
+    // Un toque que nace en un control interactivo no panea el mapa.
+    const interactiveStart = {
+      ...touchEvent([{ clientX: 50, clientY: 50 }]),
+      target: {
+        closest: jest.fn().mockReturnValue({ role: "button" }),
+      },
+    } as unknown as TouchEvent;
+    dispatch("touchstart", interactiveStart);
+    dispatch("touchmove", touchEvent([{ clientX: 90, clientY: 50 }]));
+    expect(onPanBy).not.toHaveBeenCalled();
   });
 
   it("deja el pellizco nativo de Google sin un segundo controlador táctil", () => {
