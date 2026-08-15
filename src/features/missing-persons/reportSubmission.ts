@@ -1,4 +1,9 @@
 import { Platform } from "react-native";
+import {
+  UpstreamOutageError,
+  isRetryableStatus,
+  retryOnUpstreamOutage,
+} from "../reporting/retryOnUpstreamOutage";
 import { getLastKnownVisitorLocation } from "../operational-map/visitorPresence";
 import type {
   MissingPersonReportDraft,
@@ -172,6 +177,10 @@ export interface SubmitReportOptions {
   idempotencyKey?: string;
   signal?: AbortSignal;
   requestBaseUrl?: string;
+  // CHG-101: inyectables en pruebas para no esperar de verdad.
+  retryDelaysMs?: readonly number[];
+  wait?: (ms: number) => Promise<void>;
+  onRetry?: (attempt: number) => void;
 }
 
 export async function submitMissingPersonReport(
@@ -189,30 +198,63 @@ export async function submitMissingPersonReport(
   const serializedPayload = JSON.stringify(
     buildReportPayload(draft, photos),
   );
-  const body = new FormData();
-  if (Platform.OS === "web") {
-    body.append(
-      "payload",
-      new Blob([serializedPayload], { type: "application/json" }),
-    );
-  } else {
-    body.append("payload", serializedPayload);
-  }
-  for (const photo of photos) {
-    await appendPhoto(body, photo);
-  }
+  // CHG-101: la misma llave en todos los intentos — es lo que hace
+  // seguro reintentar: el backend devuelve la constancia del reporte
+  // ya creado en vez de duplicarlo.
+  const idempotencyKey =
+    options.idempotencyKey ?? createIdempotencyKey();
 
-  const response = await fetch(`${requestBaseUrl}/api/v1/missing-person-reports`, {
-    method: "POST",
-    // CHG-054: la cookie de sesión (si existe) vincula el reporte a la
-    // cuenta para notificaciones y prioridad; sin sesión sigue anónimo.
-    credentials: "include",
-    headers: {
-      Accept: "application/json",
-      "Idempotency-Key": options.idempotencyKey ?? createIdempotencyKey(),
-    },
-    body,
+  // El cuerpo se arma dentro del intento: un FormData ya enviado no se
+  // puede reutilizar de forma fiable en un reintento.
+  const attempt = async (): Promise<Response> => {
+    const body = new FormData();
+    if (Platform.OS === "web") {
+      body.append(
+        "payload",
+        new Blob([serializedPayload], { type: "application/json" }),
+      );
+    } else {
+      body.append("payload", serializedPayload);
+    }
+    for (const photo of photos) {
+      await appendPhoto(body, photo);
+    }
+
+    const attemptResponse = await fetch(
+      `${requestBaseUrl}/api/v1/missing-person-reports`,
+      {
+        method: "POST",
+        // CHG-054: la cookie de sesión (si existe) vincula el reporte
+        // a la cuenta para notificaciones y prioridad; sin sesión
+        // sigue anónimo.
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
+        body,
+        signal: options.signal,
+      },
+    );
+
+    // Un despliegue en curso no es un rechazo del contenido: se
+    // marca como tal para que el reintento lo distinga de un 4xx.
+    if (isRetryableStatus(attemptResponse.status)) {
+      throw new UpstreamOutageError(
+        attemptResponse.status,
+        ERROR_MESSAGES_BY_STATUS[attemptResponse.status] ??
+          `El envío del reporte respondió con estado ${attemptResponse.status}.`,
+      );
+    }
+
+    return attemptResponse;
+  };
+
+  const response = await retryOnUpstreamOutage(attempt, {
     signal: options.signal,
+    delaysMs: options.retryDelaysMs,
+    wait: options.wait,
+    onRetry: options.onRetry,
   });
 
   if (!response.ok) {

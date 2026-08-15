@@ -1,4 +1,9 @@
 import { Platform } from "react-native";
+import {
+  UpstreamOutageError,
+  isRetryableStatus,
+  retryOnUpstreamOutage,
+} from "../reporting/retryOnUpstreamOutage";
 import { getLastKnownVisitorLocation } from "../operational-map/visitorPresence";
 import type { SelectedPhoto } from "../missing-persons/reportTypes";
 import type {
@@ -143,6 +148,10 @@ export interface SubmitBuildingReportOptions {
   idempotencyKey?: string;
   signal?: AbortSignal;
   requestBaseUrl?: string;
+  // CHG-101: inyectables en pruebas para no esperar de verdad.
+  retryDelaysMs?: readonly number[];
+  wait?: (ms: number) => Promise<void>;
+  onRetry?: (attempt: number) => void;
 }
 
 export async function submitUnverifiedBuildingReport(
@@ -157,36 +166,61 @@ export async function submitUnverifiedBuildingReport(
     );
   }
 
-  const body = new FormData();
   const serializedPayload = JSON.stringify(buildBuildingReportPayload(draft));
-  if (Platform.OS === "web") {
-    body.append(
-      "payload",
-      new Blob([serializedPayload], { type: "application/json" }),
-    );
-  } else {
-    body.append("payload", serializedPayload);
-  }
-  for (const photo of photos) {
-    await appendPhoto(body, photo);
-  }
+  // CHG-101: la misma llave en todos los intentos hace seguro el
+  // reintento; el backend devuelve la constancia ya creada.
+  const idempotencyKey =
+    options.idempotencyKey ?? createBuildingReportIdempotencyKey();
 
-  const response = await fetch(
-    `${requestBaseUrl}/api/v1/unverified-building-reports`,
-    {
-      method: "POST",
-      // CHG-054: la cookie de sesión (si existe) vincula el reporte a
-      // la cuenta; sin sesión sigue siendo anónimo.
-      credentials: "include",
-      headers: {
-        Accept: "application/json",
-        "Idempotency-Key":
-          options.idempotencyKey ?? createBuildingReportIdempotencyKey(),
+  // El cuerpo se arma dentro del intento: un FormData ya enviado no se
+  // puede reutilizar de forma fiable.
+  const attempt = async (): Promise<Response> => {
+    const body = new FormData();
+    if (Platform.OS === "web") {
+      body.append(
+        "payload",
+        new Blob([serializedPayload], { type: "application/json" }),
+      );
+    } else {
+      body.append("payload", serializedPayload);
+    }
+    for (const photo of photos) {
+      await appendPhoto(body, photo);
+    }
+
+    const attemptResponse = await fetch(
+      `${requestBaseUrl}/api/v1/unverified-building-reports`,
+      {
+        method: "POST",
+        // CHG-054: la cookie de sesión (si existe) vincula el reporte
+        // a la cuenta; sin sesión sigue siendo anónimo.
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
+        body,
+        signal: options.signal,
       },
-      body,
-      signal: options.signal,
-    },
-  );
+    );
+
+    if (isRetryableStatus(attemptResponse.status)) {
+      throw new UpstreamOutageError(
+        attemptResponse.status,
+        ERROR_MESSAGES_BY_STATUS[attemptResponse.status] ??
+          `El envío del reporte respondió con estado ${attemptResponse.status}.`,
+      );
+    }
+
+    return attemptResponse;
+  };
+
+  const response = await retryOnUpstreamOutage(attempt, {
+    signal: options.signal,
+    delaysMs: options.retryDelaysMs,
+    wait: options.wait,
+    onRetry: options.onRetry,
+  });
 
   if (!response.ok) {
     const detail = await extractProblemDetail(response);

@@ -254,3 +254,85 @@ describe("campos ampliados del reporte (CHG-094)", () => {
     expect(payload).not.toHaveProperty("photoCategories");
   });
 });
+
+/**
+ * CHG-101 — Ante un 504 de despliegue el envío reintenta solo, con la
+ * MISMA Idempotency-Key: eso es lo que impide que el reintento cree un
+ * segundo reporte de la misma persona.
+ */
+describe("reintento ante una caída del backend (CHG-101)", () => {
+  const receipt = {
+    publicCaseCode: "MP-2026-AAAA1111",
+    status: "published" as const,
+    receivedAt: "2026-08-15T12:00:00Z",
+  };
+
+  function jsonResponse(body: unknown, status = 201) {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      json: async () => body,
+      text: async () => JSON.stringify(body),
+      headers: { get: () => "application/json" },
+    } as unknown as Response;
+  }
+
+  it("supera el 504 y usa la misma llave en ambos intentos", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({}, 504))
+      .mockResolvedValueOnce(jsonResponse(receipt, 201));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await submitMissingPersonReport(completeDraft, [photo], {
+      requestBaseUrl: "http://api.test",
+      idempotencyKey: "clave-idempotente-0001",
+      wait: async () => undefined,
+    });
+
+    expect(result.publicCaseCode).toBe("MP-2026-AAAA1111");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const llaves = fetchMock.mock.calls.map(
+      (call) => call[1].headers["Idempotency-Key"],
+    );
+    // La misma llave en los dos intentos: sin esto, el reintento
+    // crearía un segundo reporte.
+    expect(llaves).toEqual([
+      "clave-idempotente-0001",
+      "clave-idempotente-0001",
+    ]);
+  });
+
+  it("no reintenta un 422: el usuario debe corregir el formulario", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValue(
+        jsonResponse({ detail: "Revisa los campos: reporterPhone." }, 422),
+      );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(
+      submitMissingPersonReport(completeDraft, [photo], {
+        requestBaseUrl: "http://api.test",
+        idempotencyKey: "clave-idempotente-0002",
+        wait: async () => undefined,
+      }),
+    ).rejects.toThrow(/reporterPhone/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("si el backend sigue caído, el error llega tras agotar los intentos", async () => {
+    const fetchMock = jest.fn().mockResolvedValue(jsonResponse({}, 503));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(
+      submitMissingPersonReport(completeDraft, [photo], {
+        requestBaseUrl: "http://api.test",
+        idempotencyKey: "clave-idempotente-0003",
+        wait: async () => undefined,
+      }),
+    ).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+});
