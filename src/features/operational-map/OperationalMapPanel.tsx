@@ -8,6 +8,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { colors, fontFamilies } from "../../theme";
+import { font } from "../../typography";
 import { useDataRefreshTick } from "../../platform/dataRefresh";
 import type { HumanStatus } from "../human-impact/types";
 import { categoryMeta } from "./categoryMeta";
@@ -410,7 +411,9 @@ function countHumanStatuses(
   return counts;
 }
 
-function HumanMapControls({
+// CHG-098: se exporta para poder probar el aviso de personas sin
+// ubicación sin montar el mapa completo.
+export function HumanMapControls({
   activeStatuses,
   data,
   layerVisible,
@@ -546,7 +549,12 @@ function HumanMapControls({
       {data && data.unmappedCount > 0 && (
         <View style={styles.humanLayerNotice} accessibilityRole="alert">
           <Text style={styles.humanLayerNoticeText}>
-            {mapNumberFormatter.format(data.unmappedCount)} registros sin ubicación pública; no se inventaron posiciones.
+            {mapNumberFormatter.format(data.unmappedCount)}{" "}
+            {data.unmappedCount === 1
+              ? "persona registrada no aparece en el mapa"
+              : "personas registradas no aparecen en el mapa"}{" "}
+            porque su reporte no incluyó ubicación. Siguen contando en las
+            cifras; no se inventaron posiciones.
           </Text>
         </View>
       )}
@@ -647,10 +655,10 @@ const styles = StyleSheet.create({
     marginBottom: 3,
     color: colors.cyan,
     fontFamily: fontFamilies.mono,
-    fontSize: 7,
+    fontSize: font(11),
     letterSpacing: 1.2,
   },
-  title: { color: colors.ink, fontSize: 20, fontWeight: "600", letterSpacing: -0.6 },
+  title: { color: colors.ink, fontSize: font(20), fontWeight: "600", letterSpacing: -0.6 },
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -665,7 +673,7 @@ const styles = StyleSheet.create({
   statusText: {
     color: colors.inkSoft,
     fontFamily: fontFamilies.mono,
-    fontSize: 7,
+    fontSize: font(11),
     fontWeight: "700",
     letterSpacing: 0.7,
   },
@@ -681,12 +689,12 @@ const styles = StyleSheet.create({
   humanLayerCopy: { minWidth: 0, flex: 1 },
   humanLayerOverline: {
     marginBottom: 3, color: colors.cyan, fontFamily: fontFamilies.mono,
-    fontSize: 7, fontWeight: "800", letterSpacing: 1,
+    fontSize: font(11), fontWeight: "800", letterSpacing: 1,
   },
-  humanLayerTitle: { color: colors.ink, fontSize: 16, fontWeight: "700" },
+  humanLayerTitle: { color: colors.ink, fontSize: font(16), fontWeight: "700" },
   humanLayerDescription: {
     maxWidth: 680, marginTop: 3, color: colors.inkSoft,
-    fontSize: 9, lineHeight: 14,
+    fontSize: font(11), lineHeight: 17,
   },
   layerToggle: {
     flexDirection: "row", alignItems: "center", gap: 6,
@@ -700,7 +708,7 @@ const styles = StyleSheet.create({
   layerToggleDotActive: { backgroundColor: colors.alive },
   layerToggleText: {
     color: colors.inkSoft, fontFamily: fontFamilies.mono,
-    fontSize: 7, fontWeight: "800", letterSpacing: 0.7,
+    fontSize: font(11), fontWeight: "800", letterSpacing: 0.7,
   },
   humanStatusLine: {
     flexDirection: "row", flexWrap: "wrap", alignItems: "center",
@@ -708,11 +716,11 @@ const styles = StyleSheet.create({
   },
   humanStatusText: {
     color: colors.alive, fontFamily: fontFamilies.mono,
-    fontSize: 7, fontWeight: "800", letterSpacing: 0.8,
+    fontSize: font(11), fontWeight: "800", letterSpacing: 0.8,
   },
   humanTotalText: {
     color: colors.cyan, fontFamily: fontFamilies.mono,
-    fontSize: 7, fontWeight: "800",
+    fontSize: font(11), fontWeight: "800",
   },
   humanFilters: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   humanFilter: {
@@ -724,9 +732,9 @@ const styles = StyleSheet.create({
   humanFilterDot: { width: 8, height: 8, borderRadius: 4 },
   humanFilterCopy: { minWidth: 0, flex: 1 },
   humanFilterCount: {
-    fontFamily: fontFamilies.mono, fontSize: 17, fontWeight: "900",
+    fontFamily: fontFamilies.mono, fontSize: font(17), fontWeight: "900",
   },
-  humanFilterLabel: { color: colors.inkSoft, fontSize: 12, fontWeight: "700" },
+  humanFilterLabel: { color: colors.inkSoft, fontSize: font(12), fontWeight: "700" },
   humanLayerNotice: {
     flexDirection: "row", flexWrap: "wrap", alignItems: "center",
     justifyContent: "space-between", gap: 8, padding: 9, borderWidth: 1,
@@ -734,7 +742,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,207,102,0.06)",
   },
   humanLayerNoticeText: {
-    minWidth: 160, flex: 1, color: colors.inkSoft, fontSize: 8, lineHeight: 13,
+    minWidth: 160, flex: 1, color: colors.inkSoft, fontSize: font(11), lineHeight: 17,
   },
   humanRetry: {
     paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1,
@@ -742,7 +750,7 @@ const styles = StyleSheet.create({
   },
   humanRetryText: {
     color: colors.cyan, fontFamily: fontFamilies.mono,
-    fontSize: 7, fontWeight: "800",
+    fontSize: font(11), fontWeight: "800",
   },
   humanDetail: {
     flexDirection: "row", flexWrap: "wrap", alignItems: "center",
@@ -753,21 +761,21 @@ const styles = StyleSheet.create({
   humanDetailMain: { minWidth: 180, flex: 1 },
   humanDetailEyebrow: {
     color: colors.cyan, fontFamily: fontFamilies.mono,
-    fontSize: 7, fontWeight: "800", letterSpacing: 0.7,
+    fontSize: font(11), fontWeight: "800", letterSpacing: 0.7,
   },
   humanDetailTitle: {
-    marginTop: 3, color: colors.ink, fontSize: 14, fontWeight: "800",
+    marginTop: 3, color: colors.ink, fontSize: font(14), fontWeight: "800",
   },
   humanDetailCounts: { alignItems: "flex-end", gap: 2 },
   humanDetailCount: {
-    fontFamily: fontFamilies.mono, fontSize: 7, fontWeight: "800",
+    fontFamily: fontFamilies.mono, fontSize: font(11), fontWeight: "800",
   },
   humanDetailMeta: {
-    color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 7,
+    color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: font(11),
   },
   legend: { gap: 8, padding: 10, borderWidth: 1, borderColor: colors.line, borderRadius: 9, backgroundColor: "rgba(9,15,26,0.86)" },
   legendHeading: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 6 },
-  legendTitle: { color: colors.ink, fontFamily: fontFamilies.mono, fontSize: 8, fontWeight: "800", letterSpacing: 0.8 },
+  legendTitle: { color: colors.ink, fontFamily: fontFamilies.mono, fontSize: font(11), fontWeight: "800", letterSpacing: 0.8 },
   legendHint: { color: colors.inkDim, fontSize: 8 },
   filters: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   filter: {
@@ -784,8 +792,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(13, 20, 33, 0.80)",
   },
   filterCopy: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
-  filterCount: { fontFamily: fontFamilies.mono, fontSize: 17, fontWeight: "800" },
-  filterLabel: { flex: 1, color: colors.inkSoft, fontSize: 12, fontWeight: "700" },
+  filterCount: { fontFamily: fontFamilies.mono, fontSize: font(17), fontWeight: "800" },
+  filterLabel: { flex: 1, color: colors.inkSoft, fontSize: font(12), fontWeight: "700" },
   filterLabelInactive: { color: colors.inkDim, textDecorationLine: "line-through" },
   mapCount: {
     flexDirection: "row",
@@ -796,7 +804,7 @@ const styles = StyleSheet.create({
   mapCountText: {
     color: colors.cyan,
     fontFamily: fontFamilies.mono,
-    fontSize: 7,
+    fontSize: font(11),
     fontWeight: "700",
     letterSpacing: 1,
   },
@@ -818,14 +826,14 @@ const styles = StyleSheet.create({
   detailCategory: {
     marginBottom: 3,
     fontFamily: fontFamilies.mono,
-    fontSize: 7,
+    fontSize: font(11),
     fontWeight: "800",
     letterSpacing: 0.8,
     textTransform: "uppercase",
   },
-  detailTitle: { color: colors.ink, fontSize: 11, fontWeight: "700" },
+  detailTitle: { color: colors.ink, fontSize: font(11), fontWeight: "700" },
   detailLocation: { marginTop: 3, color: colors.inkSoft, fontSize: 9 },
-  detailDescription: { maxWidth: 660, marginTop: 6, color: colors.inkDim, fontSize: 8, lineHeight: 13 },
+  detailDescription: { maxWidth: 660, marginTop: 6, color: colors.inkSoft, fontSize: font(11), lineHeight: 17 },
   detailMeta: { alignItems: "flex-end", gap: 2 },
   detailMetaText: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 7 },
   noSelection: {
@@ -844,8 +852,8 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 24,
   },
-  stateText: { color: colors.inkSoft, fontSize: 11, lineHeight: 18, textAlign: "center" },
-  errorTitle: { color: colors.reported, fontSize: 14, fontWeight: "700", textAlign: "center" },
+  stateText: { color: colors.inkSoft, fontSize: font(11), lineHeight: 18, textAlign: "center" },
+  errorTitle: { color: colors.reported, fontSize: font(14), fontWeight: "700", textAlign: "center" },
   retryButton: {
     marginTop: 4,
     paddingHorizontal: 14,
@@ -857,7 +865,7 @@ const styles = StyleSheet.create({
   retryText: {
     color: colors.cyan,
     fontFamily: fontFamilies.mono,
-    fontSize: 8,
+    fontSize: font(11),
     fontWeight: "800",
     letterSpacing: 1,
   },
