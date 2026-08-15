@@ -70,6 +70,7 @@ export const initialUnverifiedBuildingDraft: UnverifiedBuildingReportDraft = {
   searchStatus: "unknown",
   occupancyReport: "unknown",
   pendingReasons: [],
+  pendingReasonDetail: "",
   observedConditions: [],
   observationDescription: "",
   reporterName: "",
@@ -456,8 +457,30 @@ export function UnverifiedBuildingReportForm({
                 label="¿POR QUÉ SIGUE PENDIENTE? * · ELIGE UNO O MÁS"
                 options={PENDING_REASONS}
                 selected={draft.pendingReasons}
-                onToggle={(value) => toggleArrayValue("pendingReasons", value)}
+                onToggle={(value) => {
+                  // CHG-093: desmarcar "Otro motivo" también limpia su
+                  // detalle — no viaja texto huérfano en el borrador.
+                  if (
+                    value === "other" &&
+                    draft.pendingReasons.includes("other")
+                  ) {
+                    setField("pendingReasonDetail", "");
+                  }
+                  toggleArrayValue("pendingReasons", value);
+                }}
               />
+              {draft.pendingReasons.includes("other") && (
+                <FormField
+                  label="¿Cuál es el otro motivo? *"
+                  hint="Obligatorio al marcar Otro motivo"
+                  multiline
+                  placeholder="Especifica el motivo por el cual sigue pendiente…"
+                  value={draft.pendingReasonDetail}
+                  onChangeText={(value) =>
+                    setField("pendingReasonDetail", value)
+                  }
+                />
+              )}
             </FormSection>
 
             <FormSection
@@ -734,6 +757,14 @@ export function validateUnverifiedBuildingDraft(
   if (draft.pendingReasons.length === 0) {
     errors.push("Selecciona al menos un motivo por el que la búsqueda sigue pendiente.");
   }
+  if (
+    draft.pendingReasons.includes("other") &&
+    !draft.pendingReasonDetail.trim()
+  ) {
+    errors.push(
+      "Especifica el otro motivo por el cual la búsqueda sigue pendiente.",
+    );
+  }
   if (!draft.reporterPhone.trim() && !draft.reporterEmail.trim()) {
     errors.push("Ingresa al menos un teléfono o correo de contacto privado.");
   }
@@ -852,6 +883,8 @@ type FormFieldProps = {
   onChangeText: (value: string) => void;
   hint?: string;
   multiline?: boolean;
+  // CHG-093: placeholder propio (por defecto "Escribe aquí").
+  placeholder?: string;
   keyboardType?:
     | "default"
     | "phone-pad"

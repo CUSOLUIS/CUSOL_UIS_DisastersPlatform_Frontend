@@ -57,6 +57,9 @@ export interface UnverifiedBuildingReportDraft {
   searchStatus: BuildingSearchStatus;
   occupancyReport: BuildingOccupancyReport;
   pendingReasons: BuildingPendingReason[];
+  // CHG-093: detalle del motivo "Otro"; obligatorio si "other" está
+  // marcado, se limpia al desmarcarlo.
+  pendingReasonDetail: string;
   observedConditions: BuildingObservedCondition[];
   observationDescription: string;
   reporterName: string;

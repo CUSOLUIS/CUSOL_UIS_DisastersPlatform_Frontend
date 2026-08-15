@@ -57,6 +57,15 @@ export function buildBuildingReportPayload(
     }
   });
 
+  // CHG-093: el detalle del motivo "Otro" viaja solo si el motivo
+  // sigue marcado.
+  if (
+    draft.pendingReasons.includes("other") &&
+    draft.pendingReasonDetail.trim()
+  ) {
+    payload.pendingReasonDetail = draft.pendingReasonDetail.trim();
+  }
+
   // CHG-092: selección → id; texto libre → nombre (el backend
   // deduplica o crea el evento). Nunca ambos.
   if (draft.relatedEventId.trim()) {

@@ -198,3 +198,72 @@ describe("CHG-035 · Reporte de edificio con búsqueda pendiente", () => {
     expect(submitReport).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * CHG-093 — "Otro motivo" despliega su campo de detalle: aparece al
+ * marcar, se limpia y oculta al desmarcar, y es obligatorio al enviar.
+ */
+describe('Detalle de "Otro motivo" (CHG-093)', () => {
+  it("aparece al marcar, y desmarcar lo oculta y limpia", async () => {
+    render(<UnverifiedBuildingReportForm onBack={jest.fn()} />);
+
+    expect(
+      screen.queryByLabelText("¿Cuál es el otro motivo? *"),
+    ).toBeNull();
+
+    fireEvent.press(
+      screen.getByRole("checkbox", { name: "Motivo pendiente: Otro motivo" }),
+    );
+    const detailField = await screen.findByLabelText(
+      "¿Cuál es el otro motivo? *",
+    );
+    expect(detailField.props.placeholder).toBe(
+      "Especifica el motivo por el cual sigue pendiente…",
+    );
+
+    fireEvent.changeText(detailField, "Cierre por orden de la alcaldía");
+
+    // Desmarcar oculta el campo y limpia el valor.
+    fireEvent.press(
+      screen.getByRole("checkbox", { name: "Motivo pendiente: Otro motivo" }),
+    );
+    expect(
+      screen.queryByLabelText("¿Cuál es el otro motivo? *"),
+    ).toBeNull();
+
+    // Re-marcar: el campo vuelve vacío.
+    fireEvent.press(
+      screen.getByRole("checkbox", { name: "Motivo pendiente: Otro motivo" }),
+    );
+    expect(
+      (await screen.findByLabelText("¿Cuál es el otro motivo? *")).props
+        .value,
+    ).toBe("");
+  });
+
+  it("bloquea el envío si falta el detalle", () => {
+    const errors = validateUnverifiedBuildingDraft(
+      {
+        ...initialUnverifiedBuildingDraft,
+        pendingReasons: ["other"],
+      },
+      [validPhoto],
+    );
+
+    expect(errors).toContain(
+      "Especifica el otro motivo por el cual la búsqueda sigue pendiente.",
+    );
+
+    const withDetail = validateUnverifiedBuildingDraft(
+      {
+        ...initialUnverifiedBuildingDraft,
+        pendingReasons: ["other"],
+        pendingReasonDetail: "Cierre por orden de la alcaldía",
+      },
+      [validPhoto],
+    );
+    expect(
+      withDetail.some((message) => message.includes("otro motivo")),
+    ).toBe(false);
+  });
+});

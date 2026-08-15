@@ -18,6 +18,7 @@ const completeDraft: UnverifiedBuildingReportDraft = {
   longitude: "-73.12274",
   relatedEventId: "",
   relatedEventName: "",
+  pendingReasonDetail: "",
   observedDate: "2026-08-13",
   observedTime: "14:20",
   searchStatus: "incomplete",
@@ -182,5 +183,33 @@ describe("evento relacionado (CHG-092)", () => {
       "Vendaval en el barrio La Cumbre",
     );
     expect(payload).not.toHaveProperty("relatedDisasterId");
+  });
+});
+
+/**
+ * CHG-093 — El detalle del motivo "Otro" viaja solo cuando el motivo
+ * sigue marcado.
+ */
+describe('detalle de "Otro motivo" (CHG-093)', () => {
+  it("incluye el detalle con other marcado", () => {
+    const payload = buildBuildingReportPayload({
+      ...completeDraft,
+      pendingReasons: ["access_blocked", "other"],
+      pendingReasonDetail: "  Cierre por orden de la alcaldía  ",
+    });
+
+    expect(payload.pendingReasonDetail).toBe(
+      "Cierre por orden de la alcaldía",
+    );
+  });
+
+  it("omite el detalle si other no está marcado", () => {
+    const payload = buildBuildingReportPayload({
+      ...completeDraft,
+      pendingReasons: ["access_blocked"],
+      pendingReasonDetail: "Texto huérfano que no debe viajar",
+    });
+
+    expect(payload).not.toHaveProperty("pendingReasonDetail");
   });
 });
