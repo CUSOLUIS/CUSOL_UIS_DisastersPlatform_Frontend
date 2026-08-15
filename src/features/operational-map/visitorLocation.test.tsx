@@ -258,3 +258,54 @@ describe("LocateMeControl", () => {
     expect(screen.queryByTestId("locate-me-button")).toBeNull();
   });
 });
+
+// CHG-085 — Si el intento de alta precisión se agota, se reintenta en
+// modo grueso antes de rendirse.
+describe("degradación de precisión al ubicar", () => {
+  it("cae al modo grueso cuando la alta precisión se agota", async () => {
+    const calls: Array<{ enableHighAccuracy?: boolean }> = [];
+    const geolocation = {
+      getCurrentPosition: (
+        onSuccess: (p: { coords: { latitude: number; longitude: number } }) => void,
+        onError: (e: { code?: number }) => void,
+        options?: { enableHighAccuracy?: boolean },
+      ) => {
+        calls.push({ enableHighAccuracy: options?.enableHighAccuracy });
+        if (options?.enableHighAccuracy) {
+          onError({ code: 3 });
+        } else {
+          onSuccess({ coords: { latitude: 7.1, longitude: -73.1 } });
+        }
+      },
+    };
+
+    await expect(requestVisitorLocation(geolocation)).resolves.toEqual({
+      latitude: 7.1,
+      longitude: -73.1,
+    });
+    expect(calls).toEqual([
+      { enableHighAccuracy: true },
+      { enableHighAccuracy: false },
+    ]);
+  });
+
+  it("el permiso denegado no reintenta", async () => {
+    const attempts: number[] = [];
+    const geolocation = {
+      getCurrentPosition: (
+        _onSuccess: unknown,
+        onError: (e: { code?: number }) => void,
+      ) => {
+        attempts.push(1);
+        onError({ code: 1 });
+      },
+    };
+
+    await expect(
+      requestVisitorLocation(
+        geolocation as unknown as Parameters<typeof requestVisitorLocation>[0],
+      ),
+    ).rejects.toThrow(/Permiso de ubicación denegado/);
+    expect(attempts).toHaveLength(1);
+  });
+});

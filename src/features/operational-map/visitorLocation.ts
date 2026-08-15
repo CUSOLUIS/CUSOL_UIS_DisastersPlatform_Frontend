@@ -115,16 +115,14 @@ export function watchVisitorLocation(
   return () => geolocation.clearWatch?.(watchId);
 }
 
-export function requestVisitorLocation(
-  geolocation: GeolocationLike | null = getBrowserGeolocation(),
+function getPositionOnce(
+  geolocation: GeolocationLike,
+  options: {
+    enableHighAccuracy: boolean;
+    timeout: number;
+    maximumAge: number;
+  },
 ): Promise<GeographicCenter> {
-  if (geolocation === null) {
-    return Promise.reject(
-      new VisitorLocationError(
-        "Este dispositivo o navegador no permite obtener la ubicación.",
-      ),
-    );
-  }
   return new Promise((resolve, reject) => {
     geolocation.getCurrentPosition(
       (position) =>
@@ -132,39 +130,69 @@ export function requestVisitorLocation(
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
         }),
-      (error) => {
-        if (error.code === PERMISSION_DENIED) {
-          reject(
-            new VisitorLocationError(
-              "Permiso de ubicación denegado. Habilítalo en tu " +
-                "navegador para centrar el mapa donde estás.",
-            ),
-          );
-          return;
-        }
-        if (error.code === TIMEOUT) {
-          reject(
-            new VisitorLocationError(
-              "La ubicación tardó demasiado. Intenta de nuevo.",
-            ),
-          );
-          return;
-        }
-        if (error.code === POSITION_UNAVAILABLE) {
-          reject(
-            new VisitorLocationError(
-              "No fue posible determinar tu ubicación en este momento.",
-            ),
-          );
-          return;
-        }
-        reject(
-          new VisitorLocationError(
-            "No fue posible obtener tu ubicación.",
-          ),
-        );
-      },
-      { enableHighAccuracy: true, timeout: 12_000, maximumAge: 30_000 },
+      reject,
+      options,
     );
   });
+}
+
+function describeLocationError(error: unknown): VisitorLocationError {
+  const code = (error as { code?: number } | null)?.code;
+  if (code === PERMISSION_DENIED) {
+    return new VisitorLocationError(
+      "Permiso de ubicación denegado. Habilítalo en tu " +
+        "navegador para centrar el mapa donde estás.",
+    );
+  }
+  if (code === TIMEOUT) {
+    return new VisitorLocationError(
+      "La ubicación tardó demasiado. Intenta de nuevo.",
+    );
+  }
+  if (code === POSITION_UNAVAILABLE) {
+    return new VisitorLocationError(
+      "No fue posible determinar tu ubicación en este momento.",
+    );
+  }
+  return new VisitorLocationError(
+    "No fue posible obtener tu ubicación.",
+  );
+}
+
+// CHG-085 — Un solo intento de alta precisión con 12 s se vencía en
+// escritorios (sin GPS) y en interiores, y el botón fallaba con "La
+// ubicación tardó demasiado". Ahora, si el intento preciso se agota o
+// no hay señal GPS, se reintenta automáticamente en modo grueso
+// (red/wifi, acepta una posición reciente en caché) antes de
+// rendirse. El permiso denegado corta de inmediato — la autorización
+// la recuerda el propio navegador por sitio.
+export async function requestVisitorLocation(
+  geolocation: GeolocationLike | null = getBrowserGeolocation(),
+): Promise<GeographicCenter> {
+  if (geolocation === null) {
+    throw new VisitorLocationError(
+      "Este dispositivo o navegador no permite obtener la ubicación.",
+    );
+  }
+  try {
+    return await getPositionOnce(geolocation, {
+      enableHighAccuracy: true,
+      timeout: 12_000,
+      maximumAge: 30_000,
+    });
+  } catch (error: unknown) {
+    const code = (error as { code?: number } | null)?.code;
+    if (code === PERMISSION_DENIED) {
+      throw describeLocationError(error);
+    }
+    try {
+      return await getPositionOnce(geolocation, {
+        enableHighAccuracy: false,
+        timeout: 20_000,
+        maximumAge: 300_000,
+      });
+    } catch (fallbackError: unknown) {
+      throw describeLocationError(fallbackError);
+    }
+  }
 }
