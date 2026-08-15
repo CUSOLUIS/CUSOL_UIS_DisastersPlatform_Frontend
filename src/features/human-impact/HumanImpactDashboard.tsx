@@ -780,7 +780,7 @@ function SituationIntro({
           Mariana
         </Text>
         <Text style={[missionTitleStyle, styles.heroTitleAccent]}>
-          es boba
+          francesa
         </Text>
         <Text style={styles.heroDescription}>
           Unimos datos verificables y reportes ciudadanos para localizar personas,
