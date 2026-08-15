@@ -4,7 +4,6 @@ import type { ReactNode, RefObject } from "react";
 import {
   Animated,
   Easing,
-  Image,
   Linking,
   Platform,
   Pressable,
@@ -19,6 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
 import cusolUisLogo from "../../assets/cusol-uis-logo-enhanced.png";
 import prometeoLogo from "../../assets/prometeo-logo-hd.png";
+import { FadeInImage } from "../../components/FadeInImage";
 import { useReducedMotion } from "../../hooks/useReducedMotion";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import type { AuthenticatedAccount } from "../auth/types";
@@ -1066,7 +1066,7 @@ function BrandLink({
 
 function BrandIcon({ compact, narrow }: { compact: boolean; narrow: boolean }) {
   return (
-    <Image
+    <FadeInImage
       testID="cusol-brand-logo"
       source={cusolUisLogo}
       resizeMode="contain"
@@ -1090,7 +1090,7 @@ function PrometeoIcon({ compact, narrow }: { compact: boolean; narrow: boolean }
         narrow && styles.prometeoCircleNarrow,
       ]}
     >
-      <Image
+      <FadeInImage
         testID="prometeo-brand-logo"
         accessibilityIgnoresInvertColors
         source={prometeoLogo}

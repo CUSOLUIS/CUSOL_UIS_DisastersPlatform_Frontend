@@ -1,7 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useState } from "react";
 import {
-  Image,
   Linking,
   Pressable,
   ScrollView,
@@ -12,6 +11,7 @@ import {
 } from "react-native";
 import type { PressableStateCallbackType } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { FadeInImage } from "../../components/FadeInImage";
 import cusolLogo from "../../assets/cusol-uis-logo-enhanced.png";
 import prometeoLogo from "../../assets/prometeo-logo-hd.png";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
@@ -89,9 +89,9 @@ export function AboutPage({ onBack }: AboutPageProps) {
                 style={styles.identityPlate}
               >
                 <View style={styles.identitySurface}>
-                  <Image accessibilityLabel="Logo de CUSOL UIS" resizeMode="contain" source={cusolLogo} style={styles.heroLogo} />
+                  <FadeInImage accessibilityLabel="Logo de CUSOL UIS" resizeMode="contain" source={cusolLogo} style={styles.heroLogo} />
                   <View style={styles.prometeoCircle}>
-                    <Image accessibilityLabel="Logo de Prometeo UIS" resizeMode="contain" source={prometeoLogo} style={styles.prometeoLogo} />
+                    <FadeInImage accessibilityLabel="Logo de Prometeo UIS" resizeMode="contain" source={prometeoLogo} style={styles.prometeoLogo} />
                   </View>
                 </View>
               </LinearGradient>
