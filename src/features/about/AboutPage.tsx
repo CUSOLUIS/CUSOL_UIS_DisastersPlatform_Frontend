@@ -11,7 +11,10 @@ import {
 } from "react-native";
 import type { PressableStateCallbackType } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { FadeInImage } from "../../components/FadeInImage";
+import {
+  FadeInImage,
+  RevealGroupContainer,
+} from "../../components/FadeInImage";
 import cusolLogo from "../../assets/cusol-uis-logo-enhanced.png";
 import prometeoLogo from "../../assets/prometeo-logo-hd.png";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
@@ -88,12 +91,13 @@ export function AboutPage({ onBack }: AboutPageProps) {
                 end={{ x: 1, y: 1 }}
                 style={styles.identityPlate}
               >
-                <View style={styles.identitySurface}>
-                  <FadeInImage accessibilityLabel="Logo de CUSOL UIS" group="about-brand-logos" slideFrom="left" resizeMode="contain" source={cusolLogo} style={styles.heroLogo} />
+                {/* CHG-070: los círculos entran junto con los logos. */}
+                <RevealGroupContainer group="about-brand-logos" slideFrom="left" style={styles.identitySurface}>
+                  <FadeInImage accessibilityLabel="Logo de CUSOL UIS" group="about-brand-logos" revealMode="signal" resizeMode="contain" source={cusolLogo} style={styles.heroLogo} />
                   <View style={styles.prometeoCircle}>
-                    <FadeInImage accessibilityLabel="Logo de Prometeo UIS" group="about-brand-logos" slideFrom="left" resizeMode="contain" source={prometeoLogo} style={styles.prometeoLogo} />
+                    <FadeInImage accessibilityLabel="Logo de Prometeo UIS" group="about-brand-logos" revealMode="signal" resizeMode="contain" source={prometeoLogo} style={styles.prometeoLogo} />
                   </View>
-                </View>
+                </RevealGroupContainer>
               </LinearGradient>
               <Text style={styles.identityTitle}>CUSOL DISASTER PLATFORM</Text>
             </View>

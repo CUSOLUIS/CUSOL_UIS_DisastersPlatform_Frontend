@@ -18,7 +18,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
 import cusolUisLogo from "../../assets/cusol-uis-logo-enhanced.png";
 import prometeoLogo from "../../assets/prometeo-logo-hd.png";
-import { FadeInImage } from "../../components/FadeInImage";
+import {
+  FadeInImage,
+  RevealGroupContainer,
+} from "../../components/FadeInImage";
 import { useReducedMotion } from "../../hooks/useReducedMotion";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import type { AuthenticatedAccount } from "../auth/types";
@@ -574,7 +577,13 @@ function Header({
                 narrow && styles.brandLogoFrameNarrow,
               ]}
             >
-              <View style={[styles.brandLogos, narrow && styles.brandLogosNarrow]}>
+              {/* CHG-070: los círculos completos entran deslizándose
+                  junto con los logos, no solo la imagen interior. */}
+              <RevealGroupContainer
+                group="header-brand-logos"
+                slideFrom="left"
+                style={[styles.brandLogos, narrow && styles.brandLogosNarrow]}
+              >
                 <BrandLink
                   testID="cusol-brand-link"
                   accessibilityLabel="CUSOL UIS en Instagram"
@@ -591,7 +600,7 @@ function Header({
                 >
                   <PrometeoIcon compact={compact} narrow={narrow} />
                 </BrandLink>
-              </View>
+              </RevealGroupContainer>
             </View>
             <Text
               style={[
@@ -1118,10 +1127,10 @@ function BrandIcon({ compact, narrow }: { compact: boolean; narrow: boolean }) {
   return (
     <FadeInImage
       testID="cusol-brand-logo"
-      // CHG-068: ambos logos del encabezado aparecen a la vez, despacio
-      // y entrando desde la izquierda.
+      // CHG-068/070: ambos logos y sus círculos aparecen a la vez; el
+      // movimiento lo pone el contenedor del grupo.
       group="header-brand-logos"
-      slideFrom="left"
+      revealMode="signal"
       source={cusolUisLogo}
       resizeMode="contain"
       style={[
@@ -1147,7 +1156,7 @@ function PrometeoIcon({ compact, narrow }: { compact: boolean; narrow: boolean }
       <FadeInImage
         testID="prometeo-brand-logo"
         group="header-brand-logos"
-        slideFrom="left"
+        revealMode="signal"
         accessibilityIgnoresInvertColors
         source={prometeoLogo}
         resizeMode="contain"

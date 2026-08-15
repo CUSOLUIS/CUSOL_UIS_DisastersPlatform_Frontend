@@ -6,7 +6,7 @@
 
 import { act, render, screen } from "@testing-library/react-native";
 import { Animated } from "react-native";
-import { FadeInImage } from "./FadeInImage";
+import { FadeInImage, RevealGroupContainer } from "./FadeInImage";
 
 // El setup global fija "reducir movimiento" en true para acelerar las
 // demás pruebas; aquí se cubre justamente la transición animada.
@@ -42,6 +42,31 @@ it("las imágenes del grupo esperan a la última carga y aparecen juntas", async
     screen.getByTestId("logo-b").props.onLoad({ nativeEvent: {} });
   });
   expect(spy).toHaveBeenCalledTimes(2);
+});
+
+// CHG-070 — El contenedor (círculos incluidos) entra junto con los
+// logos: espera la última carga y entonces se anima como una pieza.
+it("el contenedor del grupo se desplaza con los logos al completarse la carga", async () => {
+  const spy = jest.spyOn(Animated, "parallel");
+  render(
+    <RevealGroupContainer group="par-contenedor" slideFrom="left">
+      <FadeInImage testID="logo-a" group="par-contenedor" revealMode="signal" source={cusol} />
+      <FadeInImage testID="logo-b" group="par-contenedor" revealMode="signal" source={prometeo} />
+    </RevealGroupContainer>,
+  );
+  await act(async () => undefined);
+
+  act(() => {
+    screen.getByTestId("logo-a").props.onLoad({ nativeEvent: {} });
+  });
+  expect(spy).not.toHaveBeenCalled();
+
+  act(() => {
+    screen.getByTestId("logo-b").props.onLoad({ nativeEvent: {} });
+  });
+  // Solo anima el contenedor (una vez): las imágenes "signal" no traen
+  // movimiento propio, así los círculos y los logos viajan juntos.
+  expect(spy).toHaveBeenCalledTimes(1);
 });
 
 it("sin grupo, la imagen se anima apenas carga (comportamiento CHG-063)", async () => {
