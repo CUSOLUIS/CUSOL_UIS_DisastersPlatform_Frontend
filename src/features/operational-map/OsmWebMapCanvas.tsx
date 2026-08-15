@@ -14,6 +14,7 @@ import { FallbackMapCanvas } from "./FallbackMapCanvas";
 import { HumanMapMarkerIcon } from "./HumanMapMarkerIcon";
 import { humanFeatureAccessibilityLabel } from "./humanStatusMeta";
 import { MapZoomControls } from "./MapZoomControls";
+import { LocateMeControl } from "./LocateMeControl";
 import { MapMouseHint } from "./MapMouseHint";
 import { OsmAttribution } from "./OsmAttribution";
 import type {
@@ -57,6 +58,8 @@ export function OsmWebMapCanvas(props: OperationalMapCanvasProps) {
   const [tilesFailed, setTilesFailed] = useState(
     process.env.EXPO_PUBLIC_OSM_TILES_DISABLED === "true",
   );
+  const [visitorLocation, setVisitorLocation] =
+    useState<GeographicCenter | null>(null);
   const [size, setSize] = useState<CanvasSize>({
     width: props.compact ? 360 : 1180,
     height: props.canvasMinHeight ?? (props.compact ? 370 : 480),
@@ -158,6 +161,15 @@ export function OsmWebMapCanvas(props: OperationalMapCanvasProps) {
         onZoomOut={() => changeZoom(-1)}
       />
 
+      <LocateMeControl
+        onLocated={(located) => {
+          // CHG-055: centrar el mapa en el visitante y marcarlo.
+          setVisitorLocation(located);
+          setCenter(located);
+          setZoom((current) => Math.max(current, 14));
+        }}
+      />
+
       {markers.map(({ point, left, top }) => {
         const meta = categoryMeta[point.category];
         const selected = props.selectedId === point.id;
@@ -210,6 +222,28 @@ export function OsmWebMapCanvas(props: OperationalMapCanvasProps) {
           </Pressable>
         );
       })}
+
+      {visitorLocation && (() => {
+        const worldSize = TILE_SIZE * 2 ** zoom;
+        const left =
+          size.width / 2 +
+          longitudeToWorldX(visitorLocation.longitude, worldSize) -
+          longitudeToWorldX(center.longitude, worldSize);
+        const top =
+          size.height / 2 +
+          latitudeToWorldY(visitorLocation.latitude, worldSize) -
+          latitudeToWorldY(center.latitude, worldSize);
+        return (
+          <View
+            accessibilityLabel="Tu ubicación actual en el mapa"
+            style={[styles.visitorMarker, { left, top }]}
+            testID="visitor-location-marker"
+          >
+            <View style={styles.visitorHalo} />
+            <View style={styles.visitorDot} />
+          </View>
+        );
+      })()}
 
       {props.points.length === 0 && (
         <View style={styles.empty}>
@@ -329,6 +363,37 @@ const styles = StyleSheet.create({
     marginTop: -33,
   },
   humanMarkerSelected: { zIndex: 5 },
+  // CHG-055: marcador del visitante ("estás aquí").
+  visitorMarker: {
+    position: "absolute",
+    zIndex: 5,
+    width: 0,
+    height: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  visitorHalo: {
+    position: "absolute",
+    width: 34,
+    height: 34,
+    marginLeft: -17,
+    marginTop: -17,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: "rgba(81,229,255,0.55)",
+    backgroundColor: "rgba(81,229,255,0.16)",
+  },
+  visitorDot: {
+    position: "absolute",
+    width: 12,
+    height: 12,
+    marginLeft: -6,
+    marginTop: -6,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: "#07101b",
+    backgroundColor: colors.cyan,
+  },
   empty: {
     position: "absolute",
     top: 0,

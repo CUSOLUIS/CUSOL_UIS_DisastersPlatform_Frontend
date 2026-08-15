@@ -6,6 +6,7 @@ import { categoryMeta } from "./categoryMeta";
 import { CategoryMarkerIcon } from "./CategoryMarkerIcon";
 import { HumanMapMarkerIcon } from "./HumanMapMarkerIcon";
 import { humanFeatureAccessibilityLabel } from "./humanStatusMeta";
+import { LocateMeControl } from "./LocateMeControl";
 import { MapMouseHint } from "./MapMouseHint";
 import { MapZoomControls } from "./MapZoomControls";
 import type {
@@ -58,6 +59,10 @@ export function FallbackMapCanvas({
 }: OperationalMapCanvasProps) {
   const [zoom, setZoom] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [visitorLocation, setVisitorLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const projectedPoints = projectPoints(points, zoom);
   const changeZoom = (direction: 1 | -1) => {
     setZoom((current) => Math.max(1, Math.min(2.5, current + direction * 0.5)));
@@ -148,6 +153,16 @@ export function FallbackMapCanvas({
         onZoomOut={() => changeZoom(-1)}
       />
 
+      <LocateMeControl
+        onLocated={(located) => {
+          // CHG-055: en el lienzo neutro se marca al visitante dentro
+          // del encuadre nacional (sin teselas no hay centrado fino).
+          setVisitorLocation(located);
+          setZoom(1);
+          setPanOffset({ x: 0, y: 0 });
+        }}
+      />
+
       {projectedPoints.map(({ point, left, top }) => {
         const meta = categoryMeta[point.category];
         const selected = selectedId === point.id;
@@ -217,6 +232,30 @@ export function FallbackMapCanvas({
           </Pressable>
         );
       })}
+
+      {visitorLocation && (
+        <View
+          accessibilityLabel="Tu ubicación actual en el mapa"
+          style={[
+            styles.visitorMarker,
+            projectLocation(
+              visitorLocation.latitude,
+              visitorLocation.longitude,
+              zoom,
+            ),
+            {
+              transform: [
+                { translateX: panOffset.x },
+                { translateY: panOffset.y },
+              ],
+            },
+          ]}
+          testID="visitor-location-marker"
+        >
+          <View style={styles.visitorHalo} />
+          <View style={styles.visitorDot} />
+        </View>
+      )}
 
       {points.length === 0 && (humanFeatures?.length ?? 0) === 0 && (
         <View style={styles.empty}>
@@ -293,6 +332,37 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginLeft: -33,
     marginTop: -33,
+  },
+  // CHG-055: marcador del visitante en el lienzo neutro.
+  visitorMarker: {
+    position: "absolute",
+    zIndex: 5,
+    width: 0,
+    height: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  visitorHalo: {
+    position: "absolute",
+    width: 30,
+    height: 30,
+    marginLeft: -15,
+    marginTop: -15,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: "rgba(81,229,255,0.55)",
+    backgroundColor: "rgba(81,229,255,0.16)",
+  },
+  visitorDot: {
+    position: "absolute",
+    width: 10,
+    height: 10,
+    marginLeft: -5,
+    marginTop: -5,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: "#07101b",
+    backgroundColor: colors.cyan,
   },
   empty: {
     position: "absolute",
