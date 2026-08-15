@@ -1,5 +1,13 @@
 import type { PropsWithChildren } from "react";
 import { AccessibilityInfo } from "react-native";
+import { configure } from "@testing-library/react-native";
+
+// En runners lentos o cargados (CI, la Pi durante builds) el primer
+// render de la App en un worker frío tarda varios segundos y los
+// findBy*/waitFor superan sus límites por defecto sin que exista un
+// fallo funcional; los timeouts amplios eliminan esa clase de flakes.
+configure({ asyncUtilTimeout: 15_000 });
+jest.setTimeout(60_000);
 
 process.env.EXPO_PUBLIC_HUMAN_MAP_DATA_MODE = "demo";
 process.env.EXPO_PUBLIC_PEOPLE_RECORDS_DATA_MODE = "demo";
