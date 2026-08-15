@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import { getLastKnownVisitorLocation } from "../operational-map/visitorPresence";
 import type {
   MissingPersonReportDraft,
   MissingPersonReportReceipt,
@@ -78,6 +79,14 @@ export function buildReportPayload(
   if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
     payload.lastSeenLatitude = latitude;
     payload.lastSeenLongitude = longitude;
+  }
+
+  // CHG-066: instantánea de la ubicación del reportante (si concedió el
+  // permiso de ubicación); viaja cifrada y solo la ve super_admin.
+  const snapshot = getLastKnownVisitorLocation();
+  if (snapshot) {
+    payload.reporterLatitude = snapshot.latitude;
+    payload.reporterLongitude = snapshot.longitude;
   }
 
   return payload;

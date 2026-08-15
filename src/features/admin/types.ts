@@ -1,6 +1,11 @@
 import type { AccountRole, AuthenticatedAccount } from "../auth/types";
 
-export type AdminSection = "overview" | "submissions" | "accounts" | "audit";
+export type AdminSection =
+  | "overview"
+  | "submissions"
+  | "accounts"
+  | "audit"
+  | "presence";
 export type AdminSubmissionKind =
   | "missing_person_report"
   | "unverified_building_report"
@@ -212,6 +217,27 @@ export interface AdminAuditPage {
   generatedAt: string;
 }
 
+// CHG-066: ubicación en vivo de usuarios registrados que aceptaron
+// compartirla. Solo la consola super_admin puede consultarla y la
+// cuenta jamás viaja: apenas el hecho de estar autenticado.
+export interface AdminVisitorPresence {
+  presenceId: string;
+  latitude: number;
+  longitude: number;
+  accuracyMeters: number | null;
+  platform: "web" | "android" | "ios";
+  authenticated: boolean;
+  firstSeenAt: string;
+  updatedAt: string;
+}
+
+export interface AdminVisitorPresencePage {
+  items: AdminVisitorPresence[];
+  total: number;
+  windowMinutes: number;
+  generatedAt: string;
+}
+
 export interface AdminDataSource {
   transport: "api" | "demo";
   getCurrentAccount(signal?: AbortSignal): Promise<AuthenticatedAccount>;
@@ -258,5 +284,8 @@ export interface AdminDataSource {
     filters: { q?: string; limit: 10 | 25 | 50; offset: number },
     signal?: AbortSignal,
   ): Promise<AdminAuditPage>;
+  listVisitorPresence(
+    signal?: AbortSignal,
+  ): Promise<AdminVisitorPresencePage>;
   logout(): Promise<void>;
 }

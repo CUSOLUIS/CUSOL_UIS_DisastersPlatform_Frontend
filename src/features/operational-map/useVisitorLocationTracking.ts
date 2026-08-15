@@ -6,12 +6,24 @@ import {
   watchVisitorLocation,
   type GeolocationPermissionState,
 } from "./visitorLocation";
+import {
+  reportVisitorPresence,
+  setLastKnownVisitorLocation,
+} from "./visitorPresence";
 
 // CHG-064: ubicación del visitante con seguimiento en vivo. Al activar
 // (botón) se centra el mapa una vez y el marcador sigue moviéndose con
 // la persona mientras la página esté abierta. Si el navegador recuerda
 // el permiso concedido, el seguimiento se reanuda solo al volver; si lo
 // olvidó o fue revocado, el botón vuelve a pedirlo.
+
+// CHG-066: cada lectura actualiza la instantánea para reportes y, solo
+// con sesión de usuario registrado, se comparte en vivo (throttle en el
+// módulo de presencia; sin sesión el gateway la rechaza y se pausa).
+function defaultShare(center: GeographicCenter) {
+  setLastKnownVisitorLocation(center);
+  void reportVisitorPresence(center);
+}
 
 interface UseVisitorLocationTrackingOptions {
   onCenter: (center: GeographicCenter) => void;
@@ -21,6 +33,7 @@ interface UseVisitorLocationTrackingOptions {
     onRevoked?: () => void,
   ) => () => void;
   permissionState?: () => Promise<GeolocationPermissionState>;
+  share?: (center: GeographicCenter) => void;
 }
 
 export function useVisitorLocationTracking({
@@ -28,6 +41,7 @@ export function useVisitorLocationTracking({
   locate = requestVisitorLocation,
   watch = watchVisitorLocation,
   permissionState = getGeolocationPermissionState,
+  share = defaultShare,
 }: UseVisitorLocationTrackingOptions) {
   const [location, setLocation] = useState<GeographicCenter | null>(null);
   const [locating, setLocating] = useState(false);
@@ -51,6 +65,7 @@ export function useVisitorLocationTracking({
     stopWatchRef.current = watch(
       (updated) => {
         if (mountedRef.current) setLocation(updated);
+        share(updated);
       },
       () => {
         // Permiso revocado: se detiene el seguimiento y desaparece el
@@ -58,15 +73,17 @@ export function useVisitorLocationTracking({
         stopWatchRef.current?.();
         stopWatchRef.current = null;
         if (mountedRef.current) setLocation(null);
+        setLastKnownVisitorLocation(null);
       },
     );
-  }, [watch]);
+  }, [share, watch]);
 
   const activate = useCallback(async () => {
     setLocating(true);
     setError(null);
     try {
       const located = await locate();
+      share(located);
       if (!mountedRef.current) return;
       setLocation(located);
       onCenterRef.current(located);
@@ -82,7 +99,7 @@ export function useVisitorLocationTracking({
     } finally {
       if (mountedRef.current) setLocating(false);
     }
-  }, [locate, startWatch]);
+  }, [locate, share, startWatch]);
 
   useEffect(() => {
     if (autoResumedRef.current) return;

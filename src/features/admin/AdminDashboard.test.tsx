@@ -156,6 +156,23 @@ function createDataSource(
       offset: 0,
       generatedAt: "2026-08-14T14:00:00Z",
     }),
+    listVisitorPresence: jest.fn().mockResolvedValue({
+      items: [
+        {
+          presenceId: "50000000-0000-4000-8000-000000000001",
+          latitude: 7.1193,
+          longitude: -73.1227,
+          accuracyMeters: 18,
+          platform: "android",
+          authenticated: true,
+          firstSeenAt: "2026-08-14T13:50:00Z",
+          updatedAt: "2026-08-14T14:00:00Z",
+        },
+      ],
+      total: 1,
+      windowMinutes: 30,
+      generatedAt: "2026-08-14T14:00:00Z",
+    }),
     logout: jest.fn().mockResolvedValue(undefined),
   };
 }

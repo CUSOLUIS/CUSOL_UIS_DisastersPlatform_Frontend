@@ -18,6 +18,7 @@ import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { AdminApiError, adminDataSource } from "./dataSource";
 import type {
   AdminAccountDetail,
+  AdminVisitorPresencePage,
   AdminAccountPage,
   AdminAccountStatus,
   AdminAction,
@@ -47,6 +48,7 @@ const SECTION_OPTIONS: Array<{
   { value: "submissions", label: "Ingresos", code: "02" },
   { value: "accounts", label: "Cuentas", code: "03" },
   { value: "audit", label: "Auditoría", code: "04" },
+  { value: "presence", label: "Ubicaciones", code: "05" },
 ];
 
 const KIND_LABELS: Record<AdminSubmissionKind, string> = {
@@ -128,6 +130,8 @@ function guardAdminDataSource(
       guarded(source.revokeAccountSessions(id, reason)),
     listAudit: (filters, signal) =>
       guarded(source.listAudit(filters, signal)),
+    listVisitorPresence: (signal) =>
+      guarded(source.listVisitorPresence(signal)),
   };
 }
 
@@ -307,6 +311,9 @@ export function AdminDashboard({
             )}
             {section === "audit" && (
               <AuditSection dataSource={protectedDataSource} refreshKey={refreshKey} />
+            )}
+            {section === "presence" && (
+              <PresenceSection dataSource={protectedDataSource} refreshKey={refreshKey} />
             )}
           </ScrollView>
         </View>
@@ -639,6 +646,89 @@ function AccountDetailModal({ currentAccountId, dataSource, detail, onClose, onC
   const save = async () => { if (reason.trim().length < 10) { setError("Explica el motivo con al menos 10 caracteres."); return; } const input = { expectedVersion: detail.version, reason: reason.trim(), ...(role !== detail.assignedRole ? { assignedRole: role } : {}), ...(status !== detail.status ? { status } : {}) }; if (!("assignedRole" in input) && !("status" in input)) { setError("No hay cambios de rol o estado."); return; } setWorking(true); setError(null); try { await dataSource.updateAccount(detail.id, input); setNotice("Cuenta actualizada y auditada."); await onChanged(); } catch (caught: unknown) { setError(messageOf(caught)); } finally { setWorking(false); } };
   const revoke = async () => { if (reason.trim().length < 10) { setError("Explica el motivo con al menos 10 caracteres."); return; } setWorking(true); try { await dataSource.revokeAccountSessions(detail.id, reason.trim()); setNotice("Sesiones revocadas."); setConfirmRevoke(false); await onChanged(); } catch (caught: unknown) { setError(messageOf(caught)); } finally { setWorking(false); } };
   return <Modal visible transparent animationType="fade" onRequestClose={onClose}><View style={styles.modalBackdrop}><View style={styles.modalCardSmall}><View style={styles.modalHeader}><View><Text style={styles.sectionOverline}>ACCOUNT / V{detail.version}</Text><Text accessibilityRole="header" style={styles.modalTitle}>{detail.displayName}</Text><Text style={styles.accountEmail}>{detail.email}</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Cerrar cuenta" onPress={onClose} style={styles.closeButton}><Text style={styles.closeText}>×</Text></Pressable></View><ScrollView contentContainerStyle={styles.modalScroll}><View style={styles.accountFacts}><Fact label="Ubicación" value={`${detail.municipality}, ${detail.department}`} /><Fact label="Participación" value={humanize(detail.requestedAccountType)} /><Fact label="Sesiones activas" value={String(detail.activeSessions)} /><Fact label="Cuenta propia" value={detail.id === currentAccountId ? "Sí" : "No"} /></View><FilterRow label="Rol asignado" value={role} allowAll={false} options={["user", "moderator", "super_admin"]} labels={ROLE_LABELS} onChange={(value) => value && setRole(value)} /><FilterRow label="Estado" value={status} allowAll={false} options={["pending_verification", "active", "suspended"]} labels={ACCOUNT_STATUS_LABELS} onChange={(value) => value && setStatus(value)} /><TextInput accessibilityLabel="Motivo de gestión de cuenta" value={reason} onChangeText={setReason} multiline placeholder="Motivo obligatorio (mínimo 10 caracteres)" placeholderTextColor="#536074" style={[styles.adminInput, styles.adminInputMultiline]} />{error && <InlineNotice message={error} tone="error" />}{notice && <InlineNotice message={notice} tone="safe" />}<Pressable accessibilityRole="button" accessibilityLabel="Guardar rol y estado" disabled={working} onPress={() => void save()} style={styles.primaryButton}><Text style={styles.primaryButtonText}>GUARDAR ROL Y ESTADO</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Revocar todas las sesiones" onPress={() => setConfirmRevoke(true)} style={[styles.actionButton, styles.dangerAction]}><Text style={styles.actionButtonText}>REVOCAR TODAS LAS SESIONES</Text></Pressable>{confirmRevoke && <View style={styles.confirmPanel}><Text style={styles.confirmTitle}>¿Revocar {detail.activeSessions} sesión(es)?</Text><Text style={styles.confirmText}>La cuenta deberá volver a iniciar sesión. Esta operación queda auditada.</Text><View style={styles.confirmActions}><Pressable accessibilityRole="button" onPress={() => setConfirmRevoke(false)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>CANCELAR</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Confirmar revocación de sesiones" onPress={() => void revoke()} style={styles.primaryButton}><Text style={styles.primaryButtonText}>CONFIRMAR</Text></Pressable></View></View>}<InlineNotice message="El último superadministrador activo no puede degradarse ni suspenderse." tone="safe" /></ScrollView></View></View></Modal>;
+}
+
+const PRESENCE_PLATFORM_LABELS: Record<"web" | "android" | "ios", string> = {
+  web: "Web",
+  android: "App Android",
+  ios: "App iOS",
+};
+
+function formatCoordinate(value: number) {
+  return value.toFixed(5);
+}
+
+// CHG-066: ubicación en vivo de usuarios registrados que comparten su
+// posición mientras usan la plataforma. Regla vigente: SOLO la ve la
+// consola super_admin; los anónimos no aparecen aquí (su única huella
+// es la instantánea cifrada adjunta a los reportes que envíen).
+function PresenceSection({ dataSource, refreshKey }: { dataSource: AdminDataSource; refreshKey: number }) {
+  const [page, setPage] = useState<AdminVisitorPresencePage | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setPage(await dataSource.listVisitorPresence());
+    } catch (caught: unknown) {
+      setError(messageOf(caught));
+    } finally {
+      setLoading(false);
+    }
+  }, [dataSource]);
+  useEffect(() => {
+    void load();
+    // Refresco periódico mientras la sección está abierta.
+    const timer = setInterval(() => void load(), 30_000);
+    return () => clearInterval(timer);
+  }, [load, refreshKey]);
+  return (
+    <View style={styles.sectionContent}>
+      <SectionHeading
+        code="05"
+        title="Ubicaciones en vivo"
+        description="Usuarios registrados que comparten su ubicación mientras usan la plataforma. Visible únicamente para super_admin; los reportes anónimos solo dejan una instantánea cifrada en su expediente."
+      />
+      {error && <InlineError message={error} onRetry={() => void load()} />}
+      {loading && !page ? (
+        <InlineLoading label="Cargando ubicaciones en vivo" />
+      ) : (
+        <View style={styles.listPanel}>
+          <Panel
+            title="PRESENCIA ACTIVA"
+            meta={page ? `${page.total} EN LOS ÚLTIMOS ${page.windowMinutes} MIN` : "CONSULTANDO"}
+          >
+            {page?.items.map((item) => (
+              <View key={item.presenceId} style={styles.auditCard}>
+                <View style={styles.auditTop}>
+                  <Text style={styles.auditAction}>
+                    {PRESENCE_PLATFORM_LABELS[item.platform]}
+                  </Text>
+                  <Text style={[styles.auditResult, styles.resultSuccess]}>
+                    REGISTRADO
+                  </Text>
+                </View>
+                <Text style={styles.auditActor}>
+                  {formatCoordinate(item.latitude)}, {formatCoordinate(item.longitude)}
+                </Text>
+                <Text style={styles.auditMeta}>
+                  {item.accuracyMeters !== null
+                    ? `±${Math.round(item.accuracyMeters)} m · `
+                    : ""}
+                  Visto por primera vez {formatDateTime(item.firstSeenAt)} · Última señal {formatDateTime(item.updatedAt)}
+                </Text>
+                <Text style={styles.auditReason}>ID de dispositivo {item.presenceId.slice(0, 8)}…</Text>
+              </View>
+            ))}
+            {page?.items.length === 0 && (
+              <EmptyText text="Ningún usuario registrado está compartiendo ubicación en este momento." />
+            )}
+          </Panel>
+        </View>
+      )}
+    </View>
+  );
 }
 
 function AuditSection({ dataSource, refreshKey }: { dataSource: AdminDataSource; refreshKey: number }) {

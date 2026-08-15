@@ -6,6 +6,7 @@ import type {
   AdminAuditEvent,
   AdminAuditPage,
   AdminDataSource,
+  AdminVisitorPresencePage,
   AdminEvidenceAccessGrant,
   AdminMutationReceipt,
   AdminOverview,
@@ -141,6 +142,13 @@ const apiAdminDataSource: AdminDataSource = {
   listAudit: (filters, signal) =>
     apiRequest<AdminAuditPage>(
       `/api/v1/admin/audit-events${queryString(filters)}`,
+      { signal },
+    ),
+  // CHG-066: presencia en vivo de usuarios registrados; el gateway solo
+  // responde a sesiones super_admin.
+  listVisitorPresence: (signal) =>
+    apiRequest<AdminVisitorPresencePage>(
+      "/api/v1/admin/visitor-presence",
       { signal },
     ),
   logout: authDataSource.logout,
@@ -609,6 +617,35 @@ export const demoAdminDataSource: AdminDataSource = {
       total: filtered.length,
       limit: filters.limit,
       offset: filters.offset,
+      generatedAt: nowIso(),
+    });
+  },
+  async listVisitorPresence() {
+    return clone({
+      items: [
+        {
+          presenceId: "5c0d5f2e-95a7-4a52-8f43-1d5cf0a2b901",
+          latitude: 7.1193,
+          longitude: -73.1227,
+          accuracyMeters: 18,
+          platform: "web" as const,
+          authenticated: true,
+          firstSeenAt: nowIso(),
+          updatedAt: nowIso(),
+        },
+        {
+          presenceId: "0d9a51fe-3f60-4d1a-9a0f-64f2caf40912",
+          latitude: 7.0651,
+          longitude: -73.1049,
+          accuracyMeters: 32,
+          platform: "android" as const,
+          authenticated: true,
+          firstSeenAt: nowIso(),
+          updatedAt: nowIso(),
+        },
+      ],
+      total: 2,
+      windowMinutes: 30,
       generatedAt: nowIso(),
     });
   },

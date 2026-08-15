@@ -1,7 +1,10 @@
 // CHG-055: ubicación actual del visitante para centrar el mapa.
-// El navegador pide el permiso al usuario; la coordenada solo vive en
-// memoria para centrar y dibujar el marcador "estás aquí" — jamás se
-// envía al backend ni se persiste.
+// El navegador pide el permiso al usuario y la coordenada vive en
+// memoria para centrar y dibujar el marcador "estás aquí". Desde
+// CHG-066, con el permiso concedido: los usuarios REGISTRADOS
+// comparten su posición en vivo (visible solo para super_admin) y
+// cualquier reporte enviado adjunta una instantánea cifrada de la
+// ubicación del reportante.
 
 import type { GeographicCenter } from "./webMercator";
 
