@@ -320,7 +320,11 @@ export function RecentPeopleTable({
                 <View
                   key={`placeholder-${index}`}
                   testID={`recent-record-placeholder-${index + 1}`}
-                  style={[styles.row, viewportSized && styles.rowViewport]}
+                  style={[
+                    styles.row,
+                    viewportSized && styles.rowViewport,
+                    styles.placeholderRow,
+                  ]}
                   accessibilityElementsHidden
                   importantForAccessibility="no-hide-descendants"
                 >
@@ -345,7 +349,10 @@ export function RecentPeopleTable({
                   </View>
                 </View>
               ))}
-            <Text style={styles.empty} accessibilityRole="alert">
+            <Text
+              style={[styles.empty, !compact && styles.emptyUnderPlaceholders]}
+              accessibilityRole="alert"
+            >
               No hay personas publicables que coincidan con la consulta.
             </Text>
           </>
@@ -1006,6 +1013,16 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
     color: colors.inkSoft,
     textAlign: "center",
+  },
+  // CHG-045/047: filas de espera más bajas que las reales para que la
+  // sección completa quepa en una pantalla, y aviso sin relleno extra.
+  placeholderRow: {
+    minHeight: 46,
+    paddingVertical: 8,
+  },
+  emptyUnderPlaceholders: {
+    paddingVertical: 14,
+    fontSize: 13,
   },
   // CHG-045: barras tenues del estado de espera de la tabla vacía.
   placeholderBar: {
