@@ -12,12 +12,14 @@ function ControlledPicker({
   addressQuery,
   searchCandidates,
   onChangeSpy,
+  locateVisitor,
 }: {
   addressQuery: string;
   searchCandidates?: (query: string) => Promise<
     Array<{ label: string; latitude: number; longitude: number }>
   >;
   onChangeSpy?: jest.Mock;
+  locateVisitor?: () => Promise<GeographicCenter>;
 }) {
   const [value, setValue] = useState<GeographicCenter | null>(null);
   return (
@@ -29,6 +31,7 @@ function ControlledPicker({
         setValue(next);
       }}
       searchCandidates={searchCandidates}
+      locateVisitor={locateVisitor}
     />
   );
 }
@@ -78,7 +81,7 @@ describe("Selector de última ubicación", () => {
       name: "Cruzar la dirección escrita con el mapa",
     });
     expect(crossButton.props.accessibilityState.disabled).toBe(true);
-    expect(screen.getByText(/Escribe departamento, municipio y zona/)).toBeTruthy();
+    expect(screen.getByText(/Escribe departamento, municipio y la dirección/)).toBeTruthy();
   });
 
   it("informa cuando no hay coincidencias y permite colocar el muñequito manualmente", async () => {
@@ -127,5 +130,60 @@ describe("Selector de última ubicación", () => {
     await waitFor(() =>
       expect(screen.getByText(/servicio de direcciones no respondió/)).toBeTruthy(),
     );
+  });
+});
+
+
+// CHG-080 — Fijar el muñequito con el GPS, como en el mapa de la
+// portada (CHG-055).
+describe("Mi ubicación en el selector", () => {
+  it("fija el muñequito en la posición GPS al pulsar el botón", async () => {
+    const onChangeSpy = jest.fn();
+    const locateVisitor = jest
+      .fn()
+      .mockResolvedValue({ latitude: 7.1193, longitude: -73.1227 });
+
+    render(
+      <ControlledPicker
+        addressQuery=""
+        onChangeSpy={onChangeSpy}
+        locateVisitor={locateVisitor}
+      />,
+    );
+
+    fireEvent.press(
+      screen.getByRole("button", {
+        name: "Centrar el mapa en mi ubicación actual",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(onChangeSpy).toHaveBeenCalledWith({
+        latitude: 7.1193,
+        longitude: -73.1227,
+      }),
+    );
+    expect(locateVisitor).toHaveBeenCalledTimes(1);
+  });
+
+  it("muestra el error del GPS sin romper el selector", async () => {
+    const locateVisitor = jest
+      .fn()
+      .mockRejectedValue(new Error("Permiso de ubicación denegado."));
+
+    render(
+      <ControlledPicker addressQuery="" locateVisitor={locateVisitor} />,
+    );
+
+    fireEvent.press(
+      screen.getByRole("button", {
+        name: "Centrar el mapa en mi ubicación actual",
+      }),
+    );
+
+    expect(
+      await screen.findByText("Permiso de ubicación denegado."),
+    ).toBeTruthy();
+    expect(screen.getByText(/SIN PUNTO FIJADO/)).toBeTruthy();
   });
 });

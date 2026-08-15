@@ -227,7 +227,7 @@ export function MissingPersonReportForm({
               considerations={[
                 "Documento, información médica y datos de contacto del reportante son privados y se guardan cifrados; las fotografías no se publican y solo las ve el equipo.",
                 "La información debe ser veraz y de buena fe. Este reporte no reemplaza la denuncia ante la Fiscalía o la Policía Nacional.",
-                "Describe con el mayor detalle posible la última vez que fue vista; evita direcciones residenciales exactas en los campos públicos.",
+                "Describe con el mayor detalle posible la última vez que fue vista; la dirección que escribas será visible en la búsqueda pública para ayudar a encontrarla.",
               ]}
               onRegister={onRegister}
               onLogin={onLogin}
@@ -253,14 +253,14 @@ export function MissingPersonReportForm({
               </FieldGrid>
             </FormSection>
 
-            <FormSection code="02" title="Última vez que fue vista" description="Indica una zona reconocible, no una ubicación privada exacta.">
+            <FormSection code="02" title="Última vez que fue vista" description="Escribe la dirección o el lugar donde fue vista por última vez.">
               <FieldGrid compact={compact}>
                 <FormField label="Fecha *" hint="AAAA-MM-DD" value={draft.lastSeenDate} onChangeText={(value) => setField("lastSeenDate", value)} />
                 <FormField label="Hora aproximada" hint="HH:MM" value={draft.lastSeenTime} onChangeText={(value) => setField("lastSeenTime", value)} />
                 <FormField label="Departamento *" value={draft.department} onChangeText={(value) => setField("department", value)} />
                 <FormField label="Municipio *" value={draft.municipality} onChangeText={(value) => setField("municipality", value)} />
               </FieldGrid>
-              <FormField label="Zona o lugar de referencia *" value={draft.lastSeenArea} onChangeText={(value) => setField("lastSeenArea", value)} />
+              <FormField label="Dirección *" hint="Dirección o lugar de referencia donde fue vista" value={draft.lastSeenArea} onChangeText={(value) => setField("lastSeenArea", value)} />
               <LastSeenLocationPicker
                 addressQuery={buildLastSeenQuery(draft)}
                 value={parseDraftCoordinates(draft.lastSeenLatitude, draft.lastSeenLongitude)}
@@ -377,7 +377,7 @@ function validateDraft(draft: MissingPersonReportDraft, photos: SelectedPhoto[])
     ["lastSeenDate", "Ingresa la fecha de la última visualización."],
     ["department", "Ingresa el departamento."],
     ["municipality", "Ingresa el municipio."],
-    ["lastSeenArea", "Ingresa una zona de referencia."],
+    ["lastSeenArea", "Ingresa la dirección donde fue vista."],
     ["clothingDescription", "Describe la vestimenta."],
     ["circumstances", "Describe las circunstancias."],
     ["reporterName", "Ingresa el nombre del reportante."],

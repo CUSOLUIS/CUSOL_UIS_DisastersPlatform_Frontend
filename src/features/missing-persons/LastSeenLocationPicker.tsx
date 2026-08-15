@@ -10,8 +10,14 @@ import {
 } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 import { colors, fontFamilies } from "../../theme";
+import { LocateMeControl } from "../operational-map/LocateMeControl";
 import { MapZoomControls } from "../operational-map/MapZoomControls";
 import { OsmAttribution } from "../operational-map/OsmAttribution";
+import {
+  getBrowserGeolocation,
+  requestVisitorLocation,
+} from "../operational-map/visitorLocation";
+import { setLastKnownVisitorLocation } from "../operational-map/visitorPresence";
 import { useWebMapMouseInteractions } from "../operational-map/webMapMouseInteractions";
 import {
   COLOMBIA_CENTER,
@@ -39,6 +45,8 @@ export interface LastSeenLocationPickerProps {
   value: GeographicCenter | null;
   onChange: (next: GeographicCenter | null) => void;
   searchCandidates?: (query: string) => Promise<AddressCandidate[]>;
+  // CHG-080: obtención de la posición GPS, inyectable en pruebas.
+  locateVisitor?: () => Promise<GeographicCenter>;
 }
 
 export function LastSeenLocationPicker({
@@ -46,6 +54,7 @@ export function LastSeenLocationPicker({
   value,
   onChange,
   searchCandidates = searchAddressCandidates,
+  locateVisitor,
 }: LastSeenLocationPickerProps) {
   const [zoom, setZoom] = useState(MIN_ZOOM);
   const [center, setCenter] = useState<GeographicCenter>(COLOMBIA_CENTER);
@@ -53,6 +62,12 @@ export function LastSeenLocationPicker({
   const [candidates, setCandidates] = useState<AddressCandidate[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  // CHG-080: fijar el muñequito con el GPS, como en el mapa de la
+  // portada (CHG-055).
+  const [locating, setLocating] = useState(false);
+  const [locateError, setLocateError] = useState<string | null>(null);
+  const locateAvailable =
+    locateVisitor !== undefined || getBrowserGeolocation() !== null;
 
   const trimmedQuery = addressQuery.trim();
   const tiles = useMemo(
@@ -104,6 +119,28 @@ export function LastSeenLocationPicker({
     }
   };
 
+  const locateMe = async () => {
+    setLocating(true);
+    setLocateError(null);
+    try {
+      const point = await (locateVisitor ?? requestVisitorLocation)();
+      onChange(point);
+      setCenter(point);
+      setZoom(CANDIDATE_ZOOM);
+      // CHG-066: la posición conocida también acompaña (cifrada) al
+      // reporte como instantánea del reportante.
+      setLastKnownVisitorLocation(point);
+    } catch (error: unknown) {
+      setLocateError(
+        error instanceof Error
+          ? error.message
+          : "No fue posible obtener tu ubicación.",
+      );
+    } finally {
+      setLocating(false);
+    }
+  };
+
   const selectCandidate = (candidate: AddressCandidate) => {
     const point = {
       latitude: candidate.latitude,
@@ -132,8 +169,8 @@ export function LastSeenLocationPicker({
     <View style={styles.container}>
       <Text style={styles.title}>UBICACIÓN EN EL MAPA · OPCIONAL</Text>
       <Text style={styles.helper}>
-        Cruza la dirección escrita arriba con el mapa, o arrastra el muñequito
-        hasta el lugar exacto de referencia.
+        Cruza la dirección escrita arriba con el mapa, fija tu ubicación con el
+        botón ◎ del GPS, o arrastra el muñequito hasta el lugar exacto.
       </Text>
 
       <View style={styles.actionsRow}>
@@ -167,8 +204,8 @@ export function LastSeenLocationPicker({
 
       {trimmedQuery.length === 0 && (
         <Text style={styles.hint}>
-          Escribe departamento, municipio y zona de referencia para poder cruzar
-          la dirección.
+          Escribe departamento, municipio y la dirección para poder cruzarla
+          con el mapa.
         </Text>
       )}
 
@@ -222,6 +259,15 @@ export function LastSeenLocationPicker({
           canZoomOut={zoom > MIN_ZOOM}
           onZoomIn={() => changeZoom(1)}
           onZoomOut={() => changeZoom(-1)}
+        />
+
+        {/* CHG-080: fijar el muñequito según el GPS, como en el mapa
+            de la portada. */}
+        <LocateMeControl
+          available={locateAvailable}
+          onPress={() => void locateMe()}
+          locating={locating}
+          error={locateError}
         />
 
         {markerPlacement && (

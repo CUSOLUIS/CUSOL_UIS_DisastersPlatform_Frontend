@@ -161,7 +161,7 @@ describe("Reporte de persona perdida", () => {
       ["Fecha *", "2026-08-11"],
       ["Departamento *", "Cundinamarca"],
       ["Municipio *", "Soacha"],
-      ["Zona o lugar de referencia *", "Parque central"],
+      ["Dirección *", "Parque central"],
       ["Vestimenta *", "Chaqueta amarilla"],
       ["Circunstancias de la desaparición *", "Se perdió contacto durante la evacuación"],
       ["Nombre completo *", "Ana Rojas"],
