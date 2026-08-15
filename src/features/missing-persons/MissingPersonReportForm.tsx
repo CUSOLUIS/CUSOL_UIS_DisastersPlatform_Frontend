@@ -16,6 +16,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { DatePickerField } from "../../components/DatePickerField";
+import {
+  LAST_SEEN_YEAR_MESSAGE,
+  PLATFORM_FIRST_YEAR,
+  isBeforePlatformCoverage,
+} from "./platformCoverage";
 import { InnerRouteHeader } from "../../components/InnerRouteHeader";
 import {
   PHONE_FORMAT_MESSAGE,
@@ -370,7 +375,7 @@ export function MissingPersonReportForm({
 
             <FormSection code="02" title="Última vez que fue vista" description="Escribe la dirección o el lugar donde fue vista por última vez." onPosition={registerSection}>
               <FieldGrid compact={compact}>
-                <DatePickerField label="Fecha *" accessibilityLabel="Elegir fecha de la última visualización" testID="last-seen-date-calendar" value={draft.lastSeenDate} onChange={(value) => setField("lastSeenDate", value)} invalid={invalidFields.has("lastSeenDate")} />
+                <DatePickerField label="Fecha *" accessibilityLabel="Elegir fecha de la última visualización" testID="last-seen-date-calendar" minYear={PLATFORM_FIRST_YEAR} value={draft.lastSeenDate} onChange={(value) => setField("lastSeenDate", value)} invalid={invalidFields.has("lastSeenDate")} />
                 <TimePickerField label="Hora aproximada" accessibilityLabel="Elegir hora de la última visualización" clearAccessibilityLabel="Borrar hora" testID="last-seen-time-picker" value={draft.lastSeenTime} onChange={(value) => setField("lastSeenTime", value)} invalid={invalidFields.has("lastSeenTime")} />
                 <FormField label="Departamento *" invalid={invalidFields.has("department")} value={draft.department} onChangeText={(value) => setField("department", value)} />
                 <FormField label="Municipio *" invalid={invalidFields.has("municipality")} value={draft.municipality} onChangeText={(value) => setField("municipality", value)} />
@@ -598,6 +603,10 @@ export function collectDraftIssues(
   }
   if (draft.lastSeenDate && !/^\d{4}-\d{2}-\d{2}$/.test(draft.lastSeenDate)) {
     push("lastSeenDate", "La fecha de última visualización debe usar AAAA-MM-DD.");
+  } else if (draft.lastSeenDate && isBeforePlatformCoverage(draft.lastSeenDate)) {
+    // CHG-106: el calendario ya no ofrece años previos, pero la regla
+    // vive también aquí para que un envío armado a mano no la esquive.
+    push("lastSeenDate", LAST_SEEN_YEAR_MESSAGE);
   } else if (draft.lastSeenDate && new Date(`${draft.lastSeenDate}T23:59:59`).getTime() > Date.now()) {
     push("lastSeenDate", "La fecha de última visualización no puede estar en el futuro.");
   }

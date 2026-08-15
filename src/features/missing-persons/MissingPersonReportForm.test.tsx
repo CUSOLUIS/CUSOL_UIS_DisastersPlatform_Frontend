@@ -503,3 +503,42 @@ describe("Encabezado y espaciado del reporte (CHG-097)", () => {
     expect(circunstancias).toBeTruthy();
   });
 });
+
+/**
+ * CHG-106 — El calendario de la última visualización solo ofrece años
+ * dentro de la cobertura de la plataforma (desde 2026).
+ */
+describe("Año mínimo de la última visualización (CHG-106)", () => {
+  it("el calendario no ofrece años anteriores a 2026", async () => {
+    render(<MissingPersonReportForm onBack={jest.fn()} />);
+
+    fireEvent.press(
+      screen.getByRole("button", {
+        name: "Elegir fecha de la última visualización",
+      }),
+    );
+
+    expect(
+      await screen.findByRole("button", { name: "Año 2026" }),
+    ).toBeTruthy();
+    for (const year of [2025, 2024, 2015, 2007]) {
+      expect(
+        screen.queryByRole("button", { name: `Año ${year}` }),
+      ).toBeNull();
+    }
+  });
+
+  it("la fecha de nacimiento conserva su rango completo", async () => {
+    render(<MissingPersonReportForm onBack={jest.fn()} />);
+
+    fireEvent.press(
+      screen.getByRole("button", { name: "Elegir fecha de nacimiento" }),
+    );
+
+    // CHG-106 no debe alcanzar a otros campos: nadie nace en 2026 y
+    // tiene 50 años.
+    expect(
+      await screen.findByRole("button", { name: "Año 1990" }),
+    ).toBeTruthy();
+  });
+});
