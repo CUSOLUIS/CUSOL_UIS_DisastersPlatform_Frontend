@@ -48,17 +48,19 @@ jobs:
       - name: Sincronizar dependencias y reiniciar
         run: |
           cd "$COMPOSE_DIR"
+          # La espera de salud vive DENTRO del lock: el smoke del deploy
+          # de backend no debe encontrar el frontend a medio reiniciar.
           flock -w 900 "$DEPLOY_LOCK" sh -c '
             docker compose exec -T frontend npm install --no-audit --no-fund &&
-            docker compose restart frontend
+            docker compose restart frontend &&
+            container=$(docker compose ps -q frontend) &&
+            for _ in $(seq 1 45); do
+              state=$(docker inspect -f "{{.State.Health.Status}}" "$container")
+              [ "$state" = "healthy" ] && break
+              sleep 2
+            done &&
+            [ "$state" = "healthy" ]
           '
-          container=$(docker compose ps -q frontend)
-          for _ in $(seq 1 45); do
-            state=$(docker inspect -f '{{.State.Health.Status}}' "$container")
-            [ "$state" = "healthy" ] && break
-            sleep 2
-          done
-          [ "$state" = "healthy" ]
 
       - name: Verificación por el proxy de producción
         run: |
