@@ -9,6 +9,8 @@ export const operationalMapCategories = [
   "building_pending",
   "community_meal",
   "temporary_shelter",
+  // CHG-069: alertas ciudadanas de voluntariado.
+  "volunteers_needed",
 ] as const;
 
 export type OperationalMapCategory = (typeof operationalMapCategories)[number];
@@ -24,6 +26,7 @@ export const operationalResponseCategories = [
   "building_pending",
   "community_meal",
   "temporary_shelter",
+  "volunteers_needed",
 ] as const satisfies readonly OperationalMapCategory[];
 
 export type CoordinatePrecision = "exact" | "approximate" | "municipality";
@@ -61,6 +64,7 @@ export interface OperationalMapSummary {
   buildingPending: number;
   communityMeal: number;
   temporaryShelter: number;
+  volunteersNeeded: number;
 }
 
 export interface OperationalMapOverview {

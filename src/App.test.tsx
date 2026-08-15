@@ -1076,6 +1076,7 @@ describe("App universal", () => {
           buildingPending: 0,
           communityMeal: 0,
           temporaryShelter: 0,
+          volunteersNeeded: 0,
         },
         items: [],
         generatedAt: "2026-08-12T18:30:00.000Z",
@@ -1178,6 +1179,30 @@ describe("Sesión en el encabezado", () => {
     expect(
       screen.queryByRole("button", { name: "Registrarse" }),
     ).toBeNull();
+  });
+
+  // CHG-069 — El chip de sesión despliega "Mi espacio" bajo el nombre.
+  it("despliega Mi espacio bajo el nombre y abre el panel", async () => {
+    render(
+      <App dataSource={demoDataSource} authSource={authSourceWithSession()} />,
+    );
+
+    const chip = await screen.findByTestId("session-account-chip");
+    expect(screen.queryByTestId("session-account-menu")).toBeNull();
+
+    fireEvent.press(chip);
+    expect(screen.getByTestId("session-account-menu")).toBeTruthy();
+
+    fireEvent.press(screen.getByRole("button", { name: "Abrir Mi espacio" }));
+    expect(await screen.findByTestId("my-space-panel")).toBeTruthy();
+    expect(
+      await screen.findByRole("header", { name: "Mi espacio" }),
+    ).toBeTruthy();
+
+    fireEvent.press(screen.getByRole("button", { name: "Cerrar Mi espacio" }));
+    await waitFor(() =>
+      expect(screen.queryByTestId("my-space-panel")).toBeNull(),
+    );
   });
 
   it("cierra la sesión y restaura iniciar sesión y registro", async () => {

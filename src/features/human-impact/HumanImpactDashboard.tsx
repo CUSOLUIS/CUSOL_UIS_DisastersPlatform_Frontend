@@ -23,6 +23,7 @@ import { useReducedMotion } from "../../hooks/useReducedMotion";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import type { AuthenticatedAccount } from "../auth/types";
 import { HumanitarianSearchPanel } from "../humanitarian-directory/HumanitarianSearchPanel";
+import { MySpacePanel } from "../my-space/MySpacePanel";
 import type {
   CommunityContributionDataSource,
   HumanitarianDirectoryDataSource,
@@ -187,6 +188,9 @@ export function HumanImpactDashboard({
   const headerHeight = getDashboardHeaderHeight(compact, stackedNavigation);
   const liveRecordsMinHeight = getLiveRecordsMinHeight(height, headerHeight);
   const scrollRef = useRef<ScrollView>(null);
+  // CHG-069: menú desplegable de la cuenta y panel "Mi espacio".
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [mySpaceOpen, setMySpaceOpen] = useState(false);
   const mapRef = useRef<View>(null);
   const dataRef = useRef<View>(null);
   const liveRef = useRef<View>(null);
@@ -236,6 +240,18 @@ export function HumanImpactDashboard({
           onRegister={onRegister}
           account={account}
           onLogout={onLogout}
+          accountMenuOpen={accountMenuOpen}
+          onToggleAccountMenu={() =>
+            setAccountMenuOpen((current) => !current)
+          }
+          onOpenMySpace={() => {
+            setAccountMenuOpen(false);
+            setMySpaceOpen(true);
+          }}
+        />
+        <MySpacePanel
+          visible={mySpaceOpen}
+          onClose={() => setMySpaceOpen(false)}
         />
 
         <ScrollView
@@ -507,6 +523,9 @@ function Header({
   onRegister,
   account,
   onLogout,
+  accountMenuOpen,
+  onToggleAccountMenu,
+  onOpenMySpace,
 }: {
   compact: boolean;
   narrow: boolean;
@@ -519,6 +538,9 @@ function Header({
   onRegister: () => void;
   account: AuthenticatedAccount | null;
   onLogout: () => void;
+  accountMenuOpen: boolean;
+  onToggleAccountMenu: () => void;
+  onOpenMySpace: () => void;
 }) {
   const reducedMotion = useReducedMotion();
 
@@ -600,26 +622,54 @@ function Header({
           >
             {account ? (
               // CHG-051: con sesión activa el encabezado muestra la
-              // cuenta y permite cerrarla.
+              // cuenta y permite cerrarla. CHG-069: el chip despliega
+              // "Mi espacio" debajo del nombre.
               <>
-                <View
-                  testID="session-account-chip"
-                  accessibilityLabel={`Sesión activa de ${account.displayName}`}
-                  style={[
-                    styles.sessionChip,
-                    narrow && styles.sessionChipNarrow,
-                  ]}
-                >
-                  <View style={styles.sessionDot} />
-                  <Text
-                    numberOfLines={1}
+                <View style={styles.sessionChipHolder}>
+                  <Pressable
+                    testID="session-account-chip"
+                    accessibilityRole="button"
+                    accessibilityLabel={`Sesión activa de ${account.displayName}. Abrir menú de cuenta`}
+                    onPress={onToggleAccountMenu}
                     style={[
-                      styles.sessionChipText,
-                      narrow && styles.authButtonTextNarrow,
+                      styles.sessionChip,
+                      narrow && styles.sessionChipNarrow,
                     ]}
                   >
-                    {account.displayName.toLocaleUpperCase("es-CO")}
-                  </Text>
+                    <View style={styles.sessionDot} />
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.sessionChipText,
+                        narrow && styles.authButtonTextNarrow,
+                      ]}
+                    >
+                      {account.displayName.toLocaleUpperCase("es-CO")}
+                    </Text>
+                    <Text style={styles.sessionChipCaret}>
+                      {accountMenuOpen ? "▴" : "▾"}
+                    </Text>
+                  </Pressable>
+                  {accountMenuOpen && (
+                    <View
+                      testID="session-account-menu"
+                      style={styles.sessionMenu}
+                    >
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Abrir Mi espacio"
+                        onPress={onOpenMySpace}
+                        style={({ pressed }) => [
+                          styles.sessionMenuItem,
+                          pressed && styles.authButtonPressed,
+                        ]}
+                      >
+                        <Text style={styles.sessionMenuItemText}>
+                          MI ESPACIO
+                        </Text>
+                      </Pressable>
+                    </View>
+                  )}
                 </View>
                 <Pressable
                   accessibilityRole="button"
@@ -1224,6 +1274,38 @@ const styles = StyleSheet.create({
   authActionsCompact: { gap: 6 },
   authActionsNarrow: { gap: 4 },
   // CHG-051: chip de sesión activa en el encabezado.
+  sessionChipHolder: {
+    position: "relative",
+    zIndex: 30,
+  },
+  sessionMenu: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    right: 0,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: colors.lineStrong,
+    borderRadius: 10,
+    backgroundColor: colors.panel,
+    overflow: "hidden",
+  },
+  sessionMenuItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  sessionMenuItemText: {
+    color: colors.cyan,
+    fontFamily: fontFamilies.mono,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  sessionChipCaret: {
+    color: colors.inkSoft,
+    fontSize: 11,
+    marginLeft: 2,
+  },
   sessionChip: {
     maxWidth: 200,
     flexDirection: "row",

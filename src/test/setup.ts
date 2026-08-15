@@ -14,6 +14,7 @@ process.env.EXPO_PUBLIC_PEOPLE_RECORDS_DATA_MODE = "demo";
 process.env.EXPO_PUBLIC_MISSING_PERSON_DATA_MODE = "demo";
 process.env.EXPO_PUBLIC_HUMANITARIAN_DIRECTORY_DATA_MODE = "demo";
 process.env.EXPO_PUBLIC_COMMUNITY_CONTRIBUTION_DATA_MODE = "demo";
+process.env.EXPO_PUBLIC_MY_SPACE_DATA_MODE = "demo";
 
 jest.mock("react-native-safe-area-context", () => ({
   SafeAreaProvider: ({ children }: PropsWithChildren) => children,

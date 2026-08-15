@@ -54,12 +54,17 @@ export function validatePublicOverview(
 type LegacyOperationalMapOverview = Omit<OperationalMapOverview, "summary"> & {
   summary: Omit<
     OperationalMapSummary,
-    "buildingPending" | "collectionPoint" | "communityMeal" | "temporaryShelter"
+    | "buildingPending"
+    | "collectionPoint"
+    | "communityMeal"
+    | "temporaryShelter"
+    | "volunteersNeeded"
   > & {
     buildingPending?: number;
     collectionPoint?: number;
     communityMeal?: number;
     temporaryShelter?: number;
+    volunteersNeeded?: number;
   };
 };
 
@@ -77,6 +82,7 @@ export function normalizeOperationalMapOverview(
     buildingPending: 0,
     communityMeal: 0,
     temporaryShelter: 0,
+    volunteersNeeded: 0,
   };
 
   items.forEach((point) => {
@@ -104,6 +110,9 @@ export function normalizeOperationalMapOverview(
         break;
       case "temporary_shelter":
         summary.temporaryShelter += 1;
+        break;
+      case "volunteers_needed":
+        summary.volunteersNeeded += 1;
         break;
     }
   });

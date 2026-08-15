@@ -15,7 +15,8 @@ interface CategoryMeta {
     | "rubblePending"
     | "buildingPending"
     | "communityMeal"
-    | "temporaryShelter";
+    | "temporaryShelter"
+    | "volunteersNeeded";
 }
 
 export const categoryMeta: Record<OperationalMapCategory, CategoryMeta> = {
@@ -84,5 +85,14 @@ export const categoryMeta: Record<OperationalMapCategory, CategoryMeta> = {
     color: "#f28dd0",
     markerKind: "building",
     summaryKey: "temporaryShelter",
+  },
+  // CHG-069: alerta ciudadana de que se necesita gente en un punto.
+  volunteers_needed: {
+    label: "Se necesitan voluntarios",
+    shortLabel: "Se necesitan voluntarios",
+    glyph: "✋",
+    color: "#ffd166",
+    markerKind: "person",
+    summaryKey: "volunteersNeeded",
   },
 };
