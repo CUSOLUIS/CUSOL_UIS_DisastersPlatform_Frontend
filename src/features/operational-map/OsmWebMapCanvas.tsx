@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
+  Easing,
   Image,
   Pressable,
   StyleSheet,
@@ -7,6 +9,7 @@ import {
   View,
   type LayoutChangeEvent,
 } from "react-native";
+import { useReducedMotion } from "../../hooks/useReducedMotion";
 import { colors, fontFamilies } from "../../theme";
 import { categoryMeta } from "./categoryMeta";
 import { CategoryMarkerIcon } from "./CategoryMarkerIcon";
@@ -39,6 +42,18 @@ import {
 export { panGeographicCenter } from "./webMercator";
 export type { GeographicCenter } from "./webMercator";
 
+// CHG-057: transición suave de zoom. La vista anterior queda debajo
+// escalándose hacia su posición final mientras las teselas del nuevo
+// nivel aparecen encima: el lienzo nunca queda negro esperando carga.
+interface PreviousTileLayer {
+  tiles: ReturnType<typeof buildTilePlacements>;
+  zoom: number;
+  center: GeographicCenter;
+}
+
+const ZOOM_TRANSITION_MS = 260;
+const PREVIOUS_LAYER_LIFETIME_MS = 1_600;
+
 interface MarkerPlacement {
   point: OperationalMapPoint;
   left: number;
@@ -60,6 +75,10 @@ export function OsmWebMapCanvas(props: OperationalMapCanvasProps) {
   );
   const [visitorLocation, setVisitorLocation] =
     useState<GeographicCenter | null>(null);
+  const [previousLayer, setPreviousLayer] =
+    useState<PreviousTileLayer | null>(null);
+  const transition = useRef(new Animated.Value(1)).current;
+  const reducedMotion = useReducedMotion();
   const [size, setSize] = useState<CanvasSize>({
     width: props.compact ? 360 : 1180,
     height: props.canvasMinHeight ?? (props.compact ? 370 : 480),
@@ -95,6 +114,38 @@ export function OsmWebMapCanvas(props: OperationalMapCanvasProps) {
       setCenter(COLOMBIA_CENTER);
     }
   }, [initialZoom, zoom]);
+
+  // CHG-057: al cambiar el nivel de zoom, la vista anterior se
+  // conserva debajo y se anima hacia su encuadre final.
+  const previousViewRef = useRef({ zoom, center, tiles });
+  useEffect(() => {
+    const previous = previousViewRef.current;
+    previousViewRef.current = { zoom, center, tiles };
+    if (previous.zoom === zoom) {
+      return;
+    }
+    setPreviousLayer({
+      tiles: previous.tiles,
+      zoom: previous.zoom,
+      center: previous.center,
+    });
+    if (reducedMotion) {
+      transition.setValue(1);
+    } else {
+      transition.setValue(0);
+      Animated.timing(transition, {
+        toValue: 1,
+        duration: ZOOM_TRANSITION_MS,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
+    const timer = setTimeout(
+      () => setPreviousLayer(null),
+      PREVIOUS_LAYER_LIFETIME_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [center, reducedMotion, tiles, transition, zoom]);
 
   useEffect(() => {
     const isNationalCenter =
@@ -137,7 +188,71 @@ export function OsmWebMapCanvas(props: OperationalMapCanvasProps) {
         },
       ]}
     >
-      <View style={styles.tileLayer} accessibilityElementsHidden>
+      {previousLayer && (() => {
+        // Alineación geográfica de la vista anterior bajo la nueva:
+        // escala 2^(dz) alrededor del centro del lienzo más el
+        // corrimiento del centro, todo animado hacia el estado final.
+        const factor = 2 ** (zoom - previousLayer.zoom);
+        const worldSizeOld = TILE_SIZE * 2 ** previousLayer.zoom;
+        const shiftX =
+          factor *
+          (longitudeToWorldX(previousLayer.center.longitude, worldSizeOld) -
+            longitudeToWorldX(center.longitude, worldSizeOld));
+        const shiftY =
+          factor *
+          (latitudeToWorldY(previousLayer.center.latitude, worldSizeOld) -
+            latitudeToWorldY(center.latitude, worldSizeOld));
+        return (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.tileLayer,
+              {
+                transform: [
+                  {
+                    translateX: transition.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, shiftX],
+                    }),
+                  },
+                  {
+                    translateY: transition.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, shiftY],
+                    }),
+                  },
+                  {
+                    scale: transition.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, factor],
+                    }),
+                  },
+                ],
+              },
+            ]}
+            accessibilityElementsHidden
+          >
+            {previousLayer.tiles.map((tile) => (
+              <Image
+                key={tile.key}
+                accessibilityIgnoresInvertColors
+                resizeMode="cover"
+                source={{ uri: tile.uri }}
+                style={[styles.tile, { left: tile.left, top: tile.top }]}
+                testID={`osm-previous-tile-${tile.key}`}
+              />
+            ))}
+          </Animated.View>
+        );
+      })()}
+
+      <Animated.View
+        style={[
+          styles.tileLayer,
+          previousLayer !== null && { opacity: transition },
+        ]}
+        accessibilityElementsHidden
+      >
         {tiles.map((tile) => (
           <Image
             key={tile.key}
@@ -149,7 +264,7 @@ export function OsmWebMapCanvas(props: OperationalMapCanvasProps) {
             testID={`osm-tile-${tile.key}`}
           />
         ))}
-      </View>
+      </Animated.View>
 
       <View style={styles.tint} />
       <ProviderBadge />

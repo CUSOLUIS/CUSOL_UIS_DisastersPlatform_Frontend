@@ -132,3 +132,37 @@ describe("Respaldo web OpenStreetMap", () => {
     expect(screen.getByRole("button", { name: "Acercar mapa" })).toBeTruthy();
   });
 });
+
+// CHG-057 — Transición suave de zoom sin lienzo negro.
+
+it("conserva la vista anterior debajo mientras cargan las teselas del nuevo zoom", () => {
+  render(
+    <OsmWebMapCanvas
+      compact={false}
+      onSelect={jest.fn()}
+      points={operationalMapDemoData.items}
+      selectedId={null}
+    />,
+  );
+
+  expect(
+    screen.queryAllByTestId(/^osm-previous-tile-/, {
+      includeHiddenElements: true,
+    }),
+  ).toHaveLength(0);
+
+  fireEvent.press(screen.getByRole("button", { name: "Acercar mapa" }));
+
+  // La capa de transición mantiene las teselas del zoom anterior (5)
+  // debajo de las nuevas (6): jamás un lienzo negro esperando carga.
+  expect(
+    screen.getAllByTestId(/^osm-previous-tile-5-/, {
+      includeHiddenElements: true,
+    }).length,
+  ).toBeGreaterThan(0);
+  expect(
+    screen.getAllByTestId(/^osm-tile-6-/, {
+      includeHiddenElements: true,
+    }).length,
+  ).toBeGreaterThan(0);
+});
