@@ -19,6 +19,7 @@ import {
   MAX_PHOTO_COUNT,
   validateAndMergePhotos,
 } from "../missing-persons/photoValidation";
+import { preparePhotosForUpload } from "../missing-persons/photoProcessing";
 import type { SelectedPhoto } from "../missing-persons/reportTypes";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { ReportConsiderations } from "../reporting/ReportConsiderations";
@@ -215,7 +216,10 @@ export function UnverifiedBuildingReportForm({
     setSubmitting(true);
     idempotencyKeyRef.current ??= createBuildingReportIdempotencyKey();
     try {
-      const result = await submitReport(draft, photos, {
+      // CHG-071: si el conjunto supera el presupuesto, las imágenes se
+      // comprimen automáticamente antes de guardarse.
+      const prepared = await preparePhotosForUpload(photos);
+      const result = await submitReport(draft, prepared.photos, {
         idempotencyKey: idempotencyKeyRef.current,
       });
       setReceipt(result);
@@ -507,7 +511,7 @@ export function UnverifiedBuildingReportForm({
                   <Text style={styles.photoRulesTitle}>FORMATOS PERMITIDOS</Text>
                   <Text style={styles.photoRulesText}>{ALLOWED_PHOTO_HELP}</Text>
                   <Text style={styles.photoRulesText}>
-                    Entre 1 y 5 fotos · Máximo 10 MiB por archivo · 50 MiB total.
+                    Máximo 3 fotos · La suma no puede exceder 50 MB: si pesan más, se comprimen automáticamente antes de guardarse.
                   </Text>
                 </View>
               </View>

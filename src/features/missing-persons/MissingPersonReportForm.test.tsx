@@ -21,7 +21,7 @@ describe("Reporte de persona perdida", () => {
 
     expect(screen.getByRole("header", { name: "Reportar persona perdida" })).toBeTruthy();
     expect(screen.getByText(/JPEG \(\.jpg, \.jpeg\), PNG/)).toBeTruthy();
-    expect(screen.getByText(/Entre 1 y 5 fotos/)).toBeTruthy();
+    expect(screen.getByText(/Máximo 3 fotos/)).toBeTruthy();
     expect(screen.getAllByText(/DATOS PRIVADOS/).length).toBeGreaterThan(0);
   });
 
@@ -45,22 +45,24 @@ describe("Reporte de persona perdida", () => {
     expect(screen.queryByText("foto-valentina.jpg")).toBeNull();
   });
 
-  it("rechaza formatos, tamaños y cantidades inválidas sin borrar la selección válida", () => {
+  it("rechaza formatos y cantidades inválidas sin borrar la selección válida", () => {
     const wrongType = validateAndMergePhotos([validPhoto], [
       { uri: "file:///archivo.gif", name: "archivo.gif", size: 20, mimeType: "image/gif" },
     ]);
     expect(wrongType.photos).toEqual([validPhoto]);
     expect(wrongType.errors[0]).toMatch(/formato no está permitido/);
 
+    // CHG-071: las fotos grandes ya no se rechazan al seleccionarlas —
+    // se comprimen automáticamente antes de guardarse.
     const oversized = validateAndMergePhotos([], [
       { ...validPhoto, name: "grande.jpg", size: MAX_PHOTO_BYTES + 1 },
     ]);
-    expect(oversized.photos).toHaveLength(0);
-    expect(oversized.errors[0]).toMatch(/supera el máximo/);
+    expect(oversized.photos).toHaveLength(1);
+    expect(oversized.errors).toHaveLength(0);
 
-    const tooMany = validateAndMergePhotos([validPhoto], Array(5).fill(validPhoto));
+    const tooMany = validateAndMergePhotos([validPhoto], Array(3).fill(validPhoto));
     expect(tooMany.photos).toEqual([validPhoto]);
-    expect(tooMany.errors[0]).toMatch(/máximo 5/);
+    expect(tooMany.errors[0]).toMatch(/máximo 3/);
   });
 
   it("impide preparar un formulario incompleto", () => {

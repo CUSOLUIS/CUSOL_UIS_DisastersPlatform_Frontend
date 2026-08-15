@@ -25,6 +25,7 @@
     "expo": "~56.0.19",
     "expo-constants": "~56.0.23",
     "expo-document-picker": "~56.0.4",
+    "expo-image-manipulator": "~56.0.24",
     "expo-linear-gradient": "~56.0.4",
     "expo-linking": "~56.0.16",
     "expo-location": "~56.0.23",

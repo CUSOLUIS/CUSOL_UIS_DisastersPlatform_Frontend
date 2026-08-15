@@ -28,7 +28,7 @@ describe("CHG-035 · Reporte de edificio con búsqueda pendiente", () => {
     expect(screen.getByText("OBSERVACIÓN, NO DIAGNÓSTICO")).toBeTruthy();
     expect(screen.getByText(/no confirma que haya personas dentro/i)).toBeTruthy();
     expect(screen.getAllByText(/privad/i).length).toBeGreaterThan(2);
-    expect(screen.getByText(/Entre 1 y 5 fotos/)).toBeTruthy();
+    expect(screen.getByText(/Máximo 3 fotos/)).toBeTruthy();
   });
 
   it("lista una fotografía y permite retirarla", async () => {

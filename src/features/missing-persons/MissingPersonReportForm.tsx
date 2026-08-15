@@ -18,6 +18,7 @@ import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { ReportConsiderations } from "../reporting/ReportConsiderations";
 import { buildLastSeenQuery, parseDraftCoordinates } from "./geocoding";
 import { LastSeenLocationPicker } from "./LastSeenLocationPicker";
+import { preparePhotosForUpload } from "./photoProcessing";
 import {
   ALLOWED_PHOTO_HELP,
   ALLOWED_PHOTO_MIME_TYPES,
@@ -153,8 +154,11 @@ export function MissingPersonReportForm({
     setSubmitting(true);
     idempotencyKeyRef.current ??= createIdempotencyKey();
     try {
+      // CHG-071: si el conjunto supera el presupuesto, las imágenes se
+      // comprimen automáticamente antes de guardarse.
+      const prepared = await preparePhotosForUpload(photos);
       setReceipt(
-        await submitReport(draft, photos, {
+        await submitReport(draft, prepared.photos, {
           idempotencyKey: idempotencyKeyRef.current,
         }),
       );
@@ -284,7 +288,7 @@ export function MissingPersonReportForm({
                 <View style={styles.photoRulesCopy}>
                   <Text style={styles.photoRulesTitle}>FORMATOS PERMITIDOS</Text>
                   <Text style={styles.photoRulesText}>{ALLOWED_PHOTO_HELP}</Text>
-                  <Text style={styles.photoRulesText}>Entre 1 y 5 fotos · Máximo 10 MiB por archivo · Máximo 50 MiB en total.</Text>
+                  <Text style={styles.photoRulesText}>Máximo 3 fotos · La suma no puede exceder 50 MB: si tus imágenes pesan más, se comprimen automáticamente antes de guardarse.</Text>
                 </View>
               </View>
               <Pressable

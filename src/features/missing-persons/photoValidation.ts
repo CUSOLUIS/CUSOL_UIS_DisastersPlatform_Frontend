@@ -1,6 +1,9 @@
 import type { PhotoValidationResult, SelectedPhoto } from "./reportTypes";
 
-export const MAX_PHOTO_COUNT = 5;
+// CHG-071: máximo 3 imágenes por reporte. Las fotos grandes ya no se
+// rechazan al seleccionarlas: si el conjunto supera los 50 MB (o una
+// foto pasa de 10 MiB), se comprimen automáticamente antes de enviar.
+export const MAX_PHOTO_COUNT = 3;
 export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 
 const allowedPhotoTypes: Record<string, string[]> = {
@@ -57,11 +60,6 @@ export function validateAndMergePhotos(
 
     if (photo.size === null) {
       errors.push(`${photo.name}: no fue posible verificar el tamaño.`);
-      return;
-    }
-
-    if (photo.size > MAX_PHOTO_BYTES) {
-      errors.push(`${photo.name}: supera el máximo de 10 MiB.`);
       return;
     }
 
