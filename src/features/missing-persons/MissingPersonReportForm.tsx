@@ -17,6 +17,11 @@ import Svg, { Circle, Path } from "react-native-svg";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { DatePickerField } from "../../components/DatePickerField";
 import { InnerRouteHeader } from "../../components/InnerRouteHeader";
+import {
+  PHONE_FORMAT_MESSAGE,
+  PHONE_MAX_INPUT_LENGTH,
+  isValidPhone,
+} from "../contact/phoneValidation";
 import { TimePickerField } from "../../components/TimePickerField";
 import { ReportConsiderations } from "../reporting/ReportConsiderations";
 import { reportActionCatalog } from "../reporting/reportActionCatalog";
@@ -451,7 +456,7 @@ export function MissingPersonReportForm({
               <FieldGrid compact={compact}>
                 <FormField label="Nombre completo *" invalid={invalidFields.has("reporterName")} value={draft.reporterName} onChangeText={(value) => setField("reporterName", value)} autoComplete="name" />
                 <FormField label="Relación con la persona *" invalid={invalidFields.has("reporterRelationship")} value={draft.reporterRelationship} onChangeText={(value) => setField("reporterRelationship", value)} />
-                <FormField label="Teléfono privado" invalid={invalidFields.has("reporterPhone")} value={draft.reporterPhone} onChangeText={(value) => setField("reporterPhone", value)} keyboardType="phone-pad" autoComplete="tel" />
+                <FormField label="Teléfono privado" hint="Ej. +57 300 123 4567" maxLength={PHONE_MAX_INPUT_LENGTH} invalid={invalidFields.has("reporterPhone")} value={draft.reporterPhone} onChangeText={(value) => setField("reporterPhone", value)} keyboardType="phone-pad" autoComplete="tel" />
                 <FormField label="Correo privado" invalid={invalidFields.has("reporterEmail")} value={draft.reporterEmail} onChangeText={(value) => setField("reporterEmail", value)} keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
                 <FormField label="Número de denuncia o radicado" value={draft.officialReportNumber} onChangeText={(value) => setField("officialReportNumber", value)} />
                 <FormField label="Autoridad donde se denunció" hint="Fiscalía, Policía, Gaula…" value={draft.officialAuthorityName} onChangeText={(value) => setField("officialAuthorityName", value)} />
@@ -583,6 +588,11 @@ export function collectDraftIssues(
     push("reporterPhone", "Ingresa al menos un teléfono o correo de contacto privado.");
     push("reporterEmail", "");
   }
+  // CHG-100: un teléfono inválido deja al equipo sin forma de
+  // contactar a quien reporta, así que se valida antes de enviar.
+  if (draft.reporterPhone.trim() && !isValidPhone(draft.reporterPhone)) {
+    push("reporterPhone", PHONE_FORMAT_MESSAGE);
+  }
   if (draft.reporterEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.reporterEmail)) {
     push("reporterEmail", "El correo del reportante no tiene un formato válido.");
   }
@@ -681,6 +691,8 @@ type FormFieldProps = {
   keyboardType?: "default" | "number-pad" | "phone-pad" | "email-address";
   autoCapitalize?: "none" | "sentences" | "words";
   autoComplete?: "name" | "name-given" | "name-family" | "email" | "tel";
+  // CHG-100: tope de caracteres del input.
+  maxLength?: number;
   // CHG-083: resaltado inline del campo con error.
   invalid?: boolean;
 };

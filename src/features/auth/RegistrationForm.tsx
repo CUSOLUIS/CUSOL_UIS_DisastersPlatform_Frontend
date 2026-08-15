@@ -13,6 +13,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, fontFamilies } from "../../theme";
+import {
+  PHONE_FORMAT_MESSAGE,
+  PHONE_MAX_INPUT_LENGTH,
+  isValidPhone,
+} from "../contact/phoneValidation";
 import { authDataSource } from "./dataSource";
 import type {
   AccountRegistrationInput,
@@ -171,9 +176,9 @@ export function RegistrationForm({
                 />
                 <FormField
                   label="Teléfono privado"
-                  hint="Opcional · preferiblemente con indicativo"
+                  hint="Opcional · ej. +57 300 123 4567"
                   value={draft.phone}
-                  maxLength={30}
+                  maxLength={PHONE_MAX_INPUT_LENGTH}
                   keyboardType="phone-pad"
                   onChangeText={(value) => setField("phone", value)}
                 />
@@ -353,8 +358,11 @@ export function validateRegistrationDraft(draft: RegistrationDraft): string[] {
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())) {
     errors.push("El correo electrónico no tiene un formato válido.");
   }
-  if (draft.phone.trim() && draft.phone.replace(/\D/g, "").length < 7) {
-    errors.push("El teléfono debe tener al menos 7 dígitos.");
+  // CHG-100: antes solo se exigía un mínimo de 7 dígitos, así que un
+  // número de 25 pasaba igual. Ahora usa la misma regla E.164 que los
+  // formularios de reporte.
+  if (draft.phone.trim() && !isValidPhone(draft.phone)) {
+    errors.push(PHONE_FORMAT_MESSAGE);
   }
   if (!draft.department.trim()) errors.push("Ingresa tu departamento.");
   if (!draft.municipality.trim()) errors.push("Ingresa tu municipio.");

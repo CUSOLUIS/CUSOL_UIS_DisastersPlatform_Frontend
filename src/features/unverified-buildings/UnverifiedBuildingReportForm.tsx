@@ -30,6 +30,11 @@ import { TimePickerField } from "../../components/TimePickerField";
 import { ReportConsiderations } from "../reporting/ReportConsiderations";
 import { FieldHelpTooltip } from "../../components/FieldHelpTooltip";
 import { InnerRouteHeader } from "../../components/InnerRouteHeader";
+import {
+  PHONE_FORMAT_MESSAGE,
+  PHONE_MAX_INPUT_LENGTH,
+  isValidPhone,
+} from "../contact/phoneValidation";
 import { RelatedEventField } from "./RelatedEventField";
 import {
   relatedEventsDataSource,
@@ -550,6 +555,8 @@ export function UnverifiedBuildingReportForm({
                 />
                 <FormField
                   label="Teléfono privado"
+                  hint="Ej. +57 300 123 4567"
+                  maxLength={PHONE_MAX_INPUT_LENGTH}
                   keyboardType="phone-pad"
                   autoComplete="tel"
                   value={draft.reporterPhone}
@@ -783,6 +790,10 @@ export function validateUnverifiedBuildingDraft(
   if (!draft.reporterPhone.trim() && !draft.reporterEmail.trim()) {
     errors.push("Ingresa al menos un teléfono o correo de contacto privado.");
   }
+  // CHG-100: un contacto inválido es tan inútil como no tenerlo.
+  if (draft.reporterPhone.trim() && !isValidPhone(draft.reporterPhone)) {
+    errors.push(PHONE_FORMAT_MESSAGE);
+  }
   if (
     draft.reporterEmail.trim() &&
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.reporterEmail.trim())
@@ -902,6 +913,8 @@ type FormFieldProps = {
   placeholder?: string;
   // CHG-095: ayuda contextual junto a la etiqueta.
   help?: string;
+  // CHG-100: tope de caracteres del input.
+  maxLength?: number;
   keyboardType?:
     | "default"
     | "phone-pad"
