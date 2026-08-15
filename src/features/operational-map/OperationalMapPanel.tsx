@@ -721,9 +721,9 @@ const styles = StyleSheet.create({
   humanFilterDot: { width: 8, height: 8, borderRadius: 4 },
   humanFilterCopy: { minWidth: 0, flex: 1 },
   humanFilterCount: {
-    fontFamily: fontFamilies.mono, fontSize: 13, fontWeight: "900",
+    fontFamily: fontFamilies.mono, fontSize: 17, fontWeight: "900",
   },
-  humanFilterLabel: { color: colors.inkSoft, fontSize: 8, fontWeight: "700" },
+  humanFilterLabel: { color: colors.inkSoft, fontSize: 12, fontWeight: "700" },
   humanLayerNotice: {
     flexDirection: "row", flexWrap: "wrap", alignItems: "center",
     justifyContent: "space-between", gap: 8, padding: 9, borderWidth: 1,
@@ -781,8 +781,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(13, 20, 33, 0.80)",
   },
   filterCopy: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
-  filterCount: { fontFamily: fontFamilies.mono, fontSize: 13, fontWeight: "800" },
-  filterLabel: { flex: 1, color: colors.inkSoft, fontSize: 8, fontWeight: "700" },
+  filterCount: { fontFamily: fontFamilies.mono, fontSize: 17, fontWeight: "800" },
+  filterLabel: { flex: 1, color: colors.inkSoft, fontSize: 12, fontWeight: "700" },
   filterLabelInactive: { color: colors.inkDim, textDecorationLine: "line-through" },
   mapCount: {
     flexDirection: "row",
