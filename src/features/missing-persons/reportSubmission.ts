@@ -54,7 +54,6 @@ export function buildReportPayload(
     reporterRelationship: draft.reporterRelationship.trim(),
     truthConfirmed: draft.truthConfirmed,
     photoAuthorizationConfirmed: draft.photoAuthorizationConfirmed,
-    reviewAcknowledged: draft.reviewAcknowledged,
   };
 
   OPTIONAL_TEXT_FIELDS.forEach((field) => {
@@ -194,7 +193,8 @@ export async function submitMissingPersonReport(
   }
 
   const receipt = (await response.json()) as MissingPersonReportReceipt;
-  if (!receipt.publicCaseCode || receipt.status !== "under_review") {
+  // CHG-075: el reporte se publica inmediatamente al crearse.
+  if (!receipt.publicCaseCode || receipt.status !== "published") {
     throw new Error("La API devolvió una constancia incompleta.");
   }
   return receipt;

@@ -42,7 +42,6 @@ const completeDraft: MissingPersonReportDraft = {
   officialReportNumber: "",
   truthConfirmed: true,
   photoAuthorizationConfirmed: true,
-  reviewAcknowledged: true,
 };
 
 const photo: SelectedPhoto = {
@@ -52,10 +51,11 @@ const photo: SelectedPhoto = {
   mimeType: "image/jpeg",
 };
 
+// CHG-075: la constancia informa publicación inmediata.
 const receipt = {
   id: "03c35941-e856-44ae-9815-0819180c23fb",
   publicCaseCode: "MP-2026-ABCDEF12",
-  status: "under_review",
+  status: "published",
   receivedAt: "2026-08-14T05:00:00Z",
 };
 
@@ -90,6 +90,8 @@ describe("Payload del reporte de persona perdida", () => {
     expect(payload).not.toHaveProperty("birthDate");
     expect(payload).not.toHaveProperty("reporterEmail");
     expect(payload).not.toHaveProperty("confirmPassword");
+    // CHG-075: ya no existe el consentimiento de revisión previa.
+    expect(payload).not.toHaveProperty("reviewAcknowledged");
   });
 
   it("descarta una coordenada solitaria y edades ilegibles", () => {
@@ -160,7 +162,7 @@ describe("Envío del reporte a la API real", () => {
     mockNetwork({
       ok: true,
       status: 201,
-      json: async () => ({ status: "under_review" }),
+      json: async () => ({ status: "published" }),
     });
     await expect(
       submitMissingPersonReport(completeDraft, [photo], { requestBaseUrl: "" }),

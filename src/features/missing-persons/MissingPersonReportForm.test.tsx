@@ -16,6 +16,70 @@ afterEach(() => {
 });
 
 describe("Reporte de persona perdida", () => {
+  // CHG-078 — Con sesión activa el formulario deja de tratar al
+  // usuario como anónimo: sin botones de registro/inicio de sesión y
+  // con confirmación de que el reporte quedará asociado a la cuenta.
+  it("reconoce la sesión activa y confirma la asociación a la cuenta", async () => {
+    const sessionSource = {
+      getCurrentAccount: jest.fn().mockResolvedValue({
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+        displayName: "Laura Gómez",
+        email: "laura@example.com",
+        assignedRole: "user" as const,
+        status: "active" as const,
+        sessionExpiresAt: "2026-08-16T10:00:00Z",
+      }),
+    };
+    render(
+      <MissingPersonReportForm
+        onBack={jest.fn()}
+        onRegister={jest.fn()}
+        onLogin={jest.fn()}
+        sessionSource={sessionSource}
+      />,
+    );
+
+    expect(
+      await screen.findByText("SESIÓN ACTIVA · REPORTANDO CON TU CUENTA"),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", {
+        name: "Registrarme para reportar con cuenta",
+      }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", {
+        name: "Iniciar sesión para reportar con cuenta",
+      }),
+    ).toBeNull();
+    expect(sessionSource.getCurrentAccount).toHaveBeenCalledTimes(1);
+  });
+
+  it("sin sesión conserva los accesos de registro e inicio de sesión", async () => {
+    const sessionSource = {
+      getCurrentAccount: jest
+        .fn()
+        .mockRejectedValue(new Error("Tu sesión está ausente.")),
+    };
+    render(
+      <MissingPersonReportForm
+        onBack={jest.fn()}
+        onRegister={jest.fn()}
+        onLogin={jest.fn()}
+        sessionSource={sessionSource}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("button", {
+        name: "Registrarme para reportar con cuenta",
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText("SESIÓN ACTIVA · REPORTANDO CON TU CUENTA"),
+    ).toBeNull();
+  });
+
   it("explica formatos, límites y privacidad", () => {
     render(<MissingPersonReportForm onBack={jest.fn()} />);
 
@@ -65,21 +129,22 @@ describe("Reporte de persona perdida", () => {
     expect(tooMany.errors[0]).toMatch(/máximo 3/);
   });
 
-  it("impide preparar un formulario incompleto", () => {
+  it("impide publicar un formulario incompleto", () => {
     render(<MissingPersonReportForm onBack={jest.fn()} />);
 
-    fireEvent.press(screen.getByRole("button", { name: "Enviar reporte para revisión" }));
+    fireEvent.press(screen.getByRole("button", { name: "Publicar reporte" }));
 
     expect(screen.getByText("Revisa el reporte antes de continuar")).toBeTruthy();
     expect(screen.getByText(/Ingresa los nombres/)).toBeTruthy();
     expect(screen.getByText(/Adjunta al menos una fotografía/)).toBeTruthy();
-    expect(screen.getByText(/aceptar las tres confirmaciones/)).toBeTruthy();
+    expect(screen.getByText(/aceptar las dos confirmaciones/)).toBeTruthy();
   });
 
-  it("prepara un reporte válido con estado en revisión sin publicarlo", async () => {
+  // CHG-075: el reporte se publica de inmediato al enviarse.
+  it("publica un reporte válido inmediatamente", async () => {
     const submitReport = jest.fn().mockResolvedValue({
       publicCaseCode: "DEMO-987654",
-      status: "under_review",
+      status: "published",
       receivedAt: "2026-08-12T20:00:00.000Z",
     });
     render(
@@ -109,12 +174,11 @@ describe("Reporte de persona perdida", () => {
     await screen.findByText("foto-valentina.jpg");
     fireEvent.press(screen.getByRole("checkbox", { name: "Confirmo que la información es veraz según mi conocimiento." }));
     fireEvent.press(screen.getByRole("checkbox", { name: "Confirmo que tengo autorización para compartir estas fotografías." }));
-    fireEvent.press(screen.getByRole("checkbox", { name: "Entiendo que el reporte será revisado y no se publicará automáticamente." }));
-    fireEvent.press(screen.getByRole("button", { name: "Enviar reporte para revisión" }));
+    fireEvent.press(screen.getByRole("button", { name: "Publicar reporte" }));
 
-    expect(await screen.findByRole("header", { name: "Reporte preparado" })).toBeTruthy();
+    expect(await screen.findByRole("header", { name: "Reporte publicado" })).toBeTruthy();
     expect(screen.getByText("DEMO-987654")).toBeTruthy();
-    expect(screen.getByText("EN REVISIÓN")).toBeTruthy();
+    expect(screen.getByText("PUBLICADO")).toBeTruthy();
     expect(submitReport).toHaveBeenCalledTimes(1);
   });
 });

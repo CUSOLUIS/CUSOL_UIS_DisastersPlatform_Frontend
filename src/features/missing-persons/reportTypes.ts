@@ -12,7 +12,8 @@ export interface PhotoValidationResult {
 
 export interface MissingPersonReportReceipt {
   publicCaseCode: string;
-  status: "under_review";
+  // CHG-075: la publicación es inmediata al crear el reporte.
+  status: "published";
   receivedAt: string;
 }
 
@@ -50,5 +51,4 @@ export interface MissingPersonReportDraft {
   officialReportNumber: string;
   truthConfirmed: boolean;
   photoAuthorizationConfirmed: boolean;
-  reviewAcknowledged: boolean;
 }

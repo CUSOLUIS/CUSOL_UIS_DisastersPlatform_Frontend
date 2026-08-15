@@ -16,6 +16,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { ReportConsiderations } from "../reporting/ReportConsiderations";
+import {
+  useSessionAccount,
+  type SessionAccountSource,
+} from "../auth/useSessionAccount";
 import { buildLastSeenQuery, parseDraftCoordinates } from "./geocoding";
 import { LastSeenLocationPicker } from "./LastSeenLocationPicker";
 import {
@@ -78,7 +82,6 @@ const initialDraft: MissingPersonReportDraft = {
   officialReportNumber: "",
   truthConfirmed: false,
   photoAuthorizationConfirmed: false,
-  reviewAcknowledged: false,
 };
 
 interface MissingPersonReportFormProps {
@@ -86,6 +89,8 @@ interface MissingPersonReportFormProps {
   // CHG-053: accesos para reportar con cuenta desde la leyenda.
   onRegister?: () => void;
   onLogin?: () => void;
+  // CHG-078: fuente de sesión inyectable en pruebas.
+  sessionSource?: SessionAccountSource;
   pickPhotos?: () => Promise<SelectedPhoto[]>;
   submitReport?: (
     draft: MissingPersonReportDraft,
@@ -119,11 +124,17 @@ export function MissingPersonReportForm({
   onBack,
   onRegister,
   onLogin,
+  sessionSource,
   pickPhotos = defaultPickPhotos,
   submitReport = defaultSubmitReport,
 }: MissingPersonReportFormProps) {
   const { width } = useWindowDimensions();
   const compact = width < 760;
+  // CHG-078: con sesión activa la leyenda confirma la asociación a la
+  // cuenta en lugar de ofrecer registro/inicio de sesión. El envío ya
+  // viaja con `credentials: "include"` (CHG-054), así que el gateway
+  // vincula la cuenta desde la cookie sin cambios adicionales.
+  const session = useSessionAccount(sessionSource);
   const [draft, setDraft] = useState<MissingPersonReportDraft>(initialDraft);
   const [photos, setPhotos] = useState<SelectedPhoto[]>([]);
   const [photoErrors, setPhotoErrors] = useState<string[]>([]);
@@ -196,7 +207,7 @@ export function MissingPersonReportForm({
           </Pressable>
           <View style={styles.headerStatus}>
             <View style={styles.statusDot} />
-            <Text style={styles.headerStatusText}>REPORTE PRIVADO · NO PUBLICADO</Text>
+            <Text style={styles.headerStatusText}>PUBLICACIÓN INMEDIATA · DATOS SENSIBLES PRIVADOS</Text>
           </View>
         </View>
 
@@ -208,19 +219,19 @@ export function MissingPersonReportForm({
                 Reportar persona perdida
               </Text>
               <Text style={styles.introText}>
-                Completa la información que ayude a identificarla. El reporte será revisado antes de cualquier publicación y no reemplaza una denuncia ante las autoridades.
+                Completa la información que ayude a identificarla. El reporte se publica de inmediato en la búsqueda al enviarlo y no reemplaza una denuncia ante las autoridades.
               </Text>
             </View>
 
             <ReportConsiderations
               considerations={[
-                "El equipo revisa cada reporte antes de cualquier publicación: nada se publica automáticamente al enviarlo.",
-                "Documento, información médica y datos de contacto del reportante son privados y se guardan cifrados; las fotografías no se publican sin revisión y autorización.",
+                "Documento, información médica y datos de contacto del reportante son privados y se guardan cifrados; las fotografías no se publican y solo las ve el equipo.",
                 "La información debe ser veraz y de buena fe. Este reporte no reemplaza la denuncia ante la Fiscalía o la Policía Nacional.",
                 "Describe con el mayor detalle posible la última vez que fue vista; evita direcciones residenciales exactas en los campos públicos.",
               ]}
               onRegister={onRegister}
               onLogin={onLogin}
+              session={session}
             />
 
             <PrivacyNotice />
@@ -333,7 +344,6 @@ export function MissingPersonReportForm({
             <FormSection code="06" title="Confirmaciones" description="Lee y confirma antes de preparar el reporte.">
               <ConsentCheckbox checked={draft.truthConfirmed} label="Confirmo que la información es veraz según mi conocimiento." onPress={() => setField("truthConfirmed", !draft.truthConfirmed)} />
               <ConsentCheckbox checked={draft.photoAuthorizationConfirmed} label="Confirmo que tengo autorización para compartir estas fotografías." onPress={() => setField("photoAuthorizationConfirmed", !draft.photoAuthorizationConfirmed)} />
-              <ConsentCheckbox checked={draft.reviewAcknowledged} label="Entiendo que el reporte será revisado y no se publicará automáticamente." onPress={() => setField("reviewAcknowledged", !draft.reviewAcknowledged)} />
             </FormSection>
 
             {formErrors.length > 0 && (
@@ -345,11 +355,11 @@ export function MissingPersonReportForm({
 
             <View style={[styles.submitPanel, compact && styles.submitPanelCompact]}>
               <View style={styles.submitCopy}>
-                <Text style={styles.submitTitle}>ENVÍO PARA REVISIÓN</Text>
-                <Text style={styles.submitText}>El reporte y sus fotografías se envían de forma privada al equipo de revisión. Nada se publica automáticamente: recibirás una constancia con el código del caso.</Text>
+                <Text style={styles.submitTitle}>ENVÍO Y PUBLICACIÓN</Text>
+                <Text style={styles.submitText}>El reporte se publica de inmediato en la búsqueda pública; documento, salud, contactos y fotografías quedan privados. Recibirás una constancia con el código del caso.</Text>
               </View>
-              <Pressable accessibilityRole="button" accessibilityLabel="Enviar reporte para revisión" disabled={submitting} onPress={() => void submit()} style={({ pressed }) => [styles.submitButton, pressed && styles.pressedButton]}>
-                {submitting ? <ActivityIndicator color="#07101b" /> : <Text style={styles.submitButtonText}>ENVIAR REPORTE PARA REVISIÓN →</Text>}
+              <Pressable accessibilityRole="button" accessibilityLabel="Publicar reporte" disabled={submitting} onPress={() => void submit()} style={({ pressed }) => [styles.submitButton, pressed && styles.pressedButton]}>
+                {submitting ? <ActivityIndicator color="#07101b" /> : <Text style={styles.submitButtonText}>PUBLICAR REPORTE →</Text>}
               </Pressable>
             </View>
           </View>
@@ -417,8 +427,8 @@ function validateDraft(draft: MissingPersonReportDraft, photos: SelectedPhoto[])
   if (photos.length === 0) {
     errors.push("Adjunta al menos una fotografía permitida.");
   }
-  if (!draft.truthConfirmed || !draft.photoAuthorizationConfirmed || !draft.reviewAcknowledged) {
-    errors.push("Debes aceptar las tres confirmaciones.");
+  if (!draft.truthConfirmed || !draft.photoAuthorizationConfirmed) {
+    errors.push("Debes aceptar las dos confirmaciones.");
   }
   return errors;
 }
@@ -760,7 +770,7 @@ function PrivacyNotice() {
       <Text style={styles.privacyIcon}>◇</Text>
       <View style={styles.privacyCopy}>
         <Text style={styles.privacyTitle}>PRIVACIDAD Y VERIFICACIÓN</Text>
-        <Text style={styles.privacyText}>Documento, salud y contactos son privados. Las fotos no serán públicas hasta contar con revisión y autorización. No incluyas ubicaciones residenciales exactas.</Text>
+        <Text style={styles.privacyText}>Documento, salud y contactos son privados. Las fotos no se publican: solo las ve el equipo de verificación. No incluyas ubicaciones residenciales exactas.</Text>
       </View>
     </View>
   );
@@ -780,13 +790,13 @@ function ReportConfirmation({ receipt, onBack }: { receipt: MissingPersonReportR
     <LinearGradient colors={["#071119", colors.canvas]} style={[styles.root, styles.confirmationRoot]}>
       <View style={styles.confirmationCard}>
         <View style={styles.confirmationIcon}><Text style={styles.confirmationMark}>✓</Text></View>
-        <Text style={styles.overline}>RECEIPT / LOCAL DEMO</Text>
-        <Text style={styles.confirmationTitle} accessibilityRole="header">Reporte preparado</Text>
-        <Text style={styles.confirmationText}>La validación local terminó correctamente. Ningún dato ni fotografía fue enviado porque el backend seguro continúa pendiente.</Text>
+        <Text style={styles.overline}>CONSTANCIA / CUSOL</Text>
+        <Text style={styles.confirmationTitle} accessibilityRole="header">Reporte publicado</Text>
+        <Text style={styles.confirmationText}>El reporte ya aparece en la búsqueda pública de personas. El equipo puede editarlo, cambiar su estado o retirarlo si es necesario. Guarda el código del caso.</Text>
         <View style={styles.receiptCode}>
-          <Text style={styles.receiptLabel}>CÓDIGO DE SEGUIMIENTO DEMO</Text>
+          <Text style={styles.receiptLabel}>CÓDIGO DEL CASO</Text>
           <Text style={styles.receiptValue}>{receipt.publicCaseCode}</Text>
-          <Text style={styles.reviewStatus}>EN REVISIÓN</Text>
+          <Text style={styles.reviewStatus}>PUBLICADO</Text>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel="Volver a la portada" onPress={onBack} style={styles.submitButton}>
           <Text style={styles.submitButtonText}>VOLVER A LA PORTADA</Text>
