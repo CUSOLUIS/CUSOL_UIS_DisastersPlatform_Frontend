@@ -14,6 +14,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import type { PressableStateCallbackType } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
 import cusolUisLogo from "../../assets/cusol-uis-logo-enhanced.png";
@@ -681,7 +682,10 @@ function HeaderNavigationLink({
       onBlur={() => setFocused(false)}
       onFocus={() => setFocused(true)}
       onPress={onPress}
-      style={({ hovered, pressed }) => [
+      style={({
+        hovered,
+        pressed,
+      }: PressableStateCallbackType & { hovered?: boolean }) => [
         styles.headerNavigationLink,
         (focused || hovered) && styles.headerNavigationLinkInteractive,
         pressed && styles.headerNavigationLinkPressed,

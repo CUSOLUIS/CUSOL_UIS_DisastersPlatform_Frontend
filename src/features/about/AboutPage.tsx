@@ -10,6 +10,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import type { PressableStateCallbackType } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import cusolLogo from "../../assets/cusol-uis-logo-enhanced.png";
 import prometeoLogo from "../../assets/prometeo-logo-hd.png";
@@ -320,7 +321,10 @@ function SourceLink({
       onBlur={() => setFocused(false)}
       onFocus={() => setFocused(true)}
       onPress={() => void Linking.openURL(url)}
-      style={({ hovered, pressed }) => [
+      style={({
+        hovered,
+        pressed,
+      }: PressableStateCallbackType & { hovered?: boolean }) => [
         styles.sourceCard,
         (focused || hovered) && styles.sourceCardInteractive,
         pressed && styles.pressed,
