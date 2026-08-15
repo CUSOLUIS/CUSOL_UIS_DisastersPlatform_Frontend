@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -121,6 +121,9 @@ export function HumanitarianSearchPanel({
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [windowVisible, setWindowVisible] = useState(false);
   const [searchState, setSearchState] = useState<SearchState>({ status: "idle" });
+  // CHG-061: total de coincidencias visible en el panel; los
+  // resultados siguen abriéndose solo en la ventana independiente.
+  const [matchTotal, setMatchTotal] = useState<number | null>(null);
   const [contributionTarget, setContributionTarget] =
     useState<HumanitarianDirectoryItem | null>(null);
 
@@ -131,6 +134,29 @@ export function HumanitarianSearchPanel({
     setFilter("all");
     setInlineError(null);
   };
+
+  useEffect(() => {
+    const trimmedQuery = query.trim();
+    if (trimmedQuery.length < 2) {
+      setMatchTotal(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      dataSource
+        .search({ kind, query: trimmedQuery, filter })
+        .then((response) => {
+          if (!cancelled) setMatchTotal(response.total);
+        })
+        .catch(() => {
+          if (!cancelled) setMatchTotal(null);
+        });
+    }, 450);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [dataSource, filter, kind, query]);
 
   const search = async () => {
     const trimmedQuery = query.trim();
@@ -242,7 +268,7 @@ export function HumanitarianSearchPanel({
           onPress={() => void search()}
           style={styles.searchButton}
         >
-          <Text style={styles.searchButtonText}>BUSCAR</Text>
+          <Text style={styles.searchButtonText}>VER RESULTADOS</Text>
           <Text style={styles.searchButtonArrow}>→</Text>
         </Pressable>
       </View>
@@ -275,8 +301,15 @@ export function HumanitarianSearchPanel({
         </ScrollView>
       </View>
 
-      <Text style={[styles.hint, inlineError && styles.inlineError]} accessibilityRole={inlineError ? "alert" : undefined}>
-        {inlineError ?? "Las coincidencias se abrirán en una ventana independiente."}
+      <Text
+        style={[styles.hint, inlineError && styles.inlineError]}
+        accessibilityRole={inlineError ? "alert" : undefined}
+        testID="match-count-hint"
+      >
+        {inlineError ??
+          (matchTotal !== null
+            ? `${matchTotal} ${matchTotal === 1 ? "coincidencia" : "coincidencias"} — se abrirán en una ventana independiente.`
+            : "Las coincidencias se abrirán en una ventana independiente.")}
       </Text>
 
       <Modal

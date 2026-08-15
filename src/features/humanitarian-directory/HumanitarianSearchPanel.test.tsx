@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react-native";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react-native";
 import { StyleSheet } from "react-native";
 import { HumanitarianSearchPanel } from "./HumanitarianSearchPanel";
 import { humanitarianDirectoryDataSource } from "./dataSource";
@@ -213,4 +213,53 @@ describe("Directorio humanitario", () => {
       "authenticated",
     );
   });
+});
+
+// CHG-061 — Contador de coincidencias visible sin mostrar resultados.
+
+it("muestra el total de coincidencias en la pista y renombra el botón", async () => {
+  jest.useFakeTimers();
+  const search = jest.fn(async () => ({
+    items: [],
+    total: 7,
+    limit: 20,
+    offset: 0,
+    query: "maria",
+    kind: "missing_person" as const,
+    generatedAt: "2026-08-15T12:00:00.000Z",
+  }));
+
+  render(
+    <HumanitarianSearchPanel
+      compact={false}
+      dataSource={{ transport: "fixture", search }}
+      contributionDataSource={contributionDataSource}
+    />,
+  );
+
+  expect(screen.getByText("VER RESULTADOS")).toBeTruthy();
+  expect(
+    screen.getByText("Las coincidencias se abrirán en una ventana independiente."),
+  ).toBeTruthy();
+
+  fireEvent.changeText(
+    screen.getByLabelText(
+      "Buscar persona desaparecida por cualquier dato público",
+    ),
+    "maria",
+  );
+  await act(async () => {
+    jest.advanceTimersByTime(500);
+    await Promise.resolve();
+  });
+
+  expect(search).toHaveBeenCalledWith({
+    kind: "missing_person",
+    query: "maria",
+    filter: "all",
+  });
+  expect(
+    screen.getByText(/7 coincidencias — se abrirán en una ventana/),
+  ).toBeTruthy();
+  jest.useRealTimers();
 });
