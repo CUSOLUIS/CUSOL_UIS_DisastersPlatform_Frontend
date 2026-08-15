@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -33,8 +33,10 @@ import {
 } from "../operational-map/webMercator";
 import { useDraggableMarker } from "./draggableMarker";
 import {
+  reverseGeocode,
   searchAddressCandidates,
   type AddressCandidate,
+  type ResolvedAddress,
 } from "./geocoding";
 
 const MIN_ZOOM = 5;
@@ -47,6 +49,10 @@ export interface LastSeenLocationPickerProps {
   searchCandidates?: (query: string) => Promise<AddressCandidate[]>;
   // CHG-080: obtención de la posición GPS, inyectable en pruebas.
   locateVisitor?: () => Promise<GeographicCenter>;
+  // CHG-086: al fijar el muñequito se resuelve la dirección del sitio
+  // para autocompletar el campo Dirección (siempre editable).
+  onAddressResolved?: (address: ResolvedAddress) => void;
+  resolveAddress?: (point: GeographicCenter) => Promise<ResolvedAddress>;
 }
 
 export function LastSeenLocationPicker({
@@ -55,6 +61,8 @@ export function LastSeenLocationPicker({
   onChange,
   searchCandidates = searchAddressCandidates,
   locateVisitor,
+  onAddressResolved,
+  resolveAddress = reverseGeocode,
 }: LastSeenLocationPickerProps) {
   const [zoom, setZoom] = useState(MIN_ZOOM);
   const [center, setCenter] = useState<GeographicCenter>(COLOMBIA_CENTER);
@@ -68,6 +76,37 @@ export function LastSeenLocationPicker({
   const [locateError, setLocateError] = useState<string | null>(null);
   const locateAvailable =
     locateVisitor !== undefined || getBrowserGeolocation() !== null;
+  // CHG-086: las candidatas ya traen su dirección; el resto de
+  // movimientos del muñequito (GPS, botón, arrastre) se resuelven con
+  // geocodificación inversa tras una pausa breve.
+  const skipResolveRef = useRef(false);
+
+  useEffect(() => {
+    if (!onAddressResolved || !value) {
+      return;
+    }
+    if (skipResolveRef.current) {
+      skipResolveRef.current = false;
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      resolveAddress(value)
+        .then((address) => {
+          if (!cancelled) {
+            onAddressResolved(address);
+          }
+        })
+        .catch(() => {
+          // Autocompletar es un mejor esfuerzo: sin dirección conocida
+          // no se interrumpe el flujo.
+        });
+    }, 900);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [value?.latitude, value?.longitude]);
 
   const trimmedQuery = addressQuery.trim();
   const tiles = useMemo(
@@ -146,6 +185,14 @@ export function LastSeenLocationPicker({
       latitude: candidate.latitude,
       longitude: candidate.longitude,
     };
+    // CHG-086: la candidata ya trae su dirección; no hace falta la
+    // geocodificación inversa.
+    skipResolveRef.current = true;
+    onAddressResolved?.({
+      label: candidate.label,
+      municipality: null,
+      department: null,
+    });
     onChange(point);
     setCenter(point);
     setZoom(CANDIDATE_ZOOM);

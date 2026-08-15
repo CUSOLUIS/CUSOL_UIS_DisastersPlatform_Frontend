@@ -92,3 +92,59 @@ export function parseDraftCoordinates(
 
   return { latitude: parsedLatitude, longitude: parsedLongitude };
 }
+
+// CHG-086 — Geocodificación inversa: al fijar el muñequito en el mapa
+// (GPS, botón o arrastre) se resuelve la dirección del sitio para
+// autocompletar el campo Dirección (siempre editable).
+const NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse";
+
+export interface ResolvedAddress {
+  label: string;
+  municipality: string | null;
+  department: string | null;
+}
+
+export async function reverseGeocode(
+  point: GeographicCenter,
+  fetchFn: FetchLike = fetch,
+): Promise<ResolvedAddress> {
+  const url =
+    `${NOMINATIM_REVERSE_URL}?format=jsonv2&addressdetails=1&zoom=17` +
+    `&lat=${encodeURIComponent(String(point.latitude))}` +
+    `&lon=${encodeURIComponent(String(point.longitude))}`;
+
+  let response: Awaited<ReturnType<FetchLike>>;
+  try {
+    response = await fetchFn(url, { headers: { Accept: "application/json" } });
+  } catch {
+    throw new Error("No fue posible resolver la dirección del punto.");
+  }
+  if (!response.ok) {
+    throw new Error("El servicio de direcciones no respondió. Intenta de nuevo.");
+  }
+
+  const payload = (await response.json()) as {
+    display_name?: unknown;
+    address?: Record<string, unknown>;
+  };
+  const label =
+    typeof payload.display_name === "string" ? payload.display_name : "";
+  if (!label) {
+    throw new Error("El punto no corresponde a una dirección conocida.");
+  }
+  const address = payload.address ?? {};
+  const firstString = (...keys: string[]): string | null => {
+    for (const key of keys) {
+      const value = address[key];
+      if (typeof value === "string" && value.trim()) {
+        return value.trim();
+      }
+    }
+    return null;
+  };
+  return {
+    label,
+    municipality: firstString("city", "town", "municipality", "village"),
+    department: firstString("state", "region"),
+  };
+}

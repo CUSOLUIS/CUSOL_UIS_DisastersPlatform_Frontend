@@ -2,8 +2,7 @@ import {
   buildLastSeenQuery,
   parseDraftCoordinates,
   searchAddressCandidates,
-  type FetchLike,
-} from "./geocoding";
+  type FetchLike, reverseGeocode } from "./geocoding";
 
 describe("Cruce de dirección con Nominatim", () => {
   it("arma la consulta con zona, municipio, departamento y país, omitiendo vacíos", () => {
@@ -75,5 +74,42 @@ describe("Cruce de dirección con Nominatim", () => {
     });
     expect(parseDraftCoordinates("", "-74.08360")).toBeNull();
     expect(parseDraftCoordinates("abc", "-74.08360")).toBeNull();
+  });
+});
+
+// CHG-086 — Geocodificación inversa para autocompletar la dirección.
+describe("reverseGeocode", () => {
+  it("resuelve dirección, municipio y departamento del punto", async () => {
+    const fetchFn = jest.fn(async (url: string) => {
+      expect(url).toContain("nominatim.openstreetmap.org/reverse");
+      expect(url).toContain("lat=7.1193");
+      expect(url).toContain("lon=-73.1227");
+      return {
+        ok: true,
+        json: async () => ({
+          display_name:
+            "Parque García Rovira, Bucaramanga, Santander, Colombia",
+          address: { city: "Bucaramanga", state: "Santander" },
+        }),
+      };
+    });
+
+    await expect(
+      reverseGeocode({ latitude: 7.1193, longitude: -73.1227 }, fetchFn),
+    ).resolves.toEqual({
+      label: "Parque García Rovira, Bucaramanga, Santander, Colombia",
+      municipality: "Bucaramanga",
+      department: "Santander",
+    });
+  });
+
+  it("rechaza cuando el punto no tiene dirección conocida", async () => {
+    const fetchFn = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({}),
+    }));
+    await expect(
+      reverseGeocode({ latitude: 0, longitude: 0 }, fetchFn),
+    ).rejects.toThrow(/no corresponde a una dirección conocida/);
   });
 });

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { useState } from "react";
 import type { GeographicCenter } from "../operational-map/webMercator";
 import { LastSeenLocationPicker } from "./LastSeenLocationPicker";
@@ -13,6 +13,8 @@ function ControlledPicker({
   searchCandidates,
   onChangeSpy,
   locateVisitor,
+  onAddressResolved,
+  resolveAddress,
 }: {
   addressQuery: string;
   searchCandidates?: (query: string) => Promise<
@@ -20,6 +22,8 @@ function ControlledPicker({
   >;
   onChangeSpy?: jest.Mock;
   locateVisitor?: () => Promise<GeographicCenter>;
+  onAddressResolved?: jest.Mock;
+  resolveAddress?: jest.Mock;
 }) {
   const [value, setValue] = useState<GeographicCenter | null>(null);
   return (
@@ -32,6 +36,8 @@ function ControlledPicker({
       }}
       searchCandidates={searchCandidates}
       locateVisitor={locateVisitor}
+      onAddressResolved={onAddressResolved}
+      resolveAddress={resolveAddress}
     />
   );
 }
@@ -185,5 +191,90 @@ describe("Mi ubicación en el selector", () => {
       await screen.findByText("Permiso de ubicación denegado."),
     ).toBeTruthy();
     expect(screen.getByText(/SIN PUNTO FIJADO/)).toBeTruthy();
+  });
+});
+
+// CHG-086 — Fijar el muñequito autocompleta la dirección (editable).
+describe("autocompletado de dirección desde el mapa", () => {
+  afterEach(() => jest.useRealTimers());
+
+  it("resuelve la dirección tras fijar la ubicación por GPS", async () => {
+    jest.useFakeTimers();
+    const onAddressResolved = jest.fn();
+    const resolveAddress = jest.fn().mockResolvedValue({
+      label: "Carrera 27, Bucaramanga, Santander, Colombia",
+      municipality: "Bucaramanga",
+      department: "Santander",
+    });
+    const locateVisitor = jest
+      .fn()
+      .mockResolvedValue({ latitude: 7.1193, longitude: -73.1227 });
+
+    render(
+      <ControlledPicker
+        addressQuery=""
+        locateVisitor={locateVisitor}
+        onAddressResolved={onAddressResolved}
+        resolveAddress={resolveAddress}
+      />,
+    );
+
+    fireEvent.press(
+      screen.getByRole("button", {
+        name: "Centrar el mapa en mi ubicación actual",
+      }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+      await Promise.resolve();
+    });
+
+    expect(resolveAddress).toHaveBeenCalledWith({
+      latitude: 7.1193,
+      longitude: -73.1227,
+    });
+    expect(onAddressResolved).toHaveBeenCalledWith({
+      label: "Carrera 27, Bucaramanga, Santander, Colombia",
+      municipality: "Bucaramanga",
+      department: "Santander",
+    });
+  });
+
+  it("la candidata elegida usa su propia dirección sin geocodificar de nuevo", async () => {
+    const onAddressResolved = jest.fn();
+    const resolveAddress = jest.fn();
+    const searchCandidates = jest.fn(async () => [
+      {
+        label: "Parque García Rovira, Bucaramanga",
+        latitude: 7.1148,
+        longitude: -73.1268,
+      },
+    ]);
+
+    render(
+      <ControlledPicker
+        addressQuery="Parque García Rovira, Bucaramanga, Santander, Colombia"
+        searchCandidates={searchCandidates}
+        onAddressResolved={onAddressResolved}
+        resolveAddress={resolveAddress}
+      />,
+    );
+
+    fireEvent.press(
+      screen.getByRole("button", {
+        name: "Cruzar la dirección escrita con el mapa",
+      }),
+    );
+    fireEvent.press(await screen.findByTestId("address-candidate-0"));
+
+    expect(onAddressResolved).toHaveBeenCalledWith({
+      label: "Parque García Rovira, Bucaramanga",
+      municipality: null,
+      department: null,
+    });
+    expect(resolveAddress).not.toHaveBeenCalled();
   });
 });
