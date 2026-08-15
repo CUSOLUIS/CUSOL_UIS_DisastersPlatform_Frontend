@@ -302,7 +302,7 @@ describe("App universal", () => {
     expect(getDashboardEntryMinHeight(900, false)).toBe(776);
     expect(getDashboardEntryMinHeight(900, false, true)).toBe(734);
     expect(getDashboardEntryMinHeight(900, true)).toBe(740);
-    expect(getLiveRecordsMinHeight(900, 124)).toBe(776);
+    expect(getLiveRecordsMinHeight(900, 124)).toBe(720);
     expect(getLiveRecordsMinHeight(100, 160)).toBe(0);
     expect(
       getSectionScrollDestination({

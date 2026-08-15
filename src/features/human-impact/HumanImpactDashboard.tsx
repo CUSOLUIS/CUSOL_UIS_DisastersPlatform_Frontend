@@ -116,11 +116,18 @@ export function getDashboardHeaderHeight(
       : DASHBOARD_HEADER_HEIGHT;
 }
 
+// CHG-047: aire simétrico para que la transmisión en vivo no llegue
+// borde a borde del viewport (la mitad arriba, la mitad abajo).
+export const LIVE_RECORDS_VERTICAL_BREATHING = 56;
+
 export function getLiveRecordsMinHeight(
   viewportHeight: number,
   headerHeight: number,
 ): number {
-  return Math.max(0, viewportHeight - headerHeight);
+  return Math.max(
+    0,
+    viewportHeight - headerHeight - LIVE_RECORDS_VERTICAL_BREATHING,
+  );
 }
 
 export function getSectionScrollDestination({
@@ -216,7 +223,9 @@ export function HumanImpactDashboard({
           onNavigateMap={showMap}
           onNavigateAbout={onAbout}
           onNavigateData={() => scrollToSection(dataRef)}
-          onNavigateLive={() => scrollToSection(liveRef, 0)}
+          onNavigateLive={() =>
+            scrollToSection(liveRef, LIVE_RECORDS_VERTICAL_BREATHING / 2)
+          }
           onLogin={onLogin}
           onRegister={onRegister}
         />
@@ -345,7 +354,13 @@ export function HumanImpactDashboard({
             <View
               ref={liveRef}
               testID="dashboard-live-transmission"
-              style={[styles.liveSection, { minHeight: liveRecordsMinHeight }]}
+              style={[
+                styles.liveSection,
+                {
+                  minHeight: liveRecordsMinHeight,
+                  marginVertical: LIVE_RECORDS_VERTICAL_BREATHING / 2,
+                },
+              ]}
             >
               <RecentPeopleTable
                 dataSource={peopleRecordsDataSource}
@@ -358,7 +373,9 @@ export function HumanImpactDashboard({
             compact={compact}
             onNavigateAbout={onAbout}
             onNavigateData={() => scrollToSection(dataRef)}
-            onNavigateLive={() => scrollToSection(liveRef, 0)}
+            onNavigateLive={() =>
+              scrollToSection(liveRef, LIVE_RECORDS_VERTICAL_BREATHING / 2)
+            }
             onNavigateMap={showMap}
           />
         </ScrollView>
