@@ -30,6 +30,15 @@ import type {
   HumanMapDataSource,
   OperationalMapDataSource,
 } from "./features/operational-map/types";
+import {
+  CHANGE_SIGNAL_INTERVAL_MS,
+  changeSignalSource,
+  type ChangeSignalSource,
+} from "./platform/changeSignal";
+import {
+  notifyDataRefresh,
+  useDataRefreshTick,
+} from "./platform/dataRefresh";
 import { colors } from "./theme";
 
 type LoadState =
@@ -55,6 +64,8 @@ interface AppProps {
   onAbout?: () => void;
   // CHG-051: origen de la sesión (inyectable en pruebas).
   authSource?: AuthDataSource;
+  // CHG-082: sonda de la señal de cambios (inyectable en pruebas).
+  changeSignal?: ChangeSignalSource;
 }
 
 export function App({
@@ -74,6 +85,7 @@ export function App({
   onRegister = () => undefined,
   onAbout = () => undefined,
   authSource = authDataSource,
+  changeSignal = changeSignalSource,
 }: AppProps) {
   // CHG-051: la sesión activa (si existe) se muestra en el encabezado
   // y puede cerrarse desde ahí. Sin sesión, el encabezado conserva los
@@ -102,6 +114,38 @@ export function App({
       .catch(() => undefined)
       .finally(() => setSessionAccount(null));
   };
+
+  // CHG-082: sonda de la señal de cambios — cuando la huella del
+  // backend cambia (registro nuevo o modificado), todos los módulos
+  // suscritos de la portada refrescan de inmediato. Los fallos se
+  // ignoran: el sondeo de 30 s de cada módulo sigue de respaldo.
+  useEffect(() => {
+    if (changeSignal.transport !== "api") {
+      return;
+    }
+    const controller = new AbortController();
+    let lastSignal: string | null = null;
+    const probe = async () => {
+      try {
+        const signal = await changeSignal.fetchSignal(controller.signal);
+        if (lastSignal !== null && signal !== lastSignal) {
+          notifyDataRefresh();
+        }
+        lastSignal = signal;
+      } catch {
+        // Silencio deliberado: sin señal no se interrumpe nada.
+      }
+    };
+    void probe();
+    const timer = globalThis.setInterval(
+      () => void probe(),
+      CHANGE_SIGNAL_INTERVAL_MS,
+    );
+    return () => {
+      controller.abort();
+      globalThis.clearInterval(timer);
+    };
+  }, [changeSignal]);
 
   return (
     <SafeAreaProvider>
@@ -169,6 +213,8 @@ function DashboardLoader({
   onLogout: () => void;
 }) {
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
+  // CHG-082: refresco inmediato cuando la señal de cambios avisa.
+  const refreshTick = useDataRefreshTick();
 
   // CHG-050: en web la página jamás se desplaza horizontalmente (en
   // móvil un ancho desbordado permitía sacar toda la app hacia los
@@ -235,7 +281,7 @@ function DashboardLoader({
         globalThis.clearInterval(refreshTimer);
       }
     };
-  }, [dataSource]);
+  }, [dataSource, refreshTick]);
 
   if (loadState.status === "loading") {
     return (

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useDataRefreshTick } from "../../platform/dataRefresh";
 import type { HumanStatus } from "../human-impact/types";
 import type {
   HumanMapDataSource,
@@ -39,6 +40,8 @@ export function useHumanMapLayer({
       : { status: "loading" },
   );
   const [requestVersion, setRequestVersion] = useState(0);
+  // CHG-082: refresco inmediato cuando la señal de cambios avisa.
+  const refreshTick = useDataRefreshTick();
   const statusKey = statuses.join(",");
   const { west, south, east, north } = viewport.bounds;
 
@@ -117,6 +120,7 @@ export function useHumanMapLayer({
     east,
     enabled,
     north,
+    refreshTick,
     requestVersion,
     south,
     statusKey,

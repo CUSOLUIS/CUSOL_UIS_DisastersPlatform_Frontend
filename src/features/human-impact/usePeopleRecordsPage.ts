@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useDataRefreshTick } from "../../platform/dataRefresh";
 import type {
   PeopleRecordPage,
   PeopleRecordsDataSource,
@@ -27,6 +28,8 @@ export function usePeopleRecordsPage({
     status: "loading",
   });
   const [requestVersion, setRequestVersion] = useState(0);
+  // CHG-082: refresco inmediato cuando la señal de cambios avisa.
+  const refreshTick = useDataRefreshTick();
   const statusKey = query.statuses.join(",");
 
   useEffect(() => {
@@ -89,6 +92,7 @@ export function usePeopleRecordsPage({
     query.limit,
     query.offset,
     query.q,
+    refreshTick,
     requestVersion,
     statusKey,
   ]);

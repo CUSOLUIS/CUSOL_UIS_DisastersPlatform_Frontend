@@ -8,6 +8,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { colors, fontFamilies } from "../../theme";
+import { useDataRefreshTick } from "../../platform/dataRefresh";
 import type { HumanStatus } from "../human-impact/types";
 import { categoryMeta } from "./categoryMeta";
 import { CategoryMarkerIcon } from "./CategoryMarkerIcon";
@@ -100,6 +101,8 @@ export function OperationalMapPanel({
   ]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [requestVersion, setRequestVersion] = useState(0);
+  // CHG-082: refresco inmediato cuando la señal de cambios avisa.
+  const refreshTick = useDataRefreshTick();
   const [humanLayerVisible, setHumanLayerVisible] = useState(true);
   const [activeHumanStatuses, setActiveHumanStatuses] = useState<HumanStatus[]>([
     ...humanMapStatuses,
@@ -169,7 +172,7 @@ export function OperationalMapPanel({
         globalThis.clearInterval(refreshTimer);
       }
     };
-  }, [dataSource, requestVersion]);
+  }, [dataSource, refreshTick, requestVersion]);
 
   const retry = () => {
     setLoadState({ status: "loading" });
