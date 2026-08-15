@@ -18,6 +18,10 @@ import {
 } from "react-native";
 import { colors, fontFamilies } from "../theme";
 import {
+  detectRuntimeContext,
+  rulesForRuntime,
+} from "../platform/runtimeContext";
+import {
   reportVisitorPresence,
   setLastKnownVisitorLocation,
 } from "../features/operational-map/visitorPresence";
@@ -73,9 +77,13 @@ export function LocationConsentGate({
   watcher?: () => Promise<LocationWatcher>;
   platformOs?: typeof Platform.OS;
 }) {
-  const isNative = platformOs === "android" || platformOs === "ios";
+  // CHG-067: la obligatoriedad del portón es una regla por contexto de
+  // ejecución (solo la app instalada la exige).
+  const gateRequired = rulesForRuntime(
+    detectRuntimeContext(platformOs),
+  ).requireLocationConsentGate;
   const [status, setStatus] = useState<GateStatus>(
-    isNative ? "consent" : "ready",
+    gateRequired ? "consent" : "ready",
   );
   const subscriptionRef = useRef<LocationWatchSubscription | null>(null);
   const mountedRef = useRef(true);

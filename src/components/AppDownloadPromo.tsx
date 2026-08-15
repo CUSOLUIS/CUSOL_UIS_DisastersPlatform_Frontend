@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
 import {
   Linking,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { currentRuntimeRules } from "../platform/runtimeContext";
 import { colors, fontFamilies } from "../theme";
 
 // CHG-065: anuncio de descarga de la app al entrar a la plataforma web.
 // Dura 10 segundos con cuenta regresiva visible, se puede cerrar con la
 // X o se cierra solo, y aparece una única vez por sesión del navegador.
+// CHG-067: solo se muestra en celulares web (regla por contexto en
+// runtimeContext); si la persona no instala la app, no pasa nada.
 
 export const APP_DOWNLOAD_PROMO_SECONDS = 10;
 export const ANDROID_APK_PATH = "/descargas/cusol-disasters.apk";
@@ -34,7 +36,7 @@ interface AppDownloadPromoProps {
 }
 
 export function AppDownloadPromo({
-  enabled = Platform.OS === "web",
+  enabled = currentRuntimeRules().showAppDownloadPromo,
   seconds = APP_DOWNLOAD_PROMO_SECONDS,
 }: AppDownloadPromoProps) {
   const [visible, setVisible] = useState(false);
@@ -86,7 +88,7 @@ export function AppDownloadPromo({
         </View>
 
         <Text style={styles.title} accessibilityRole="header">
-          Lleva CUSOL Desastres en tu bolsillo
+          Cusol Disaster App
         </Text>
         <Text style={styles.text}>
           La misma plataforma, con el mapa, los reportes y tu cuenta,
