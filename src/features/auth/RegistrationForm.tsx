@@ -31,6 +31,9 @@ export const initialRegistrationDraft: RegistrationDraft = {
   requestedAccountType: "citizen",
   organizationName: "",
   organizationRole: "",
+  healthProfession: "",
+  healthLicenseNumber: "",
+  healthInstitution: "",
   password: "",
   confirmPassword: "",
   termsAccepted: false,
@@ -233,7 +236,36 @@ export function RegistrationForm({
               </View>
             </FormSection>
 
-            <FormSection code="04" title="Seguridad" description="Usa una contraseña única que no emplees en otros servicios.">
+            {/* CHG-077: quienes declaran profesión y registro del
+                sector salud pueden cambiar de inmediato el estado de
+                una persona reportada como encontrada o fallecida. */}
+            <FormSection code="04" title="Sector salud (opcional)" description="Si trabajas en el sector salud, declara tu profesión y registro profesional: tus novedades sobre personas desaparecidas aplican de inmediato.">
+              <FieldGrid compact={compact}>
+                <FormField
+                  label="Profesión u ocupación en salud"
+                  hint="Ej. Médica general, enfermero"
+                  value={draft.healthProfession}
+                  maxLength={120}
+                  onChangeText={(value) => setField("healthProfession", value)}
+                />
+                <FormField
+                  label="Registro o tarjeta profesional"
+                  hint="Obligatorio si declaras profesión"
+                  value={draft.healthLicenseNumber}
+                  maxLength={80}
+                  onChangeText={(value) => setField("healthLicenseNumber", value)}
+                />
+                <FormField
+                  label="Institución de salud"
+                  hint="Opcional"
+                  value={draft.healthInstitution}
+                  maxLength={160}
+                  onChangeText={(value) => setField("healthInstitution", value)}
+                />
+              </FieldGrid>
+            </FormSection>
+
+            <FormSection code="05" title="Seguridad" description="Usa una contraseña única que no emplees en otros servicios.">
               <FieldGrid compact={compact}>
                 <PasswordField
                   label="Contraseña *"
@@ -249,7 +281,7 @@ export function RegistrationForm({
               <PasswordRequirements password={draft.password} />
             </FormSection>
 
-            <FormSection code="05" title="Consentimientos" description="Lee y confirma cada punto antes de crear la cuenta.">
+            <FormSection code="06" title="Consentimientos" description="Lee y confirma cada punto antes de crear la cuenta.">
               <ConsentCheckbox
                 checked={draft.termsAccepted}
                 label="Acepto los términos de uso de la plataforma."
@@ -332,6 +364,22 @@ export function validateRegistrationDraft(draft: RegistrationDraft): string[] {
   ) {
     errors.push("Ingresa el nombre de la organización que representas.");
   }
+  // CHG-077: profesión y registro del sector salud van juntos.
+  const healthProfession = draft.healthProfession.trim();
+  const healthLicense = draft.healthLicenseNumber.trim();
+  if (
+    (healthProfession && !healthLicense) ||
+    (healthLicense && !healthProfession)
+  ) {
+    errors.push(
+      "Para el sector salud declara la profesión y el registro profesional juntos.",
+    );
+  }
+  if (draft.healthInstitution.trim() && !healthProfession) {
+    errors.push(
+      "La institución de salud requiere declarar profesión y registro.",
+    );
+  }
   if (!hasStrongPassword(draft.password)) {
     errors.push("La contraseña debe cumplir los cinco requisitos de seguridad.");
   }
@@ -357,6 +405,9 @@ export function toRegistrationInput(
     requestedAccountType: draft.requestedAccountType,
     organizationName: draft.organizationName.trim() || null,
     organizationRole: draft.organizationRole.trim() || null,
+    healthProfession: draft.healthProfession.trim() || null,
+    healthLicenseNumber: draft.healthLicenseNumber.trim() || null,
+    healthInstitution: draft.healthInstitution.trim() || null,
     password: draft.password,
     termsAccepted: true,
     privacyAccepted: true,

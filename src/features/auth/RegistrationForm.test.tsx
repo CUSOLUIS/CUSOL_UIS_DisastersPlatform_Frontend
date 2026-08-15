@@ -14,6 +14,9 @@ const strongDraft: RegistrationDraft = {
   requestedAccountType: "citizen",
   organizationName: "",
   organizationRole: "",
+  healthProfession: "",
+  healthLicenseNumber: "",
+  healthInstitution: "",
   password: "ClaveSegura#2026",
   confirmPassword: "ClaveSegura#2026",
   termsAccepted: true,
@@ -53,11 +56,34 @@ describe("RegistrationForm", () => {
     expect(screen.getByRole("header", { name: "Identidad" })).toBeTruthy();
     expect(screen.getByRole("header", { name: "Contacto y ubicación" })).toBeTruthy();
     expect(screen.getByRole("header", { name: "Cómo deseas participar" })).toBeTruthy();
+    expect(screen.getByRole("header", { name: "Sector salud (opcional)" })).toBeTruthy();
     expect(screen.getByRole("header", { name: "Seguridad" })).toBeTruthy();
     expect(screen.getByRole("header", { name: "Consentimientos" })).toBeTruthy();
     expect(screen.queryByLabelText("Número de documento")).toBeNull();
     expect(screen.queryByLabelText("Fecha de nacimiento")).toBeNull();
     expect(screen.queryByLabelText("Dirección residencial")).toBeNull();
+  });
+
+  // CHG-077: los datos del sector salud son opcionales pero van juntos.
+  it("exige profesión y registro de salud como pareja", () => {
+    expect(
+      validateRegistrationDraft({
+        ...strongDraft,
+        healthProfession: "Médica general",
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        "Para el sector salud declara la profesión y el registro profesional juntos.",
+      ]),
+    );
+    expect(
+      validateRegistrationDraft({
+        ...strongDraft,
+        healthProfession: "Médica general",
+        healthLicenseNumber: "RM-12345",
+        healthInstitution: "Hospital Universitario",
+      }),
+    ).toEqual([]);
   });
 
   it("envía el payload contractual sin la confirmación y muestra verificación", async () => {
@@ -86,6 +112,8 @@ describe("RegistrationForm", () => {
     fireEvent.press(screen.getByRole("radio", { name: "Organización" }));
     fireEvent.changeText(screen.getByLabelText("Nombre de la organización *"), "Fundación Ayuda");
     fireEvent.changeText(screen.getByLabelText("Función o cargo"), "Coordinadora");
+    fireEvent.changeText(screen.getByLabelText("Profesión u ocupación en salud"), "Médica general");
+    fireEvent.changeText(screen.getByLabelText("Registro o tarjeta profesional"), "RM-12345");
     fireEvent.changeText(screen.getByLabelText("Contraseña *"), "ClaveSegura#2026");
     fireEvent.changeText(screen.getByLabelText("Confirmar contraseña *"), "ClaveSegura#2026");
     fireEvent.press(screen.getByRole("checkbox", { name: "Acepto los términos de uso de la plataforma." }));
@@ -101,6 +129,9 @@ describe("RegistrationForm", () => {
       email: "laura@example.com",
       requestedAccountType: "organization_representative",
       organizationName: "Fundación Ayuda",
+      healthProfession: "Médica general",
+      healthLicenseNumber: "RM-12345",
+      healthInstitution: null,
       termsAccepted: true,
       privacyAccepted: true,
       accuracyConfirmed: true,

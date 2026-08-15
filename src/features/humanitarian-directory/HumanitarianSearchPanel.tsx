@@ -17,10 +17,12 @@ import {
   CommunityContributionForm,
   type PickContributionPhotos,
 } from "./CommunityContributionForm";
+import { PersonNoveltyPanel } from "./PersonNoveltyPanel";
 import type {
   AidLocationDirectoryCard,
   CommunityContributionDataSource,
   DirectoryFilter,
+  FetchPersonNovelties,
   HumanitarianDirectoryDataSource,
   HumanitarianDirectoryItem,
   HumanitarianDirectoryKind,
@@ -109,11 +111,14 @@ export function HumanitarianSearchPanel({
   contributionDataSource,
   dataSource,
   pickPhotos,
+  fetchNovelties,
 }: {
   compact: boolean;
   contributionDataSource: CommunityContributionDataSource;
   dataSource: HumanitarianDirectoryDataSource;
   pickPhotos?: PickContributionPhotos;
+  // CHG-077: inyectable en pruebas; por defecto usa la API real.
+  fetchNovelties?: FetchPersonNovelties;
 }) {
   const [kind, setKind] = useState<HumanitarianDirectoryKind>("missing_person");
   const [filter, setFilter] = useState<DirectoryFilter>("all");
@@ -126,6 +131,9 @@ export function HumanitarianSearchPanel({
   const [matchTotal, setMatchTotal] = useState<number | null>(null);
   const [contributionTarget, setContributionTarget] =
     useState<HumanitarianDirectoryItem | null>(null);
+  // CHG-077: persona cuyo detalle de novedades está abierto.
+  const [detailTarget, setDetailTarget] =
+    useState<MissingPersonDirectoryCard | null>(null);
 
   const activeFilter = filtersByKind[kind].find((option) => option.value === filter);
 
@@ -167,6 +175,7 @@ export function HumanitarianSearchPanel({
 
     setInlineError(null);
     setContributionTarget(null);
+    setDetailTarget(null);
     setWindowVisible(true);
     setSearchState({ status: "loading" });
 
@@ -187,6 +196,7 @@ export function HumanitarianSearchPanel({
   const closeWindow = () => {
     setWindowVisible(false);
     setContributionTarget(null);
+    setDetailTarget(null);
   };
 
   return (
@@ -325,7 +335,9 @@ export function HumanitarianSearchPanel({
               <Text style={styles.modalTitle} accessibilityRole="header">
                 {contributionTarget
                   ? "Aportar evidencia"
-                  : `Coincidencias de ${kindLabels[kind]}`}
+                  : detailTarget
+                    ? "Novedades de la persona"
+                    : `Coincidencias de ${kindLabels[kind]}`}
               </Text>
             </View>
             <Pressable
@@ -351,6 +363,13 @@ export function HumanitarianSearchPanel({
                 pickPhotos={pickPhotos}
                 onBack={() => setContributionTarget(null)}
               />
+            ) : detailTarget ? (
+              <PersonNoveltyPanel
+                person={detailTarget}
+                onBack={() => setDetailTarget(null)}
+                onContribute={() => setContributionTarget(detailTarget)}
+                fetchNovelties={fetchNovelties}
+              />
             ) : (
               <SearchResults
                 state={searchState}
@@ -358,6 +377,7 @@ export function HumanitarianSearchPanel({
                 query={query.trim()}
                 filterLabel={activeFilter?.label ?? "Todos"}
                 onContribute={setContributionTarget}
+                onOpenDetail={setDetailTarget}
               />
             )}
           </ScrollView>
@@ -371,12 +391,14 @@ function SearchResults({
   filterLabel,
   kind,
   onContribute,
+  onOpenDetail,
   query,
   state,
 }: {
   filterLabel: string;
   kind: HumanitarianDirectoryKind;
   onContribute: (item: HumanitarianDirectoryItem) => void;
+  onOpenDetail: (item: MissingPersonDirectoryCard) => void;
   query: string;
   state: SearchState;
 }) {
@@ -424,7 +446,12 @@ function SearchResults({
         <View style={styles.cardGrid}>
           {response.items.map((item) =>
             item.kind === "missing_person" ? (
-              <PersonCard key={item.id} item={item} onContribute={() => onContribute(item)} />
+              <PersonCard
+                key={item.id}
+                item={item}
+                onContribute={() => onContribute(item)}
+                onOpenDetail={() => onOpenDetail(item)}
+              />
             ) : (
               <AidLocationCard key={item.id} item={item} onContribute={() => onContribute(item)} />
             ),
@@ -435,7 +462,15 @@ function SearchResults({
   );
 }
 
-function PersonCard({ item, onContribute }: { item: MissingPersonDirectoryCard; onContribute: () => void }) {
+function PersonCard({
+  item,
+  onContribute,
+  onOpenDetail,
+}: {
+  item: MissingPersonDirectoryCard;
+  onContribute: () => void;
+  onOpenDetail: () => void;
+}) {
   return (
     <View testID={`directory-person-card-${item.id}`} style={styles.card}>
       <View style={styles.cardTop}>
@@ -473,6 +508,17 @@ function PersonCard({ item, onContribute }: { item: MissingPersonDirectoryCard; 
           FUENTE · {item.source.name} · VIGENCIA · {dateFormatter.format(new Date(item.updatedAt))}
         </Text>
       </View>
+      {/* CHG-077: al abrir la tarjeta se ven las novedades que otras
+          personas reportaron (qué dicen quienes la encontraron). */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Ver novedades de ${item.displayName}`}
+        onPress={onOpenDetail}
+        style={[styles.cardAction, styles.cardActionSecondary]}
+      >
+        <Text style={styles.cardActionText}>VER NOVEDADES E INFORMACIÓN</Text>
+        <Text style={styles.cardActionArrow}>→</Text>
+      </Pressable>
       {item.status === "missing" && (
         <Pressable
           accessibilityRole="button"
@@ -677,6 +723,7 @@ const styles = StyleSheet.create({
   ratingStars: { color: colors.missing, fontSize: 18, letterSpacing: 1 },
   ratingText: { color: colors.inkSoft, fontFamily: fontFamilies.mono, fontSize: 7, fontWeight: "800" },
   cardAction: { minHeight: 48, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: colors.line, backgroundColor: "rgba(81,229,255,0.035)" },
+  cardActionSecondary: { backgroundColor: "transparent" },
   cardActionText: { color: colors.cyan, fontFamily: fontFamilies.mono, fontSize: 7, fontWeight: "900", letterSpacing: 0.5 },
   cardActionArrow: { color: colors.cyan, fontSize: 16 },
 });

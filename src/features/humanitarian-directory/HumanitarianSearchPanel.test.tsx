@@ -145,12 +145,12 @@ describe("Directorio humanitario", () => {
     );
     fireEvent.press(
       screen.getByRole("checkbox", {
-        name: "Entiendo que será revisado y no cambia información pública de inmediato.",
+        name: "Entiendo que mi aporte será visible en las novedades públicas de este registro.",
       }),
     );
     fireEvent.press(screen.getByRole("button", { name: "Enviar aporte para revisión" }));
 
-    expect(await screen.findByRole("header", { name: "En revisión" })).toBeTruthy();
+    expect(await screen.findByRole("header", { name: "Novedad recibida" })).toBeTruthy();
     expect(screen.getByText("APORTE CON CUENTA")).toBeTruthy();
     expect(submit).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -198,12 +198,12 @@ describe("Directorio humanitario", () => {
     );
     fireEvent.press(
       screen.getByRole("checkbox", {
-        name: "Entiendo que será revisado y no cambia información pública de inmediato.",
+        name: "Entiendo que mi aporte será visible en las novedades públicas de este registro.",
       }),
     );
     fireEvent.press(screen.getByRole("button", { name: "Enviar aporte para revisión" }));
 
-    expect(await screen.findByRole("header", { name: "En revisión" })).toBeTruthy();
+    expect(await screen.findByRole("header", { name: "Novedad recibida" })).toBeTruthy();
     expect(submit).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: "missing_person_status",
@@ -212,6 +212,62 @@ describe("Directorio humanitario", () => {
       }),
       "authenticated",
     );
+  });
+
+  // CHG-077 — Al abrir la tarjeta se ven las novedades de terceros.
+  it("muestra las novedades de la persona al abrir su tarjeta", async () => {
+    const fetchNovelties = jest.fn(async (personId: string) => ({
+      personId,
+      publicStatus: "found" as const,
+      items: [
+        {
+          id: "novelty-1",
+          claimedOutcome: "found" as const,
+          evidenceDescription: "La vi en el albergue del colegio central.",
+          locationDescription: "Albergue del colegio central",
+          occurredAt: "2026-08-14T10:00:00Z",
+          receivedAt: "2026-08-14T11:00:00Z",
+          reporterKind: "health_sector" as const,
+          moderationStatus: "under_review" as const,
+        },
+      ],
+      total: 1,
+    }));
+    render(
+      <HumanitarianSearchPanel
+        compact={false}
+        dataSource={humanitarianDirectoryDataSource}
+        contributionDataSource={contributionDataSource}
+        fetchNovelties={fetchNovelties}
+      />,
+    );
+
+    fireEvent.changeText(
+      screen.getByLabelText("Buscar persona desaparecida por cualquier dato público"),
+      "valentina",
+    );
+    fireEvent.press(screen.getByRole("button", { name: "Buscar personas" }));
+    fireEvent.press(
+      await screen.findByRole("button", {
+        name: "Ver novedades de Valentina Rojas",
+      }),
+    );
+
+    expect(
+      await screen.findByText("La vi en el albergue del colegio central."),
+    ).toBeTruthy();
+    expect(screen.getByText("SECTOR SALUD")).toBeTruthy();
+    expect(screen.getByText("ESTADO ACTUAL · ENCONTRADA")).toBeTruthy();
+    expect(screen.getByText(/5 o más\s+personas reportan el mismo desenlace/)).toBeTruthy();
+    expect(fetchNovelties).toHaveBeenCalledTimes(1);
+
+    // Desde el detalle se puede reportar una novedad propia.
+    fireEvent.press(
+      screen.getByRole("button", { name: "Reportar novedad sobre Valentina Rojas" }),
+    );
+    expect(
+      await screen.findByRole("header", { name: "Aportar evidencia" }),
+    ).toBeTruthy();
   });
 });
 

@@ -185,3 +185,27 @@ export const humanitarianDirectoryDataSource: HumanitarianDirectoryDataSource = 
   transport: directoryTransport,
   search: directoryTransport === "fixture" ? searchFixture : searchApi,
 };
+
+// CHG-077 — Novedades visibles de una persona publicada.
+export async function fetchPersonNovelties(
+  personId: string,
+): Promise<import("./types").PersonStatusReportsPage> {
+  if (directoryTransport === "fixture") {
+    return { personId, publicStatus: "missing", items: [], total: 0 };
+  }
+  if (apiBaseUrl === undefined) {
+    throw new Error(
+      "Configura EXPO_PUBLIC_API_BASE_URL para consultar las novedades.",
+    );
+  }
+  const response = await fetch(
+    `${apiBaseUrl}/api/v1/missing-persons/${personId}/status-reports`,
+    { headers: { Accept: "application/json" } },
+  );
+  if (!response.ok) {
+    throw new Error(
+      "No fue posible consultar las novedades en este momento.",
+    );
+  }
+  return (await response.json()) as import("./types").PersonStatusReportsPage;
+}

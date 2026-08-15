@@ -15,6 +15,10 @@ export interface RegistrationDraft {
   requestedAccountType: RequestedAccountType;
   organizationName: string;
   organizationRole: string;
+  // CHG-077: datos opcionales del sector salud.
+  healthProfession: string;
+  healthLicenseNumber: string;
+  healthInstitution: string;
   password: string;
   confirmPassword: string;
   termsAccepted: boolean;
@@ -32,6 +36,9 @@ export interface AccountRegistrationInput {
   requestedAccountType: RequestedAccountType;
   organizationName: string | null;
   organizationRole: string | null;
+  healthProfession: string | null;
+  healthLicenseNumber: string | null;
+  healthInstitution: string | null;
   password: string;
   termsAccepted: true;
   privacyAccepted: true;

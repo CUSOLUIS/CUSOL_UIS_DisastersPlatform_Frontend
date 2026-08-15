@@ -82,7 +82,9 @@ export function CommunityContributionForm({
     return () => controller.abort();
   }, [dataSource]);
 
-  const maximumPhotos = isPerson ? 5 : 3;
+  // CHG-071/CHG-077: el máximo real es 3 en todos los aportes (el
+  // contrato y la validación de fotos comparten este límite).
+  const maximumPhotos = 3;
 
   const selectPhotos = async () => {
     setSelectingPhotos(true);
@@ -169,12 +171,13 @@ export function CommunityContributionForm({
       <View style={styles.receipt} accessibilityRole="alert">
         <Text style={styles.overline}>APORTE / RECIBIDO</Text>
         <Text style={styles.receiptTitle} accessibilityRole="header">
-          En revisión
+          Novedad recibida
         </Text>
         <Text style={styles.receiptText}>
-          La información y las pruebas se recibieron de forma privada. No cambia
-          el estado ni la valoración pública hasta que una persona autorizada la
-          verifique.
+          La información y las pruebas se recibieron de forma privada. El
+          estado público cambia cuando 5 o más personas reportan lo mismo, de
+          inmediato si reporta alguien del sector salud, o cuando el equipo lo
+          verifica. Tu aporte ya es visible en las novedades de la persona.
         </Text>
         <View style={styles.receiptMeta}>
           <Text style={styles.receiptCode}>{receipt.id}</Text>
@@ -234,10 +237,14 @@ export function CommunityContributionForm({
       </View>
 
       <View style={styles.safetyNotice} accessibilityRole="alert">
-        <Text style={styles.safetyTitle}>EVIDENCIA PRIVADA · REVISIÓN HUMANA</Text>
+        <Text style={styles.safetyTitle}>
+          {isPerson
+            ? "VERIFICACIÓN COMUNITARIA · FOTOS PRIVADAS"
+            : "EVIDENCIA PRIVADA · REVISIÓN HUMANA"}
+        </Text>
         <Text style={styles.safetyText}>
           {isPerson
-            ? "Esta novedad no declara oficialmente un hallazgo o fallecimiento. Las fotos y el texto no se publican automáticamente."
+            ? "Tu texto será visible en las novedades de la persona; las fotos quedan privadas. Si 5 o más personas reportan lo mismo, o si reporta el sector salud, el estado público cambia."
             : "Las estrellas expresan una experiencia ciudadana; no certifican oficialmente el lugar y solo afectan el promedio tras revisión."}
         </Text>
       </View>
@@ -345,7 +352,7 @@ export function CommunityContributionForm({
       />
       <Consent
         checked={reviewAcknowledged}
-        label="Entiendo que será revisado y no cambia información pública de inmediato."
+        label="Entiendo que mi aporte será visible en las novedades públicas de este registro."
         onPress={() => setReviewAcknowledged((current) => !current)}
       />
 

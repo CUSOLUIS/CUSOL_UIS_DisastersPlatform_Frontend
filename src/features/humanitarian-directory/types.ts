@@ -145,3 +145,32 @@ export interface CommunityContributionDataSource {
     signal?: AbortSignal,
   ): Promise<CommunityContributionReceipt>;
 }
+
+// CHG-077 — Novedades públicas de una persona: qué dicen quienes la
+// vieron, sin identidad del reportante ni fotografías.
+export type PersonNoveltyReporterKind =
+  | "anonymous"
+  | "authenticated"
+  | "health_sector";
+
+export interface PersonStatusReportPublic {
+  id: string;
+  claimedOutcome: "found" | "deceased";
+  evidenceDescription: string;
+  locationDescription: string | null;
+  occurredAt: string | null;
+  receivedAt: string;
+  reporterKind: PersonNoveltyReporterKind;
+  moderationStatus: "under_review" | "accepted";
+}
+
+export interface PersonStatusReportsPage {
+  personId: string;
+  publicStatus: PublicPersonStatus;
+  items: PersonStatusReportPublic[];
+  total: number;
+}
+
+export type FetchPersonNovelties = (
+  personId: string,
+) => Promise<PersonStatusReportsPage>;
