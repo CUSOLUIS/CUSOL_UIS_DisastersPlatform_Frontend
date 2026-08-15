@@ -25,12 +25,23 @@ const darkMapStyle = [
   { featureType: "water", elementType: "geometry", stylers: [{ color: "#07101b" }] },
 ];
 
-export function OperationalMapCanvas(props: OperationalMapCanvasProps) {
+export function OperationalMapCanvas({
+  platformOs = Platform.OS,
+  ...props
+}: OperationalMapCanvasProps & { platformOs?: typeof Platform.OS }) {
   const mapRef = useRef<MapView | null>(null);
   const [zoom, setZoom] = useState(5);
   const [osmStatus, setOsmStatus] = useState<"checking" | "ready" | "failed">(
     osmTilesDisabled ? "failed" : "checking",
   );
+  // CHG-074: en Android react-native-maps SOLO funciona con Google Maps
+  // y exige una API key en el manifest; sin ella, inflar MapView tumba
+  // la app entera al abrir (crash nativo, no capturable en JS). Sin la
+  // clave configurada se usa el canvas propio, que no depende de
+  // Google. En iOS el proveedor por defecto es Apple Maps y no la
+  // necesita.
+  const androidWithoutGoogleKey =
+    platformOs === "android" && !googleMapsNativeEnabled;
 
   useEffect(() => {
     if (googleMapsNativeEnabled || osmTilesDisabled) {
@@ -60,7 +71,10 @@ export function OperationalMapCanvas(props: OperationalMapCanvasProps) {
     return () => controller.abort();
   }, []);
 
-  if (!googleMapsNativeEnabled && osmStatus === "failed") {
+  if (
+    androidWithoutGoogleKey ||
+    (!googleMapsNativeEnabled && osmStatus === "failed")
+  ) {
     return <FallbackMapCanvas {...props} />;
   }
 
