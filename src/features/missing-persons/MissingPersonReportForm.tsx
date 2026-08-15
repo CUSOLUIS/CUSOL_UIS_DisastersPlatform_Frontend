@@ -15,6 +15,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
+import { DatePickerField } from "../../components/DatePickerField";
+import { TimePickerField } from "../../components/TimePickerField";
 import { ReportConsiderations } from "../reporting/ReportConsiderations";
 import {
   useSessionAccount,
@@ -283,7 +285,7 @@ export function MissingPersonReportForm({
                 <FormField label="Nombres *" invalid={invalidFields.has("firstNames")} value={draft.firstNames} onChangeText={(value) => setField("firstNames", value)} autoComplete="name-given" />
                 <FormField label="Apellidos *" invalid={invalidFields.has("lastNames")} value={draft.lastNames} onChangeText={(value) => setField("lastNames", value)} autoComplete="name-family" />
                 <FormField label="Alias o nombre conocido" value={draft.aliases} onChangeText={(value) => setField("aliases", value)} />
-                <BirthDateField value={draft.birthDate} onChange={(value) => setField("birthDate", value)} />
+                <DatePickerField label="Fecha de nacimiento" accessibilityLabel="Elegir fecha de nacimiento" clearAccessibilityLabel="Borrar fecha de nacimiento" testID="birth-date-calendar" value={draft.birthDate} onChange={(value) => setField("birthDate", value)} />
                 <FormField label="Edad aproximada" value={draft.approximateAge} onChangeText={(value) => setField("approximateAge", value)} keyboardType="number-pad" />
                 <ChoiceChipsField label="Sexo" options={SEX_OPTIONS} value={draft.genderIdentity} onChange={(value) => setField("genderIdentity", value)} />
                 <SelectListField label="Nacionalidad" options={NATIONALITY_OPTIONS} value={draft.nationality} onChange={(value) => setField("nationality", value)} searchable searchPlaceholder="Busca tu nacionalidad" />
@@ -297,8 +299,8 @@ export function MissingPersonReportForm({
 
             <FormSection code="02" title="Última vez que fue vista" description="Escribe la dirección o el lugar donde fue vista por última vez." onPosition={registerSection}>
               <FieldGrid compact={compact}>
-                <FormField label="Fecha *" invalid={invalidFields.has("lastSeenDate")} hint="AAAA-MM-DD" value={draft.lastSeenDate} onChangeText={(value) => setField("lastSeenDate", value)} />
-                <FormField label="Hora aproximada" invalid={invalidFields.has("lastSeenTime")} hint="HH:MM" value={draft.lastSeenTime} onChangeText={(value) => setField("lastSeenTime", value)} />
+                <DatePickerField label="Fecha *" accessibilityLabel="Elegir fecha de la última visualización" testID="last-seen-date-calendar" value={draft.lastSeenDate} onChange={(value) => setField("lastSeenDate", value)} invalid={invalidFields.has("lastSeenDate")} />
+                <TimePickerField label="Hora aproximada" accessibilityLabel="Elegir hora de la última visualización" clearAccessibilityLabel="Borrar hora" testID="last-seen-time-picker" value={draft.lastSeenTime} onChange={(value) => setField("lastSeenTime", value)} invalid={invalidFields.has("lastSeenTime")} />
                 <FormField label="Departamento *" invalid={invalidFields.has("department")} value={draft.department} onChangeText={(value) => setField("department", value)} />
                 <FormField label="Municipio *" invalid={invalidFields.has("municipality")} value={draft.municipality} onChangeText={(value) => setField("municipality", value)} />
               </FieldGrid>
@@ -311,6 +313,21 @@ export function MissingPersonReportForm({
                     ...current,
                     lastSeenLatitude: coordinates ? coordinates.latitude.toFixed(5) : "",
                     lastSeenLongitude: coordinates ? coordinates.longitude.toFixed(5) : "",
+                  }))
+                }
+                // CHG-086: fijar el muñequito autocompleta la
+                // dirección (editable); municipio y departamento solo
+                // se rellenan si estaban vacíos.
+                onAddressResolved={(address) =>
+                  setDraft((current) => ({
+                    ...current,
+                    lastSeenArea: address.label,
+                    municipality:
+                      current.municipality.trim() ||
+                      (address.municipality ?? ""),
+                    department:
+                      current.department.trim() ||
+                      (address.department ?? ""),
                   }))
                 }
               />
@@ -706,142 +723,6 @@ function SelectListField({
   );
 }
 
-const MONTH_LABELS = [
-  "ENE", "FEB", "MAR", "ABR", "MAY", "JUN",
-  "JUL", "AGO", "SEP", "OCT", "NOV", "DIC",
-];
-const BIRTH_YEAR_MIN = 1900;
-
-function daysInMonth(year: number, month: number): number {
-  return new Date(year, month + 1, 0).getDate();
-}
-
-function BirthDateField({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [year, setYear] = useState<number | null>(null);
-  const [month, setMonth] = useState<number | null>(null);
-  const currentYear = new Date().getFullYear();
-  const years: number[] = [];
-  for (let item = currentYear; item >= BIRTH_YEAR_MIN; item -= 1) {
-    years.push(item);
-  }
-  const pickDay = (day: number) => {
-    if (year === null || month === null) return;
-    const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    onChange(iso);
-    setOpen(false);
-  };
-  return (
-    <View style={styles.field}>
-      <View style={styles.fieldLabelRow}>
-        <Text style={styles.fieldLabel}>Fecha de nacimiento</Text>
-      </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Elegir fecha de nacimiento"
-        accessibilityState={{ expanded: open }}
-        onPress={() => {
-          setOpen((current) => !current);
-          setYear(null);
-          setMonth(null);
-        }}
-        style={styles.fieldInput}
-      >
-        <View style={styles.selectValueRow}>
-          <Text style={value ? styles.selectValue : styles.selectPlaceholder}>
-            {value || "Elegir en el calendario"}
-          </Text>
-          <Text style={styles.selectCaret}>{open ? "▴" : "📅"}</Text>
-        </View>
-      </Pressable>
-      {open && (
-        <View style={styles.selectPanel} testID="birth-date-calendar">
-          {year === null && (
-            <>
-              <Text style={styles.calendarStep}>ELIGE EL AÑO</Text>
-              <ScrollView style={styles.selectScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                <View style={styles.calendarGrid}>
-                  {years.map((option) => (
-                    <Pressable
-                      key={option}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Año ${option}`}
-                      onPress={() => setYear(option)}
-                      style={styles.calendarCell}
-                    >
-                      <Text style={styles.calendarCellText}>{option}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </ScrollView>
-            </>
-          )}
-          {year !== null && month === null && (
-            <>
-              <Text style={styles.calendarStep}>ELIGE EL MES · {year}</Text>
-              <View style={styles.calendarGrid}>
-                {MONTH_LABELS.map((labelText, index) => (
-                  <Pressable
-                    key={labelText}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Mes ${labelText} de ${year}`}
-                    onPress={() => setMonth(index)}
-                    style={styles.calendarCell}
-                  >
-                    <Text style={styles.calendarCellText}>{labelText}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </>
-          )}
-          {year !== null && month !== null && (
-            <>
-              <Text style={styles.calendarStep}>
-                ELIGE EL DÍA · {MONTH_LABELS[month]} {year}
-              </Text>
-              <View style={styles.calendarGrid}>
-                {Array.from(
-                  { length: daysInMonth(year, month) },
-                  (_, index) => index + 1,
-                ).map((day) => (
-                  <Pressable
-                    key={day}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Día ${day}`}
-                    onPress={() => pickDay(day)}
-                    style={styles.calendarCellSmall}
-                  >
-                    <Text style={styles.calendarCellText}>{day}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </>
-          )}
-          {value !== "" && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Borrar fecha de nacimiento"
-              onPress={() => {
-                onChange("");
-                setOpen(false);
-              }}
-              style={styles.selectOption}
-            >
-              <Text style={styles.selectClearText}>Borrar fecha</Text>
-            </Pressable>
-          )}
-        </View>
-      )}
-    </View>
-  );
-}
-
 function PrivateFieldsLabel() {
   return (
     <View style={styles.privateLabel}>
@@ -971,7 +852,10 @@ const styles = StyleSheet.create({
   calendarCell: { minWidth: 62, paddingVertical: 9, alignItems: "center", borderWidth: 1, borderColor: "rgba(137,166,207,0.18)", borderRadius: 6 },
   calendarCellSmall: { minWidth: 40, paddingVertical: 8, alignItems: "center", borderWidth: 1, borderColor: "rgba(137,166,207,0.18)", borderRadius: 6 },
   calendarCellText: { color: colors.ink, fontSize: 12 },
-  privateLabel: { paddingHorizontal: 10, paddingVertical: 7, borderLeftWidth: 2, borderLeftColor: colors.deceased, backgroundColor: "rgba(135,150,255,0.06)" },
+  // CHG-087: márgenes propios — la separación no puede depender del `gap`
+  // de flexbox (no lo aplican navegadores/WebViews viejos y la cinta
+  // quedaba montada sobre el campo anterior). Fondo sólido.
+  privateLabel: { marginTop: 14, marginBottom: 2, alignSelf: "stretch", paddingHorizontal: 10, paddingVertical: 7, borderLeftWidth: 2, borderLeftColor: colors.deceased, borderRadius: 4, backgroundColor: "#10142a" },
   privateLabelText: { color: colors.deceased, fontFamily: fontFamilies.mono, fontSize: 8, fontWeight: "700", letterSpacing: 0.5 },
   photoRules: { flexDirection: "row", alignItems: "center", gap: 14, padding: 15, borderWidth: 1, borderColor: "rgba(81,229,255,0.20)", borderRadius: 9, backgroundColor: "rgba(81,229,255,0.05)" },
   photoRulesCopy: { minWidth: 0, flex: 1 },

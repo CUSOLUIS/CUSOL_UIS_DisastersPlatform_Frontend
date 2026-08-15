@@ -230,7 +230,6 @@ describe("Reporte de persona perdida", () => {
     const values: Array<[string, string]> = [
       ["Nombres *", "Valentina"],
       ["Apellidos *", "Rojas"],
-      ["Fecha *", "2026-08-11"],
       ["Departamento *", "Cundinamarca"],
       ["Municipio *", "Soacha"],
       ["Dirección *", "Parque central"],
@@ -241,6 +240,14 @@ describe("Reporte de persona perdida", () => {
       ["Teléfono privado", "3001234567"],
     ];
     values.forEach(([label, value]) => fireEvent.changeText(screen.getByLabelText(label), value));
+
+    // CHG-088: la fecha se elige en el calendario estándar.
+    fireEvent.press(
+      screen.getByRole("button", { name: "Elegir fecha de la última visualización" }),
+    );
+    fireEvent.press(screen.getByRole("button", { name: "Año 2026" }));
+    fireEvent.press(screen.getByRole("button", { name: "Mes AGO de 2026" }));
+    fireEvent.press(screen.getByRole("button", { name: "Día 11" }));
 
     fireEvent.press(screen.getByRole("button", { name: "Seleccionar una o varias fotografías" }));
     await screen.findByText("foto-valentina.jpg");
@@ -300,5 +307,28 @@ describe("Listas cerradas del formulario de persona", () => {
 
     expect(screen.getByText("1990-05-20")).toBeTruthy();
     expect(screen.queryByTestId("birth-date-calendar")).toBeNull();
+  });
+});
+
+// CHG-089 — La hora se elige en el selector estándar (24 h, bloques
+// de 15 minutos), sin texto libre.
+describe("Selector de hora estándar", () => {
+  it("elige la hora en bloques y produce HH:MM", async () => {
+    render(<MissingPersonReportForm onBack={jest.fn()} />);
+
+    fireEvent.press(
+      screen.getByRole("button", {
+        name: "Elegir hora de la última visualización",
+      }),
+    );
+    expect(screen.getByTestId("last-seen-time-picker")).toBeTruthy();
+
+    fireEvent.press(screen.getByRole("button", { name: "Hora 18" }));
+    fireEvent.press(
+      screen.getByRole("button", { name: "Minutos 30 de las 18" }),
+    );
+
+    expect(screen.getByText("18:30")).toBeTruthy();
+    expect(screen.queryByTestId("last-seen-time-picker")).toBeNull();
   });
 });

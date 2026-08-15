@@ -137,7 +137,6 @@ describe("CHG-035 · Reporte de edificio con búsqueda pendiente", () => {
       ["Municipio *", "Bucaramanga"],
       ["Barrio, vereda o sector *", "Centro"],
       ["Referencia para encontrar el lugar *", "Frente al parque principal"],
-      ["Fecha de observación *", "2026-08-13"],
       [
         "Describe lo observado *",
         "El acceso principal está cubierto por escombros y no vi personal de búsqueda.",
@@ -149,6 +148,14 @@ describe("CHG-035 · Reporte de edificio con búsqueda pendiente", () => {
     fields.forEach(([label, value]) =>
       fireEvent.changeText(screen.getByLabelText(label), value),
     );
+
+    // CHG-088: la fecha se elige en el calendario estándar.
+    fireEvent.press(
+      screen.getByRole("button", { name: "Elegir fecha de observación" }),
+    );
+    fireEvent.press(screen.getByRole("button", { name: "Año 2026" }));
+    fireEvent.press(screen.getByRole("button", { name: "Mes AGO de 2026" }));
+    fireEvent.press(screen.getByRole("button", { name: "Día 13" }));
     fireEvent.press(
       screen.getByRole("checkbox", {
         name: "Motivo pendiente: Acceso bloqueado",

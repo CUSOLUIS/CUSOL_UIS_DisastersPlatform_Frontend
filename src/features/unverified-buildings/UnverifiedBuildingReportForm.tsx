@@ -25,6 +25,8 @@ import {
 } from "../missing-persons/photoProcessing";
 import type { SelectedPhoto } from "../missing-persons/reportTypes";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
+import { DatePickerField } from "../../components/DatePickerField";
+import { TimePickerField } from "../../components/TimePickerField";
 import { ReportConsiderations } from "../reporting/ReportConsiderations";
 import {
   useSessionAccount,
@@ -386,17 +388,25 @@ export function UnverifiedBuildingReportForm({
               description="Registra lo que sabes sin convertir observaciones en conclusiones."
             >
               <FieldGrid compact={compact}>
-                <FormField
+                {/* CHG-088: mismo selector de fecha estándar que el
+                    reporte de persona (mini agenda CHG-073). */}
+                <DatePickerField
                   label="Fecha de observación *"
-                  hint="AAAA-MM-DD"
+                  accessibilityLabel="Elegir fecha de observación"
+                  clearAccessibilityLabel="Borrar fecha de observación"
+                  testID="observed-date-calendar"
                   value={draft.observedDate}
-                  onChangeText={(value) => setField("observedDate", value)}
+                  onChange={(value) => setField("observedDate", value)}
                 />
-                <FormField
+                {/* CHG-089: selector de hora estándar (24 h, bloques
+                    de 15 minutos), sin texto libre. */}
+                <TimePickerField
                   label="Hora aproximada"
-                  hint="HH:MM"
+                  accessibilityLabel="Elegir hora de observación"
+                  clearAccessibilityLabel="Borrar hora de observación"
+                  testID="observed-time-picker"
                   value={draft.observedTime}
-                  onChangeText={(value) => setField("observedTime", value)}
+                  onChange={(value) => setField("observedTime", value)}
                 />
                 <FormField
                   label="ID del evento relacionado"
@@ -1282,11 +1292,19 @@ const styles = StyleSheet.create({
   },
   multiMarkActive: { color: colors.building },
   privateLabel: {
+    // CHG-087: márgenes propios — la separación no puede depender del
+    // `gap` de flexbox (no lo aplican navegadores/WebViews viejos y la
+    // cinta quedaba montada sobre el borde del campo anterior). Fondo
+    // sólido para que jamás se transparente sobre otro elemento.
+    marginTop: 14,
+    marginBottom: 2,
+    alignSelf: "stretch",
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderLeftWidth: 2,
     borderLeftColor: colors.deceased,
-    backgroundColor: "rgba(135,150,255,0.06)",
+    borderRadius: 4,
+    backgroundColor: "#10142a",
   },
   privateLabelText: {
     color: colors.deceased,
