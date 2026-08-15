@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
+import { ReportConsiderations } from "../reporting/ReportConsiderations";
 import { buildLastSeenQuery, parseDraftCoordinates } from "./geocoding";
 import { LastSeenLocationPicker } from "./LastSeenLocationPicker";
 import {
@@ -73,6 +74,9 @@ const initialDraft: MissingPersonReportDraft = {
 
 interface MissingPersonReportFormProps {
   onBack: () => void;
+  // CHG-053: accesos para reportar con cuenta desde la leyenda.
+  onRegister?: () => void;
+  onLogin?: () => void;
   pickPhotos?: () => Promise<SelectedPhoto[]>;
   submitReport?: (
     draft: MissingPersonReportDraft,
@@ -104,6 +108,8 @@ const defaultSubmitReport = submitMissingPersonReport;
 
 export function MissingPersonReportForm({
   onBack,
+  onRegister,
+  onLogin,
   pickPhotos = defaultPickPhotos,
   submitReport = defaultSubmitReport,
 }: MissingPersonReportFormProps) {
@@ -193,6 +199,17 @@ export function MissingPersonReportForm({
                 Completa la información que ayude a identificarla. El reporte será revisado antes de cualquier publicación y no reemplaza una denuncia ante las autoridades.
               </Text>
             </View>
+
+            <ReportConsiderations
+              considerations={[
+                "El equipo revisa cada reporte antes de cualquier publicación: nada se publica automáticamente al enviarlo.",
+                "Documento, información médica y datos de contacto del reportante son privados y se guardan cifrados; las fotografías no se publican sin revisión y autorización.",
+                "La información debe ser veraz y de buena fe. Este reporte no reemplaza la denuncia ante la Fiscalía o la Policía Nacional.",
+                "Describe con el mayor detalle posible la última vez que fue vista; evita direcciones residenciales exactas en los campos públicos.",
+              ]}
+              onRegister={onRegister}
+              onLogin={onLogin}
+            />
 
             <PrivacyNotice />
 

@@ -4,5 +4,11 @@ import { MissingPersonReportForm } from "../features/missing-persons/MissingPers
 export default function ReportMissingPersonRoute() {
   const router = useRouter();
 
-  return <MissingPersonReportForm onBack={() => router.back()} />;
+  return (
+    <MissingPersonReportForm
+      onBack={() => router.back()}
+      onRegister={() => router.push("/registrarse")}
+      onLogin={() => router.push("/iniciar-sesion")}
+    />
+  );
 }

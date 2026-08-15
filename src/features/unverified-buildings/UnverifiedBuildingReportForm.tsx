@@ -21,6 +21,7 @@ import {
 } from "../missing-persons/photoValidation";
 import type { SelectedPhoto } from "../missing-persons/reportTypes";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
+import { ReportConsiderations } from "../reporting/ReportConsiderations";
 import {
   createBuildingReportIdempotencyKey,
   submitUnverifiedBuildingReport,
@@ -124,6 +125,9 @@ const OBSERVED_CONDITIONS: Array<{
 
 interface UnverifiedBuildingReportFormProps {
   onBack: () => void;
+  // CHG-053: accesos para reportar con cuenta desde la leyenda.
+  onRegister?: () => void;
+  onLogin?: () => void;
   pickPhotos?: () => Promise<SelectedPhoto[]>;
   submitReport?: (
     draft: UnverifiedBuildingReportDraft,
@@ -149,6 +153,8 @@ const defaultPickPhotos = async (): Promise<SelectedPhoto[]> => {
 
 export function UnverifiedBuildingReportForm({
   onBack,
+  onRegister,
+  onLogin,
   pickPhotos = defaultPickPhotos,
   submitReport = submitUnverifiedBuildingReport,
 }: UnverifiedBuildingReportFormProps) {
@@ -273,6 +279,17 @@ export function UnverifiedBuildingReportForm({
                 si la estructura es segura.
               </Text>
             </View>
+
+            <ReportConsiderations
+              considerations={[
+                "Si hay una emergencia activa llama primero a la línea 123: este reporte no despacha equipos de rescate.",
+                "El equipo revisa cada reporte antes de que aparezca en el mapa; no confirma presencia de personas ni evalúa la seguridad estructural.",
+                "La dirección exacta, las coordenadas y tus datos de contacto son privados y se guardan cifrados; en el mapa solo se publica la zona aproximada.",
+                "Reporta únicamente lo que observaste directamente e incluye mínimo una fotografía del inmueble tomada desde un lugar seguro.",
+              ]}
+              onRegister={onRegister}
+              onLogin={onLogin}
+            />
 
             <SafetyNotice />
 
