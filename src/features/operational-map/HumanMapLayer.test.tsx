@@ -16,6 +16,12 @@ function overview(overrides: Partial<HumanMapOverview> = {}) {
     totalMatched: 1,
     totalMapped: 0,
     unmappedCount: 1,
+    unmappedStatusCounts: {
+      missing: 0,
+      reportedDeceased: 0,
+      confirmedAlive: 1,
+      confirmedDeceased: 0,
+    },
     returnedFeatures: 0,
     nextCursor: null,
     generatedAt: "2026-08-15T12:00:00Z",
@@ -62,4 +68,33 @@ it("sin registros sin ubicación no muestra el aviso", () => {
   renderLayer(overview({ totalMatched: 1, totalMapped: 1, unmappedCount: 0 }));
 
   expect(screen.queryByText(/no aparece en el mapa/i)).toBeNull();
+});
+
+/**
+ * CHG-099 — Los contadores de la capa deben cuadrar con las cifras de
+ * la portada: contaban solo lo dibujado, así que una persona sin
+ * ubicación aparecía como 0 en su estado mientras las cifras la
+ * contaban, y se leía como una contradicción.
+ */
+it("suma a quien no se puede ubicar en el contador de su estado", () => {
+  renderLayer(overview());
+
+  // La persona "confirmada viva" no tiene punto en el mapa, pero
+  // existe: su filtro debe contarla, igual que las cifras.
+  const aliveFilter = screen.getByLabelText(
+    /Filtrar capa humana por Confirmadas vivas/i,
+  );
+  const counts = screen
+    .getAllByText("1")
+    .filter((node) => node.parent !== null);
+  expect(aliveFilter).toBeTruthy();
+  expect(counts.length).toBeGreaterThan(0);
+});
+
+it("distingue el total del estado de lo que hay dibujado", () => {
+  renderLayer(overview());
+
+  // 1 persona en total, 0 dibujadas: ambas lecturas conviven sin
+  // contradecirse.
+  expect(screen.getByText(/0 PERSONAS EN MAPA/)).toBeTruthy();
 });

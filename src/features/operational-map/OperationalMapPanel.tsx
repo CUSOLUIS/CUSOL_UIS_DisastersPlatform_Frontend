@@ -389,14 +389,19 @@ function MapContent({
   );
 }
 
+// CHG-099: la capa contaba solo lo dibujado, así que "Confirmadas
+// vivas: 0" convivía con "CONFIRMADOS VIVOS: 1" en las cifras de la
+// portada y se leía como una contradicción. Ahora suma también a
+// quienes no se pueden ubicar, que es lo que miden esas cifras.
 function countHumanStatuses(
   features: HumanMapFeature[],
+  unmapped?: HumanMapStatusCounts,
 ): HumanMapStatusCounts {
   const counts: HumanMapStatusCounts = {
-    missing: 0,
-    reportedDeceased: 0,
-    confirmedAlive: 0,
-    confirmedDeceased: 0,
+    missing: unmapped?.missing ?? 0,
+    reportedDeceased: unmapped?.reportedDeceased ?? 0,
+    confirmedAlive: unmapped?.confirmedAlive ?? 0,
+    confirmedDeceased: unmapped?.confirmedDeceased ?? 0,
   };
   features.forEach((feature) => {
     if (feature.kind === "cluster") {
@@ -432,7 +437,10 @@ export function HumanMapControls({
   onToggleStatus: (status: HumanStatus) => void;
   selectedFeature: HumanMapFeature | null;
 }) {
-  const statusCounts = countHumanStatuses(data?.features ?? []);
+  const statusCounts = countHumanStatuses(
+    data?.features ?? [],
+    data?.unmappedStatusCounts,
+  );
   const status = !layerVisible
     ? "CAPA OCULTA"
     : activeStatuses.length === 0

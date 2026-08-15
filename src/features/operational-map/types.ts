@@ -134,6 +134,9 @@ export interface HumanMapOverview {
   totalMatched: number;
   totalMapped: number;
   unmappedCount: number;
+  // CHG-099: desglose por estado de quienes no se pueden dibujar; la
+  // capa lo suma para mostrar el total y coincidir con las cifras.
+  unmappedStatusCounts: HumanMapStatusCounts;
   returnedFeatures: number;
   nextCursor: string | null;
   generatedAt: string;

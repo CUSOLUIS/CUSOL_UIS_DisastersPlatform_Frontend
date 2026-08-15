@@ -118,6 +118,12 @@ export function getHumanMapDemoOverview(
     totalMatched: totalMapped,
     totalMapped,
     unmappedCount: 0,
+    unmappedStatusCounts: {
+      missing: 0,
+      reportedDeceased: 0,
+      confirmedAlive: 0,
+      confirmedDeceased: 0,
+    },
     returnedFeatures: clusters.length,
     nextCursor: null,
     generatedAt: "2026-08-13T21:24:46.000Z",

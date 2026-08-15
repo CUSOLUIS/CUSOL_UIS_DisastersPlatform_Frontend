@@ -28,6 +28,12 @@ function page(
     totalMatched: 3,
     totalMapped: 3,
     unmappedCount: 0,
+  unmappedStatusCounts: {
+    missing: 0,
+    reportedDeceased: 0,
+    confirmedAlive: 0,
+    confirmedDeceased: 0,
+    },
     returnedFeatures: 0,
     nextCursor: null,
     generatedAt: "2026-08-13T21:24:46Z",
