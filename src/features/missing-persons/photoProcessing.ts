@@ -81,6 +81,25 @@ export function photosWithinBudget(photos: SelectedPhoto[]): boolean {
   );
 }
 
+// Aviso previo al envío (CHG-071b, hallazgo del VPS): la persona debe
+// enterarse ANTES de enviar de que su selección supera el presupuesto y
+// será comprimida, en vez de descubrirlo con un 413 del borde.
+export function totalSizeNotice(photos: SelectedPhoto[]): string | null {
+  if (photos.length === 0 || photosWithinBudget(photos)) return null;
+  const total = totalBytes(photos);
+  if (total > MAX_TOTAL_PHOTO_BYTES) {
+    const totalMb = Math.round(total / (1024 * 1024));
+    return (
+      `Tus fotos suman ${totalMb} MB y el máximo es 50 MB: se ` +
+      "comprimirán automáticamente al enviar el reporte."
+    );
+  }
+  return (
+    "Alguna foto supera los 10 MiB: se comprimirá automáticamente al " +
+    "enviar el reporte."
+  );
+}
+
 export interface PreparedPhotos {
   photos: SelectedPhoto[];
   compressed: boolean;

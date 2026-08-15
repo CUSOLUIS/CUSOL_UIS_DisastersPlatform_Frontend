@@ -8,6 +8,7 @@ import {
   MAX_SINGLE_PHOTO_BYTES,
   MAX_TOTAL_PHOTO_BYTES,
   preparePhotosForUpload,
+  totalSizeNotice,
   type PhotoCompressor,
 } from "./photoProcessing";
 import type { SelectedPhoto } from "./reportTypes";
@@ -68,6 +69,18 @@ it("comprime TODAS las imágenes cuando la suma excede los 50 MB", async () => {
   expect(
     prepared.photos.every((item) => (item.size ?? 0) <= MAX_SINGLE_PHOTO_BYTES),
   ).toBe(true);
+});
+
+// CHG-071b (hallazgo del VPS): el aviso de suma total aparece ANTES de
+// enviar, en vez de un 413 confuso del borde.
+it("avisa antes de enviar cuando la selección supera el presupuesto", () => {
+  expect(totalSizeNotice([photo("a.jpg", 8), photo("b.jpg", 9)])).toBeNull();
+  expect(
+    totalSizeNotice([photo("a.jpg", 30), photo("b.jpg", 25)]),
+  ).toMatch(/suman 55 MB y el máximo es 50 MB/);
+  expect(totalSizeNotice([photo("grande.jpg", 12)])).toMatch(
+    /supera los 10 MiB/,
+  );
 });
 
 it("intenta pasos más agresivos y rechaza si ni así cabe", async () => {

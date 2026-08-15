@@ -18,7 +18,10 @@ import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { ReportConsiderations } from "../reporting/ReportConsiderations";
 import { buildLastSeenQuery, parseDraftCoordinates } from "./geocoding";
 import { LastSeenLocationPicker } from "./LastSeenLocationPicker";
-import { preparePhotosForUpload } from "./photoProcessing";
+import {
+  preparePhotosForUpload,
+  totalSizeNotice,
+} from "./photoProcessing";
 import {
   ALLOWED_PHOTO_HELP,
   ALLOWED_PHOTO_MIME_TYPES,
@@ -301,6 +304,11 @@ export function MissingPersonReportForm({
                 {selectingPhotos ? <ActivityIndicator color={colors.cyan} /> : <Text style={styles.photoButtonText}>+ SELECCIONAR FOTOGRAFÍAS</Text>}
               </Pressable>
               {photoErrors.map((error) => <Text key={error} style={styles.errorText} accessibilityRole="alert">{error}</Text>)}
+              {totalSizeNotice(photos) && (
+                <Text style={styles.photoRulesText} accessibilityRole="alert" testID="photo-total-notice">
+                  {totalSizeNotice(photos)}
+                </Text>
+              )}
               <View style={styles.photoList}>
                 {photos.map((photo, index) => (
                   <View key={`${photo.uri}-${index}`} style={styles.photoItem} testID={`selected-photo-${index}`}>

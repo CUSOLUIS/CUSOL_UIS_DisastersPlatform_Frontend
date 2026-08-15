@@ -19,7 +19,10 @@ import {
   MAX_PHOTO_COUNT,
   validateAndMergePhotos,
 } from "../missing-persons/photoValidation";
-import { preparePhotosForUpload } from "../missing-persons/photoProcessing";
+import {
+  preparePhotosForUpload,
+  totalSizeNotice,
+} from "../missing-persons/photoProcessing";
 import type { SelectedPhoto } from "../missing-persons/reportTypes";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { ReportConsiderations } from "../reporting/ReportConsiderations";
@@ -539,6 +542,15 @@ export function UnverifiedBuildingReportForm({
                   {error}
                 </Text>
               ))}
+              {totalSizeNotice(photos) && (
+                <Text
+                  accessibilityRole="alert"
+                  style={styles.photoRules}
+                  testID="photo-total-notice"
+                >
+                  {totalSizeNotice(photos)}
+                </Text>
+              )}
               <View style={styles.photoList}>
                 {photos.map((photo, index) => (
                   <View
