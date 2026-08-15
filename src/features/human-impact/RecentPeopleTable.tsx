@@ -170,7 +170,7 @@ export function RecentPeopleTable({
             style={[styles.title, viewportSized && styles.titleViewport]}
             accessibilityRole="header"
           >
-            Personas agregadas
+            Transmisión de registros en vivo
           </Text>
           <Text style={[styles.description, viewportSized && styles.descriptionViewport]}>
             Consulta paginada de todas las personas publicables, ordenadas por incorporación.
