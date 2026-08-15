@@ -34,6 +34,9 @@ export function OperationalMapCanvas(props: OperationalMapCanvasProps) {
       mapRef.current?.panBy(-deltaX, -deltaY),
     onZoomBy: changeZoom,
     dragButtons: [2],
+    // Google Maps procesa su propio pellizco en modo greedy. El controlador
+    // exterior solo agrega mouse derecho para evitar un zoom táctil duplicado.
+    touchGestures: false,
   });
 
   useEffect(() => {

@@ -52,6 +52,8 @@ interface HumanImpactDashboardProps {
   onReportUnverifiedBuilding: () => void;
   onRegisterCollectionCenter: () => void;
   onRegisterDonationPoint: () => void;
+  onOfferCommunityMeals: () => void;
+  onOfferTemporaryShelter: () => void;
   onLogin: () => void;
   onRegister: () => void;
   onAbout: () => void;
@@ -150,6 +152,8 @@ export function HumanImpactDashboard({
   onReportUnverifiedBuilding,
   onRegisterCollectionCenter,
   onRegisterDonationPoint,
+  onOfferCommunityMeals,
+  onOfferTemporaryShelter,
   onLogin,
   onRegister,
   onAbout,
@@ -280,6 +284,8 @@ export function HumanImpactDashboard({
                 onReportUnverifiedBuilding={onReportUnverifiedBuilding}
                 onRegisterCollectionCenter={onRegisterCollectionCenter}
                 onRegisterDonationPoint={onRegisterDonationPoint}
+                onOfferCommunityMeals={onOfferCommunityMeals}
+                onOfferTemporaryShelter={onOfferTemporaryShelter}
               />
 
               <ScrollContinuationCue onPress={showMap} />

@@ -39,6 +39,8 @@ interface AppProps {
   onReportUnverifiedBuilding?: () => void;
   onRegisterCollectionCenter?: () => void;
   onRegisterDonationPoint?: () => void;
+  onOfferCommunityMeals?: () => void;
+  onOfferTemporaryShelter?: () => void;
   onLogin?: () => void;
   onRegister?: () => void;
   onAbout?: () => void;
@@ -55,6 +57,8 @@ export function App({
   onReportUnverifiedBuilding = () => undefined,
   onRegisterCollectionCenter = () => undefined,
   onRegisterDonationPoint = () => undefined,
+  onOfferCommunityMeals = () => undefined,
+  onOfferTemporaryShelter = () => undefined,
   onLogin = () => undefined,
   onRegister = () => undefined,
   onAbout = () => undefined,
@@ -72,6 +76,8 @@ export function App({
         onReportUnverifiedBuilding={onReportUnverifiedBuilding}
         onRegisterCollectionCenter={onRegisterCollectionCenter}
         onRegisterDonationPoint={onRegisterDonationPoint}
+        onOfferCommunityMeals={onOfferCommunityMeals}
+        onOfferTemporaryShelter={onOfferTemporaryShelter}
         onLogin={onLogin}
         onRegister={onRegister}
         onAbout={onAbout}
@@ -91,6 +97,8 @@ function DashboardLoader({
   onReportUnverifiedBuilding,
   onRegisterCollectionCenter,
   onRegisterDonationPoint,
+  onOfferCommunityMeals,
+  onOfferTemporaryShelter,
   onLogin,
   onRegister,
   onAbout,
@@ -105,6 +113,8 @@ function DashboardLoader({
   onReportUnverifiedBuilding: () => void;
   onRegisterCollectionCenter: () => void;
   onRegisterDonationPoint: () => void;
+  onOfferCommunityMeals: () => void;
+  onOfferTemporaryShelter: () => void;
   onLogin: () => void;
   onRegister: () => void;
   onAbout: () => void;
@@ -188,6 +198,8 @@ function DashboardLoader({
       onReportUnverifiedBuilding={onReportUnverifiedBuilding}
       onRegisterCollectionCenter={onRegisterCollectionCenter}
       onRegisterDonationPoint={onRegisterDonationPoint}
+      onOfferCommunityMeals={onOfferCommunityMeals}
+      onOfferTemporaryShelter={onOfferTemporaryShelter}
       onLogin={onLogin}
       onRegister={onRegister}
       onAbout={onAbout}

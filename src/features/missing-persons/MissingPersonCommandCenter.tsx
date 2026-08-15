@@ -32,10 +32,12 @@ interface ReportActionsProps {
   onReportUnverifiedBuilding: () => void;
   onRegisterCollectionCenter: () => void;
   onRegisterDonationPoint: () => void;
+  onOfferCommunityMeals: () => void;
+  onOfferTemporaryShelter: () => void;
   compact: boolean;
 }
 
-type ReportActionColumns = 1 | 2 | 4;
+type ReportActionColumns = 1 | 2 | 3 | 6;
 
 const reportActionIconColor = "#174d59";
 
@@ -142,6 +144,8 @@ export function ReportActions({
   onReportUnverifiedBuilding,
   onRegisterCollectionCenter,
   onRegisterDonationPoint,
+  onOfferCommunityMeals,
+  onOfferTemporaryShelter,
 }: ReportActionsProps) {
   const { width } = useWindowDimensions();
   const columns = getReportActionColumns(width);
@@ -157,7 +161,7 @@ export function ReportActions({
         accessibilityLabel="Reportar persona perdida"
         code="PERSONA · REPORTE CIUDADANO"
         title="Reportar persona perdida"
-        description="Registra información y fotografías para iniciar su verificación."
+        description="Registra información y fotos para iniciar su verificación."
         meta="ABRIR REPORTE"
         icon={<PersonAlertIcon />}
         compact={compact}
@@ -170,7 +174,7 @@ export function ReportActions({
         accessibilityHint="Informa un edificio cuya búsqueda no ha terminado y donde aún no se puede descartar presencia humana"
         code="EDIFICIO · BÚSQUEDA PENDIENTE"
         title="Reportar edificio sin verificar"
-        description="No hay presencia confirmada, pero la búsqueda aún no permite descartarla."
+        description="Informa un edificio donde la búsqueda sigue pendiente."
         meta="ABRIR REPORTE"
         icon={<BuildingSearchIcon />}
         compact={compact}
@@ -183,7 +187,7 @@ export function ReportActions({
         accessibilityHint="Registra un lugar que recibe, clasifica y almacena ayudas y que deberá ser revisado antes de publicarse"
         code="AYUDA · RECEPCIÓN Y ALMACENAMIENTO"
         title="Inscribir centro de acopio"
-        description="Registra un lugar que recibe y administra alimentos, agua, instrumentos y otros insumos."
+        description="Registra un lugar que recibe y administra ayudas."
         meta="INICIAR REGISTRO"
         icon={<CollectionCenterIcon />}
         compact={compact}
@@ -196,12 +200,38 @@ export function ReportActions({
         accessibilityHint="Registra un punto comunitario de entrega que reúne ayudas para trasladarlas posteriormente"
         code="AYUDA · ENTREGA COMUNITARIA"
         title="Registrar punto de recolección"
-        description="Informa dónde entregar ayudas para reunirlas y trasladarlas después a la operación."
+        description="Informa un punto que reúne ayudas para su traslado."
         meta="INICIAR REGISTRO"
         icon={<DonationPointIcon />}
         compact={compact}
         columns={columns}
         onPress={onRegisterDonationPoint}
+      />
+      <ReportAction
+        testID="offer-community-meals-action"
+        accessibilityLabel="Ofrecer comida comunitaria"
+        accessibilityHint="Informa que preparas alimentos y deseas compartirlos con personas afectadas durante la emergencia"
+        code="AYUDA · ALIMENTACIÓN SOLIDARIA"
+        title="Ofrecer comida comunitaria"
+        description="Comparte alimentos preparados con personas afectadas."
+        meta="INICIAR OFERTA"
+        icon={<CommunityMealIcon />}
+        compact={compact}
+        columns={columns}
+        onPress={onOfferCommunityMeals}
+      />
+      <ReportAction
+        testID="offer-temporary-shelter-action"
+        accessibilityLabel="Ofrecer alojamiento temporal"
+        accessibilityHint="Informa que tienes un espacio disponible para que personas afectadas puedan dormir temporalmente"
+        code="AYUDA · ALOJAMIENTO SOLIDARIO"
+        title="Ofrecer alojamiento temporal"
+        description="Ofrece un espacio temporal donde personas afectadas puedan dormir."
+        meta="INICIAR OFERTA"
+        icon={<TemporaryShelterIcon />}
+        compact={compact}
+        columns={columns}
+        onPress={onOfferTemporaryShelter}
       />
     </View>
   );
@@ -216,11 +246,15 @@ export function getReportActionColumns(width: number): ReportActionColumns {
     return 1;
   }
 
-  if (width < 1280) {
+  if (width < 1080) {
     return 2;
   }
 
-  return 4;
+  if (width < 1280) {
+    return 3;
+  }
+
+  return 6;
 }
 
 function ReportAction({
@@ -248,7 +282,7 @@ function ReportAction({
   testID: string;
   title: string;
 }) {
-  const dense = columns === 4;
+  const dense = columns === 3 || columns === 6;
 
   return (
     <Pressable
@@ -259,7 +293,8 @@ function ReportAction({
       onPress={onPress}
       style={({ pressed }) => [
         styles.reportAction,
-        columns === 4 && styles.reportActionFourColumns,
+        columns === 6 && styles.reportActionSixColumns,
+        columns === 3 && styles.reportActionThreeColumns,
         columns === 2 && styles.reportActionTwoColumns,
         columns === 1 && styles.reportActionSingleColumn,
         pressed && styles.pressed,
@@ -288,7 +323,14 @@ function ReportAction({
           {icon}
         </View>
         <View style={[styles.reportActionCopy, dense && styles.reportActionCopyDense]}>
-          <Text style={styles.reportActionCode}>{code}</Text>
+          <Text
+            style={[
+              styles.reportActionCode,
+              dense && styles.reportActionCodeDense,
+            ]}
+          >
+            {code}
+          </Text>
           <Text
             style={[
               styles.reportActionTitle,
@@ -298,7 +340,14 @@ function ReportAction({
           >
             {title}
           </Text>
-          <Text style={styles.reportActionDescription}>{description}</Text>
+          <Text
+            style={[
+              styles.reportActionDescription,
+              dense && styles.reportActionDescriptionDense,
+            ]}
+          >
+            {description}
+          </Text>
         </View>
         <View style={[styles.reportActionEnd, dense && styles.reportActionEndDense]}>
           {!compact && !dense && <Text style={styles.reportActionMeta}>{meta}</Text>}
@@ -457,6 +506,43 @@ function DonationPointIcon() {
   );
 }
 
+function CommunityMealIcon() {
+  return (
+    <Svg width={36} height={36} viewBox="0 0 36 36">
+      <Path
+        d="M7 19h22c0 6.1-4.9 11-11 11S7 25.1 7 19ZM5 19h26M13 14c-2.2-2-1.6-4.2.2-6M20 14c-2.2-2-1.6-4.2.2-6M27 14c-2.2-2-1.6-4.2.2-6"
+        fill="none"
+        stroke={reportActionIconColor}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M11 30h14"
+        fill="none"
+        stroke={reportActionIconColor}
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+function TemporaryShelterIcon() {
+  return (
+    <Svg width={36} height={36} viewBox="0 0 36 36">
+      <Path
+        d="m4 17 14-11 14 11M7 15.5V31h22V15.5M11 26v-7h5.5c2 0 3.5 1.6 3.5 3.5V26M11 22.5h9M11 19v7M25 19v7M9 26h18"
+        fill="none"
+        stroke={reportActionIconColor}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 function SearchIcon() {
   return (
     <Svg width={20} height={20} viewBox="0 0 24 24">
@@ -523,11 +609,12 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderRadius: 16,
   },
-  reportActionFourColumns: { flexBasis: "23%" },
+  reportActionSixColumns: { flexBasis: "15%" },
+  reportActionThreeColumns: { flexBasis: "31%" },
   reportActionTwoColumns: { flexBasis: "48%" },
   reportActionSingleColumn: { width: "100%", flexBasis: "100%" },
   reportActionSurface: {
-    minHeight: 196,
+    minHeight: 180,
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
@@ -556,15 +643,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#1b7787",
   },
   reportActionDense: {
-    minHeight: 216,
+    minHeight: 188,
     flexDirection: "column",
     alignItems: "flex-start",
-    gap: 13,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+    gap: 7,
+    paddingHorizontal: 13,
+    paddingVertical: 12,
   },
   reportActionCompact: {
-    minHeight: 174,
+    minHeight: 160,
     gap: 14,
     paddingHorizontal: 17,
     paddingVertical: 20,
@@ -581,9 +668,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.48)",
   },
   reportActionIconDense: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
   },
   reportActionIconCompact: {
     width: 52,
@@ -592,7 +679,7 @@ const styles = StyleSheet.create({
   },
   reportActionArrow: {
     color: "#174d59",
-    fontSize: 34,
+    fontSize: 30,
     fontWeight: "300",
   },
   reportActionCopy: {
@@ -601,7 +688,7 @@ const styles = StyleSheet.create({
   },
   reportActionCopyDense: {
     width: "100%",
-    paddingRight: 16,
+    paddingRight: 10,
   },
   reportActionCode: {
     color: "#42616a",
@@ -609,6 +696,11 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "800",
     letterSpacing: 0.8,
+  },
+  reportActionCodeDense: {
+    fontSize: 7,
+    letterSpacing: 0.55,
+    lineHeight: 10,
   },
   reportActionTitle: {
     marginTop: 5,
@@ -624,9 +716,10 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   reportActionTitleDense: {
-    fontSize: 21,
-    letterSpacing: -0.6,
-    lineHeight: 24,
+    marginTop: 4,
+    fontSize: 17,
+    letterSpacing: -0.4,
+    lineHeight: 19,
   },
   reportActionDescription: {
     maxWidth: 460,
@@ -634,6 +727,11 @@ const styles = StyleSheet.create({
     color: "#40545f",
     fontSize: 12,
     lineHeight: 18,
+  },
+  reportActionDescriptionDense: {
+    marginTop: 6,
+    fontSize: 10,
+    lineHeight: 14,
   },
   reportActionEnd: {
     flexShrink: 0,
@@ -643,8 +741,8 @@ const styles = StyleSheet.create({
   },
   reportActionEndDense: {
     position: "absolute",
-    top: 18,
-    right: 18,
+    top: 12,
+    right: 12,
     alignSelf: "auto",
   },
   reportActionMeta: {

@@ -234,11 +234,13 @@ describe("App universal", () => {
     expect(onAbout).toHaveBeenCalledTimes(1);
   });
 
-  it("prioriza situación, muestra la búsqueda y debajo las cuatro acciones", async () => {
+  it("prioriza situación, muestra la búsqueda y debajo las seis acciones", async () => {
     const onReportPerson = jest.fn();
     const onReportBuilding = jest.fn();
     const onRegisterCenter = jest.fn();
     const onRegisterPoint = jest.fn();
+    const onOfferMeals = jest.fn();
+    const onOfferShelter = jest.fn();
     render(
       <App
         dataSource={demoDataSource}
@@ -246,6 +248,8 @@ describe("App universal", () => {
         onReportUnverifiedBuilding={onReportBuilding}
         onRegisterCollectionCenter={onRegisterCenter}
         onRegisterDonationPoint={onRegisterPoint}
+        onOfferCommunityMeals={onOfferMeals}
+        onOfferTemporaryShelter={onOfferShelter}
       />,
     );
 
@@ -318,8 +322,11 @@ describe("App universal", () => {
     ).toBe(0);
     expect(shouldStackReportActions(620)).toBe(false);
     expect(shouldStackReportActions(619)).toBe(true);
-    expect(getReportActionColumns(1380)).toBe(4);
-    expect(getReportActionColumns(1279)).toBe(2);
+    expect(getReportActionColumns(1380)).toBe(6);
+    expect(getReportActionColumns(1280)).toBe(6);
+    expect(getReportActionColumns(1279)).toBe(3);
+    expect(getReportActionColumns(1080)).toBe(3);
+    expect(getReportActionColumns(1079)).toBe(2);
     expect(getReportActionColumns(900)).toBe(2);
     expect(getReportActionColumns(619)).toBe(1);
 
@@ -334,6 +341,8 @@ describe("App universal", () => {
       "report-unverified-building-action",
       "register-collection-center-action",
       "register-donation-point-action",
+      "offer-community-meals-action",
+      "offer-temporary-shelter-action",
     ]);
 
     const reportButton = await screen.findByRole("button", {
@@ -348,18 +357,29 @@ describe("App universal", () => {
     const donationPointButton = screen.getByRole("button", {
       name: "Registrar punto de recolección",
     });
+    const communityMealsButton = screen.getByRole("button", {
+      name: "Ofrecer comida comunitaria",
+    });
+    const temporaryShelterButton = screen.getByRole("button", {
+      name: "Ofrecer alojamiento temporal",
+    });
     const actionTestIds = [
       "report-missing-person-action",
       "report-unverified-building-action",
       "register-collection-center-action",
       "register-donation-point-action",
+      "offer-community-meals-action",
+      "offer-temporary-shelter-action",
     ];
     const reportSurfaceStyles = actionTestIds.map((testID) =>
       StyleSheet.flatten(screen.getByTestId(`${testID}-surface`).props.style),
     );
     const reportSurfaceStyle = reportSurfaceStyles[0];
-    expect(reportSurfaceStyle.minHeight).toBeGreaterThanOrEqual(174);
+    expect(reportSurfaceStyle.minHeight).toBeGreaterThanOrEqual(160);
+    expect(reportSurfaceStyle.minHeight).toBeLessThan(196);
     expect(reportSurfaceStyles.map(({ backgroundColor }) => backgroundColor)).toEqual([
+      "#e3e9e8",
+      "#e3e9e8",
       "#e3e9e8",
       "#e3e9e8",
       "#e3e9e8",
@@ -384,11 +404,19 @@ describe("App universal", () => {
     expect(buildingButton.props.accessibilityHint).toMatch(/no se puede descartar presencia humana/i);
     expect(centerButton.props.accessibilityHint).toMatch(/recibe, clasifica y almacena ayudas/i);
     expect(donationPointButton.props.accessibilityHint).toMatch(/entrega que reúne ayudas/i);
+    expect(communityMealsButton.props.accessibilityHint).toMatch(/preparas alimentos/i);
+    expect(temporaryShelterButton.props.accessibilityHint).toMatch(/espacio disponible/i);
     expect(
-      screen.getByText(/recibe y administra alimentos, agua, instrumentos/i),
+      screen.getByText(/recibe y administra ayudas/i),
     ).toBeTruthy();
     expect(
-      screen.getByText(/dónde entregar ayudas para reunirlas y trasladarlas/i),
+      screen.getByText(/punto que reúne ayudas para su traslado/i),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/alimentos preparados con personas afectadas/i),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/espacio temporal donde personas afectadas puedan dormir/i),
     ).toBeTruthy();
     const showMoreButton = screen.getByRole("button", {
       name: "Ver más contenido",
@@ -404,10 +432,14 @@ describe("App universal", () => {
     fireEvent.press(buildingButton);
     fireEvent.press(centerButton);
     fireEvent.press(donationPointButton);
+    fireEvent.press(communityMealsButton);
+    fireEvent.press(temporaryShelterButton);
     expect(onReportPerson).toHaveBeenCalledTimes(1);
     expect(onReportBuilding).toHaveBeenCalledTimes(1);
     expect(onRegisterCenter).toHaveBeenCalledTimes(1);
     expect(onRegisterPoint).toHaveBeenCalledTimes(1);
+    expect(onOfferMeals).toHaveBeenCalledTimes(1);
+    expect(onOfferShelter).toHaveBeenCalledTimes(1);
   });
 
   it("busca por cualquier atributo público sin depender de tildes", async () => {
