@@ -25,6 +25,19 @@ const completeDraft: MissingPersonReportDraft = {
   eyeDescription: "",
   distinctiveMarks: "",
   medicalInformation: "",
+  // CHG-094: campos ampliados; con espacios alrededor para comprobar
+  // el recorte, y algunos vacíos para comprobar que no viajan.
+  tattooDescription: "  Tatuaje de ancla en el antebrazo  ",
+  scarsDescription: "",
+  prostheticsDescription: "  Prótesis auditiva derecha  ",
+  piercingsAndMoles: "",
+  mentalHealthCondition: "  Alzheimer inicial  ",
+  vitalMedication: "  Insulina cada 8 horas  ",
+  severeAllergies: "",
+  belongingsDescription: "  Mochila azul con portátil  ",
+  transportMode: "private_vehicle",
+  vehicleDetails: "  Placa ABC123, Renault gris  ",
+  companionsDescription: "",
   lastSeenDate: "2026-08-10",
   lastSeenTime: "",
   department: "Santander",
@@ -40,6 +53,9 @@ const completeDraft: MissingPersonReportDraft = {
   reporterPhone: "+57 3001234567",
   reporterEmail: "",
   officialReportNumber: "",
+  officialAuthorityName: "  Fiscalía General de la Nación  ",
+  isReporterPhonePublic: true,
+  isReporterEmailPublic: false,
   truthConfirmed: true,
   photoAuthorizationConfirmed: true,
 };
@@ -176,5 +192,65 @@ describe("Clave de idempotencia", () => {
     expect(key.length).toBeGreaterThanOrEqual(16);
     expect(key.length).toBeLessThanOrEqual(128);
     expect(createIdempotencyKey()).not.toBe(key);
+  });
+});
+
+/**
+ * CHG-094 — Campos ampliados: se recortan, los vacíos no viajan y el
+ * consentimiento de contacto viaja siempre explícito.
+ */
+describe("campos ampliados del reporte (CHG-094)", () => {
+  it("recorta los campos nuevos y omite los vacíos", () => {
+    const payload = buildReportPayload(completeDraft);
+
+    expect(payload.tattooDescription).toBe(
+      "Tatuaje de ancla en el antebrazo",
+    );
+    expect(payload.prostheticsDescription).toBe(
+      "Prótesis auditiva derecha",
+    );
+    expect(payload.mentalHealthCondition).toBe("Alzheimer inicial");
+    expect(payload.vitalMedication).toBe("Insulina cada 8 horas");
+    expect(payload.belongingsDescription).toBe(
+      "Mochila azul con portátil",
+    );
+    expect(payload.transportMode).toBe("private_vehicle");
+    expect(payload.vehicleDetails).toBe("Placa ABC123, Renault gris");
+    expect(payload.officialAuthorityName).toBe(
+      "Fiscalía General de la Nación",
+    );
+
+    // Vacíos: no viajan.
+    expect(payload).not.toHaveProperty("scarsDescription");
+    expect(payload).not.toHaveProperty("piercingsAndMoles");
+    expect(payload).not.toHaveProperty("severeAllergies");
+    expect(payload).not.toHaveProperty("companionsDescription");
+  });
+
+  it("envía el consentimiento de contacto siempre, también en falso", () => {
+    const payload = buildReportPayload(completeDraft);
+
+    expect(payload.isReporterPhonePublic).toBe(true);
+    expect(payload.isReporterEmailPublic).toBe(false);
+  });
+
+  it("alinea las categorías de foto por posición y completa las no declaradas", () => {
+    const payload = buildReportPayload(completeDraft, [
+      { ...photo, category: "recent_face" },
+      { ...photo, name: "cuerpo.jpg" },
+      { ...photo, name: "marca.jpg", category: "distinctive_mark" },
+    ]);
+
+    expect(payload.photoCategories).toEqual([
+      "recent_face",
+      "other",
+      "distinctive_mark",
+    ]);
+  });
+
+  it("omite photoCategories si ninguna foto declara categoría", () => {
+    const payload = buildReportPayload(completeDraft, [photo]);
+
+    expect(payload).not.toHaveProperty("photoCategories");
   });
 });

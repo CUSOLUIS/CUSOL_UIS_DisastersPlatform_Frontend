@@ -54,6 +54,7 @@ import type {
   MissingPersonReportDraft,
   MissingPersonReportReceipt,
   SelectedPhoto,
+  TransportMode,
 } from "./reportTypes";
 
 const initialDraft: MissingPersonReportDraft = {
@@ -73,6 +74,17 @@ const initialDraft: MissingPersonReportDraft = {
   eyeDescription: "",
   distinctiveMarks: "",
   medicalInformation: "",
+  tattooDescription: "",
+  scarsDescription: "",
+  prostheticsDescription: "",
+  piercingsAndMoles: "",
+  mentalHealthCondition: "",
+  vitalMedication: "",
+  severeAllergies: "",
+  belongingsDescription: "",
+  transportMode: "",
+  vehicleDetails: "",
+  companionsDescription: "",
   lastSeenDate: "",
   lastSeenTime: "",
   department: "",
@@ -88,6 +100,9 @@ const initialDraft: MissingPersonReportDraft = {
   reporterPhone: "",
   reporterEmail: "",
   officialReportNumber: "",
+  officialAuthorityName: "",
+  isReporterPhonePublic: false,
+  isReporterEmailPublic: false,
   truthConfirmed: false,
   photoAuthorizationConfirmed: false,
 };
@@ -372,6 +387,25 @@ export function MissingPersonReportForm({
               />
               <FormField label="Vestimenta *" invalid={invalidFields.has("clothingDescription")} multiline value={draft.clothingDescription} onChangeText={(value) => setField("clothingDescription", value)} />
               <FormField label="Circunstancias de la desaparición *" invalid={invalidFields.has("circumstances")} multiline value={draft.circumstances} onChangeText={(value) => setField("circumstances", value)} />
+              {/* CHG-094: contexto del desplazamiento — qué llevaba,
+                  cómo se movilizaba y con quién. */}
+              <FormField label="Pertenencias que llevaba" hint="Mochila, dispositivos, joyas, documentos…" multiline value={draft.belongingsDescription} onChangeText={(value) => setField("belongingsDescription", value)} />
+              <TransportModeField
+                value={draft.transportMode}
+                onChange={(value) => {
+                  setField("transportMode", value);
+                  // Los datos del vehículo solo aplican con vehículo:
+                  // cambiar el medio limpia lo que dejaría de valer.
+                  if (value !== "private_vehicle" && value !== "other") {
+                    setField("vehicleDetails", "");
+                  }
+                }}
+              />
+              {(draft.transportMode === "private_vehicle" ||
+                draft.transportMode === "other") && (
+                <FormField label="Datos del vehículo · privado" hint="Placa, marca, modelo, color" value={draft.vehicleDetails} onChangeText={(value) => setField("vehicleDetails", value)} />
+              )}
+              <FormField label="Acompañantes" hint="Personas o grupos con los que se le vio por última vez" multiline value={draft.companionsDescription} onChangeText={(value) => setField("companionsDescription", value)} />
             </FormSection>
 
             <FormSection code="03" title="Características físicas" description="Agrega detalles visuales que permitan reconocer a la persona." onPosition={registerSection}>
@@ -383,9 +417,22 @@ export function MissingPersonReportForm({
                 <FormField label="Ojos" value={draft.eyeDescription} onChangeText={(value) => setField("eyeDescription", value)} />
               </FieldGrid>
               <FormField label="Señales particulares" multiline value={draft.distinctiveMarks} onChangeText={(value) => setField("distinctiveMarks", value)} />
+              {/* CHG-094: marcas desglosadas — describir por separado
+                  ayuda a reconocer más rápido que un solo párrafo. */}
+              <FieldGrid compact={compact}>
+                <FormField label="Tatuajes" hint="Ubicación y diseño" multiline value={draft.tattooDescription} onChangeText={(value) => setField("tattooDescription", value)} />
+                <FormField label="Cicatrices" multiline value={draft.scarsDescription} onChangeText={(value) => setField("scarsDescription", value)} />
+                <FormField label="Prótesis u órtesis" multiline value={draft.prostheticsDescription} onChangeText={(value) => setField("prostheticsDescription", value)} />
+                <FormField label="Perforaciones, aretes y lunares" multiline value={draft.piercingsAndMoles} onChangeText={(value) => setField("piercingsAndMoles", value)} />
+              </FieldGrid>
               <FormField label="Descripción adicional" multiline value={draft.additionalDescription} onChangeText={(value) => setField("additionalDescription", value)} />
               <PrivateFieldsLabel />
               <FormField label="Información médica relevante · privada" multiline value={draft.medicalInformation} onChangeText={(value) => setField("medicalInformation", value)} />
+              {/* CHG-094: alertas médicas — el backend las guarda
+                  cifradas, como el resto de la información de salud. */}
+              <FormField label="Condición cognitiva o de salud mental · privada" hint="Desorientación, Alzheimer, autismo…" multiline value={draft.mentalHealthCondition} onChangeText={(value) => setField("mentalHealthCondition", value)} />
+              <FormField label="Medicación de dependencia vital · privada" multiline value={draft.vitalMedication} onChangeText={(value) => setField("vitalMedication", value)} />
+              <FormField label="Alergias graves · privada" multiline value={draft.severeAllergies} onChangeText={(value) => setField("severeAllergies", value)} />
             </FormSection>
 
             <FormSection code="04" title="Datos del reportante" description="Esta información es privada y se usa únicamente para verificar el reporte." onPosition={registerSection}>
@@ -395,8 +442,22 @@ export function MissingPersonReportForm({
                 <FormField label="Teléfono privado" invalid={invalidFields.has("reporterPhone")} value={draft.reporterPhone} onChangeText={(value) => setField("reporterPhone", value)} keyboardType="phone-pad" autoComplete="tel" />
                 <FormField label="Correo privado" invalid={invalidFields.has("reporterEmail")} value={draft.reporterEmail} onChangeText={(value) => setField("reporterEmail", value)} keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
                 <FormField label="Número de denuncia o radicado" value={draft.officialReportNumber} onChangeText={(value) => setField("officialReportNumber", value)} />
+                <FormField label="Autoridad donde se denunció" hint="Fiscalía, Policía, Gaula…" value={draft.officialAuthorityName} onChangeText={(value) => setField("officialAuthorityName", value)} />
               </FieldGrid>
               <Text style={styles.fieldHint}>Debes ingresar al menos teléfono o correo.</Text>
+              {/* CHG-094: el texto describe lo que realmente ocurre —
+                  el equipo de revisión puede compartir el dato con
+                  quien aporte información; no se publica en la ficha. */}
+              <ConsentCheckbox
+                checked={draft.isReporterPhonePublic}
+                label="Autorizo compartir mi teléfono con quien aporte información sobre el caso"
+                onPress={() => setField("isReporterPhonePublic", !draft.isReporterPhonePublic)}
+              />
+              <ConsentCheckbox
+                checked={draft.isReporterEmailPublic}
+                label="Autorizo compartir mi correo con quien aporte información sobre el caso"
+                onPress={() => setField("isReporterEmailPublic", !draft.isReporterEmailPublic)}
+              />
             </FormSection>
 
             <FormSection code="05" title="Fotografías" description="Adjunta imágenes recientes y claras de la persona." onPosition={registerSection}>
@@ -561,8 +622,15 @@ const FIELD_SECTIONS: Record<string, string> = {
   heightCm: "03", build: "03", skinTone: "03", hairDescription: "03",
   eyeDescription: "03", distinctiveMarks: "03",
   additionalDescription: "03", medicalInformation: "03",
+  tattooDescription: "03", scarsDescription: "03",
+  prostheticsDescription: "03", piercingsAndMoles: "03",
+  mentalHealthCondition: "03", vitalMedication: "03",
+  severeAllergies: "03",
+  belongingsDescription: "02", transportMode: "02",
+  vehicleDetails: "02", companionsDescription: "02",
   reporterName: "04", reporterRelationship: "04", reporterPhone: "04",
   reporterEmail: "04", officialReportNumber: "04",
+  officialAuthorityName: "04",
   photos: "05",
   confirmations: "06", truthConfirmed: "06",
   photoAuthorizationConfirmed: "06",
@@ -627,6 +695,51 @@ function FormField({ label, hint, multiline = false, invalid = false, ...inputPr
 
 // CHG-073 — Campos de lista cerrada y mini agenda de fecha: nada de
 // texto libre en sexo, nacionalidad, tipo de documento ni nacimiento.
+
+// CHG-094 — Medio de transporte: lista cerrada con etiqueta legible y
+// valor del contrato.
+const TRANSPORT_MODES: Array<{ value: TransportMode; label: string }> = [
+  { value: "on_foot", label: "A pie" },
+  { value: "bicycle", label: "Bicicleta" },
+  { value: "public_transport", label: "Transporte público" },
+  { value: "private_vehicle", label: "Vehículo particular" },
+  { value: "other", label: "Otro" },
+];
+
+function TransportModeField({
+  value,
+  onChange,
+}: {
+  value: TransportMode | "";
+  onChange: (value: TransportMode | "") => void;
+}) {
+  return (
+    <View style={styles.field}>
+      <View style={styles.fieldLabelRow}>
+        <Text style={styles.fieldLabel}>Medio de transporte</Text>
+      </View>
+      <View style={styles.choiceRow}>
+        {TRANSPORT_MODES.map((option) => {
+          const selected = value === option.value;
+          return (
+            <Pressable
+              key={option.value}
+              accessibilityRole="button"
+              accessibilityLabel={`Medio de transporte: ${option.label}`}
+              accessibilityState={{ selected }}
+              onPress={() => onChange(selected ? "" : option.value)}
+              style={[styles.choiceChip, selected && styles.choiceChipActive]}
+            >
+              <Text style={[styles.choiceChipText, selected && styles.choiceChipTextActive]}>
+                {option.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
 
 function ChoiceChipsField({
   label,

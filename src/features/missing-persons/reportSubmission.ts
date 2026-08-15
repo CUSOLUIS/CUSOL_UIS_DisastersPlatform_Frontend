@@ -15,7 +15,7 @@ const apiBaseUrl =
 
 export type MissingPersonReportPayload = Record<
   string,
-  string | number | boolean
+  string | number | boolean | string[]
 >;
 
 const OPTIONAL_TEXT_FIELDS = [
@@ -36,10 +36,27 @@ const OPTIONAL_TEXT_FIELDS = [
   "reporterPhone",
   "reporterEmail",
   "officialReportNumber",
+  // CHG-094 — Identificación física detallada.
+  "tattooDescription",
+  "scarsDescription",
+  "prostheticsDescription",
+  "piercingsAndMoles",
+  // CHG-094 — Alertas médicas.
+  "mentalHealthCondition",
+  "vitalMedication",
+  "severeAllergies",
+  // CHG-094 — Contexto del desplazamiento.
+  "belongingsDescription",
+  "transportMode",
+  "vehicleDetails",
+  "companionsDescription",
+  // CHG-094 — Estado institucional.
+  "officialAuthorityName",
 ] as const;
 
 export function buildReportPayload(
   draft: MissingPersonReportDraft,
+  photos: SelectedPhoto[] = [],
 ): MissingPersonReportPayload {
   const payload: MissingPersonReportPayload = {
     firstNames: draft.firstNames.trim(),
@@ -54,6 +71,10 @@ export function buildReportPayload(
     reporterRelationship: draft.reporterRelationship.trim(),
     truthConfirmed: draft.truthConfirmed,
     photoAuthorizationConfirmed: draft.photoAuthorizationConfirmed,
+    // CHG-094: el consentimiento viaja siempre explícito, también en
+    // falso — su ausencia no debe confundirse con una negativa.
+    isReporterPhonePublic: draft.isReporterPhonePublic,
+    isReporterEmailPublic: draft.isReporterEmailPublic,
   };
 
   OPTIONAL_TEXT_FIELDS.forEach((field) => {
@@ -71,6 +92,15 @@ export function buildReportPayload(
   const heightCm = Number.parseInt(draft.heightCm.trim(), 10);
   if (Number.isFinite(heightCm)) {
     payload.heightCm = heightCm;
+  }
+
+  // CHG-094: el backend exige una categoría por foto, así que el
+  // arreglo solo viaja si alguna se declaró, y entonces completo:
+  // las no declaradas caen en "other" para no desalinear posiciones.
+  if (photos.some((photo) => photo.category)) {
+    payload.photoCategories = photos.map(
+      (photo) => photo.category ?? "other",
+    );
   }
 
   const latitude = Number.parseFloat(draft.lastSeenLatitude.trim());
@@ -156,7 +186,9 @@ export async function submitMissingPersonReport(
     );
   }
 
-  const serializedPayload = JSON.stringify(buildReportPayload(draft));
+  const serializedPayload = JSON.stringify(
+    buildReportPayload(draft, photos),
+  );
   const body = new FormData();
   if (Platform.OS === "web") {
     body.append(
