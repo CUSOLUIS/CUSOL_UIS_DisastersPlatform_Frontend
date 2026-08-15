@@ -44,7 +44,7 @@ async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
     },
   });
   if (!response.ok) {
-    let detail: string | null = null;
+    let detail: string | null;
     try {
       const body = (await response.json()) as { detail?: unknown };
       detail = typeof body.detail === "string" ? body.detail : null;
