@@ -381,6 +381,26 @@ describe("reintento ante una caída del backend (CHG-101)", () => {
     );
   });
 
+  // CHG-117 — El proxy cortaba las fotos en 1 MiB (su valor por
+  // defecto) y el cliente traducía ese 413 a "máximo 10 MiB por foto":
+  // quien reportaba leía que su foto de 2 MiB era demasiado grande.
+  it("ante un 413 no culpa a quien reporta de pasarse del límite", async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue(jsonResponse({}, 413)) as unknown as typeof fetch;
+
+    const error = await submitMissingPersonReport(completeDraft, [photo], {
+      requestBaseUrl: "http://api.test",
+      idempotencyKey: "clave-idempotente-0005",
+      wait: async () => undefined,
+    }).catch((rejection: unknown) => rejection);
+
+    expect((error as Error).message).toBe(
+      "El servidor rechazó el envío por su tamaño. Intenta con menos fotografías o más livianas.",
+    );
+    expect((error as Error).message).not.toContain("10 MiB");
+  });
+
   it("un rechazo sin claves no inventa ninguna", async () => {
     global.fetch = jest
       .fn()

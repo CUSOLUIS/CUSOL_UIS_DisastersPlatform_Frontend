@@ -114,7 +114,12 @@ export function createBuildingReportIdempotencyKey(): string {
 }
 
 const ERROR_MESSAGES_BY_STATUS: Record<number, string> = {
-  413: "Las fotografías superan el tamaño permitido: máximo 10 MiB por foto y 50 MiB en total.",
+  // CHG-117: el cliente ya comprime y acota las fotos antes de
+  // enviarlas, así que un 413 no significa que quien reporta se
+  // haya pasado del límite: significa que algo del lado del
+  // servidor cortó el envío. El aviso dejaba de decir la verdad
+  // —el proxy cortaba en 1 MiB y el texto hablaba de 10—.
+  413: "El servidor rechazó el envío por su tamaño. Intenta con menos fotografías o más livianas.",
   415: "Alguna fotografía tiene un formato no permitido. Usa JPEG, PNG, WebP o HEIC.",
   422: "La API rechazó el reporte por datos inválidos. Revisa los campos e intenta de nuevo.",
   429: "Se recibieron demasiados reportes seguidos. Espera un momento e intenta de nuevo.",
