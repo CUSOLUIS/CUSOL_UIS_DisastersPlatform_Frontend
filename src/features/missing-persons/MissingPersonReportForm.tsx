@@ -1,4 +1,5 @@
 import * as DocumentPicker from "expo-document-picker";
+import { fieldGridLayout } from "../../components/fieldGrid";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -381,7 +382,7 @@ export function MissingPersonReportForm({
             <PrivacyNotice />
 
             <FormSection code="01" title="Datos de la persona" description="Identificación básica. Los campos marcados con * son obligatorios." onPosition={registerSection}>
-              <FieldGrid compact={compact}>
+              <FieldGrid>
                 <FormField label="Nombres *" invalid={invalidFields.has("firstNames")} value={draft.firstNames} onChangeText={(value) => setField("firstNames", value)} autoComplete="name-given" />
                 <FormField label="Apellidos *" invalid={invalidFields.has("lastNames")} value={draft.lastNames} onChangeText={(value) => setField("lastNames", value)} autoComplete="name-family" />
                 {duplicateSuggestions.status === "ready" && (
@@ -403,14 +404,14 @@ export function MissingPersonReportForm({
                 <SelectListField label="Nacionalidad" options={NATIONALITY_OPTIONS} value={draft.nationality} onChange={(value) => setField("nationality", value)} searchable searchPlaceholder="Busca tu nacionalidad" />
               </FieldGrid>
               <PrivateFieldsLabel />
-              <FieldGrid compact={compact}>
+              <FieldGrid>
                 <SelectListField label="Tipo de documento · privado" options={DOCUMENT_TYPE_OPTIONS} value={draft.documentType} onChange={(value) => setField("documentType", value)} />
                 <FormField label="Número de documento · privado" value={draft.documentNumber} onChangeText={(value) => setField("documentNumber", value)} />
               </FieldGrid>
             </FormSection>
 
             <FormSection code="02" title="Última vez que fue vista" description="Escribe la dirección o el lugar donde fue vista por última vez." onPosition={registerSection}>
-              <FieldGrid compact={compact}>
+              <FieldGrid>
                 <DatePickerField label="Fecha *" accessibilityLabel="Elegir fecha de la última visualización" testID="last-seen-date-calendar" minYear={PLATFORM_FIRST_YEAR} value={draft.lastSeenDate} onChange={(value) => setField("lastSeenDate", value)} invalid={invalidFields.has("lastSeenDate")} />
                 <TimePickerField label="Hora aproximada" accessibilityLabel="Elegir hora de la última visualización" clearAccessibilityLabel="Borrar hora" testID="last-seen-time-picker" value={draft.lastSeenTime} onChange={(value) => setField("lastSeenTime", value)} invalid={invalidFields.has("lastSeenTime")} />
                 <FormField label="Departamento *" invalid={invalidFields.has("department")} value={draft.department} onChangeText={(value) => setField("department", value)} />
@@ -467,7 +468,7 @@ export function MissingPersonReportForm({
             </FormSection>
 
             <FormSection code="03" title="Características físicas" description="Agrega detalles visuales que permitan reconocer a la persona." onPosition={registerSection}>
-              <FieldGrid compact={compact}>
+              <FieldGrid>
                 <FormField label="Estatura aproximada (cm)" value={draft.heightCm} onChangeText={(value) => setField("heightCm", value)} keyboardType="number-pad" />
                 <FormField label="Contextura" value={draft.build} onChangeText={(value) => setField("build", value)} />
                 <FormField label="Tono de piel" value={draft.skinTone} onChangeText={(value) => setField("skinTone", value)} />
@@ -477,7 +478,7 @@ export function MissingPersonReportForm({
               <FormField label="Señales particulares" multiline value={draft.distinctiveMarks} onChangeText={(value) => setField("distinctiveMarks", value)} />
               {/* CHG-094: marcas desglosadas — describir por separado
                   ayuda a reconocer más rápido que un solo párrafo. */}
-              <FieldGrid compact={compact}>
+              <FieldGrid>
                 <FormField label="Tatuajes" hint="Ubicación y diseño" multiline value={draft.tattooDescription} onChangeText={(value) => setField("tattooDescription", value)} />
                 <FormField label="Cicatrices" multiline value={draft.scarsDescription} onChangeText={(value) => setField("scarsDescription", value)} />
                 <FormField label="Prótesis u órtesis" multiline value={draft.prostheticsDescription} onChangeText={(value) => setField("prostheticsDescription", value)} />
@@ -494,7 +495,7 @@ export function MissingPersonReportForm({
             </FormSection>
 
             <FormSection code="04" title="Datos del reportante" description="Esta información es privada y se usa únicamente para verificar el reporte." onPosition={registerSection}>
-              <FieldGrid compact={compact}>
+              <FieldGrid>
                 <FormField label="Nombre completo *" invalid={invalidFields.has("reporterName")} value={draft.reporterName} onChangeText={(value) => setField("reporterName", value)} autoComplete="name" />
                 <FormField label="Relación con la persona *" invalid={invalidFields.has("reporterRelationship")} value={draft.reporterRelationship} onChangeText={(value) => setField("reporterRelationship", value)} />
                 <FormField label="Teléfono privado" hint="Ej. +57 300 123 4567" maxLength={PHONE_MAX_INPUT_LENGTH} invalid={invalidFields.has("reporterPhone")} value={draft.reporterPhone} onChangeText={(value) => setField("reporterPhone", value)} keyboardType="phone-pad" autoComplete="tel" />
@@ -729,8 +730,8 @@ function FormSection({ code, title, description, children, onPosition }: { code:
   );
 }
 
-function FieldGrid({ compact, children }: { compact: boolean; children: React.ReactNode }) {
-  return <View style={[styles.fieldGrid, compact && styles.fieldGridCompact]}>{children}</View>;
+function FieldGrid({ children }: { children: React.ReactNode }) {
+  return <View style={styles.fieldGrid}>{children}</View>;
 }
 
 type FormFieldProps = {
@@ -1062,10 +1063,12 @@ const styles = StyleSheet.create({
   // CHG-097: 14 px dejaba el textarea de un campo pegado a la
   // etiqueta del siguiente; 24 separa los bloques de forma uniforme.
   sectionBody: { gap: 24, padding: 20 },
-  fieldGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  fieldGridCompact: { flexDirection: "column" },
-  field: { minWidth: 250, flex: 1, gap: 7 },
-  fieldWide: { minWidth: "100%" },
+  // CHG-116: la regla vive en components/fieldGrid.ts; era la
+  // misma copiada en los tres formularios y en los tres
+  // desbordaba por la derecha.
+  fieldGrid: fieldGridLayout.grid,
+  field: fieldGridLayout.field,
+  fieldWide: fieldGridLayout.fieldWide,
   fieldLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   fieldLabel: { color: colors.inkSoft, fontSize: 10, fontWeight: "700" },
   fieldHint: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 8 },

@@ -1,4 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
+import { fieldGridLayout } from "../../components/fieldGrid";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import {
@@ -146,7 +147,7 @@ export function RegistrationForm({
             <PrivacyNotice />
 
             <FormSection code="01" title="Identidad" description="Información mínima para reconocer al titular de la cuenta.">
-              <FieldGrid compact={compact}>
+              <FieldGrid>
                 <FormField
                   label="Nombres *"
                   value={draft.firstNames}
@@ -166,7 +167,7 @@ export function RegistrationForm({
             </FormSection>
 
             <FormSection code="02" title="Contacto y ubicación" description="Datos privados para verificar la cuenta y ubicar tu contexto general.">
-              <FieldGrid compact={compact}>
+              <FieldGrid>
                 <FormField
                   label="Correo electrónico *"
                   value={draft.email}
@@ -213,7 +214,7 @@ export function RegistrationForm({
                 ))}
               </View>
               {draft.requestedAccountType !== "citizen" && (
-                <FieldGrid compact={compact}>
+                <FieldGrid>
                   <FormField
                     label={
                       draft.requestedAccountType === "organization_representative"
@@ -246,7 +247,7 @@ export function RegistrationForm({
                 sector salud pueden cambiar de inmediato el estado de
                 una persona reportada como encontrada o fallecida. */}
             <FormSection code="04" title="Sector salud (opcional)" description="Si trabajas en el sector salud, declara tu profesión y registro profesional: tus novedades sobre personas desaparecidas aplican de inmediato.">
-              <FieldGrid compact={compact}>
+              <FieldGrid>
                 <FormField
                   label="Profesión u ocupación en salud"
                   hint="Ej. Médica general, enfermero"
@@ -272,7 +273,7 @@ export function RegistrationForm({
             </FormSection>
 
             <FormSection code="05" title="Seguridad" description="Usa una contraseña única que no emplees en otros servicios.">
-              <FieldGrid compact={compact}>
+              <FieldGrid>
                 <PasswordField
                   label="Contraseña *"
                   value={draft.password}
@@ -466,8 +467,8 @@ function FormSection({ code, title, description, children }: { code: string; tit
   );
 }
 
-function FieldGrid({ compact, children }: { compact: boolean; children: ReactNode }) {
-  return <View style={[styles.fieldGrid, compact && styles.fieldGridCompact]}>{children}</View>;
+function FieldGrid({ children }: { children: ReactNode }) {
+  return <View style={styles.fieldGrid}>{children}</View>;
 }
 
 function FormField({
@@ -646,9 +647,11 @@ const styles = StyleSheet.create({
   sectionTitle: { color: colors.ink, fontSize: 21, fontWeight: "700", letterSpacing: -0.6 },
   sectionDescription: { marginTop: 4, color: colors.inkDim, fontSize: 10, lineHeight: 16 },
   sectionBody: { gap: 14, padding: 20 },
-  fieldGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  fieldGridCompact: { flexDirection: "column" },
-  field: { minWidth: 250, flex: 1, gap: 7 },
+  // CHG-116: la regla vive en components/fieldGrid.ts; era la
+  // misma copiada en los tres formularios y en los tres
+  // desbordaba por la derecha.
+  fieldGrid: fieldGridLayout.grid,
+  field: fieldGridLayout.field,
   fieldLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   fieldLabel: { color: colors.inkSoft, fontSize: 10, fontWeight: "700" },
   fieldHint: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 8 },

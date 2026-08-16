@@ -1,4 +1,5 @@
 import * as DocumentPicker from "expo-document-picker";
+import { fieldGridLayout } from "../../components/fieldGrid";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRef, useState } from "react";
 import {
@@ -354,7 +355,7 @@ export function UnverifiedBuildingReportForm({
                 selected={draft.buildingType}
                 onSelect={(value) => setField("buildingType", value)}
               />
-              <FieldGrid compact={compact}>
+              <FieldGrid>
                 <FormField
                   label="Nombre o referencia del edificio *"
                   value={draft.buildingReference}
@@ -390,7 +391,7 @@ export function UnverifiedBuildingReportForm({
                 value={draft.address}
                 onChangeText={(value) => setField("address", value)}
               />
-              <FieldGrid compact={compact}>
+              <FieldGrid>
                 <FormField
                   label="Latitud exacta · privada"
                   hint="Ej. 7.11935"
@@ -417,7 +418,7 @@ export function UnverifiedBuildingReportForm({
               title="Búsqueda pendiente"
               description="Registra lo que sabes sin convertir observaciones en conclusiones."
             >
-              <FieldGrid compact={compact}>
+              <FieldGrid>
                 {/* CHG-088: mismo selector de fecha estándar que el
                     reporte de persona (mini agenda CHG-073). */}
                 <DatePickerField
@@ -534,7 +535,7 @@ export function UnverifiedBuildingReportForm({
               <PrivateFieldsLabel>
                 Datos privados · no aparecen en consultas públicas
               </PrivateFieldsLabel>
-              <FieldGrid compact={compact}>
+              <FieldGrid>
                 <FormField
                   label="Nombre completo *"
                   autoComplete="name"
@@ -890,17 +891,11 @@ function FormSection({
 }
 
 function FieldGrid({
-  compact,
   children,
 }: {
-  compact: boolean;
   children: React.ReactNode;
 }) {
-  return (
-    <View style={[styles.fieldGrid, compact && styles.fieldGridCompact]}>
-      {children}
-    </View>
-  );
+  return <View style={styles.fieldGrid}>{children}</View>;
 }
 
 type FormFieldProps = {
@@ -1299,10 +1294,12 @@ const styles = StyleSheet.create({
   // CHG-097: mismo espaciado que el reporte de persona, para que los
   // bloques de campo no queden pegados a la etiqueta siguiente.
   sectionBody: { gap: 24, padding: 20 },
-  fieldGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  fieldGridCompact: { flexDirection: "column" },
-  field: { minWidth: 250, flex: 1, gap: 7 },
-  fieldWide: { minWidth: "100%" },
+  // CHG-116: la regla vive en components/fieldGrid.ts; era la
+  // misma copiada en los tres formularios y en los tres
+  // desbordaba por la derecha.
+  fieldGrid: fieldGridLayout.grid,
+  field: fieldGridLayout.field,
+  fieldWide: fieldGridLayout.fieldWide,
   // CHG-095: la etiqueta y su ayuda comparten fila sin empujar el
   // ancho del campo; el popover flota en absoluto.
   fieldLabelWithHelp: {

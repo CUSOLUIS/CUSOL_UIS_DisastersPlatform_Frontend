@@ -1,4 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
+import { FIELD_BASIS } from "../../components/fieldGrid";
 import { RegistrationForm, validateRegistrationDraft } from "./RegistrationForm";
 import type { RegistrationDraft } from "./types";
 
@@ -62,6 +64,39 @@ describe("RegistrationForm", () => {
     expect(screen.queryByLabelText("Número de documento")).toBeNull();
     expect(screen.queryByLabelText("Fecha de nacimiento")).toBeNull();
     expect(screen.queryByLabelText("Dirección residencial")).toBeNull();
+  });
+
+  // CHG-116 — "Institución de salud" se salía del contenedor y quedaba
+  // cortada contra el borde derecho en Android. Al reorganizar la
+  // rejilla, los tres campos siguen escribiéndose y conservando su
+  // valor: la maquetación no puede llevarse por delante el estado.
+  it("conserva lo escrito en los tres campos del sector salud", () => {
+    render(<RegistrationForm onBack={jest.fn()} onLogin={jest.fn()} />);
+
+    const campos: Array<[string, string]> = [
+      ["Profesión u ocupación en salud", "Médica general"],
+      ["Registro o tarjeta profesional", "RM-123456"],
+      ["Institución de salud", "Hospital Universitario de Santander"],
+    ];
+
+    campos.forEach(([etiqueta, valor]) =>
+      fireEvent.changeText(screen.getByLabelText(etiqueta), valor),
+    );
+
+    campos.forEach(([etiqueta, valor]) =>
+      expect(screen.getByLabelText(etiqueta).props.value).toBe(valor),
+    );
+
+    // Y el contenedor del campo lleva la regla que impide el
+    // desbordamiento: base real y sin mínimo que fuerce el ancho.
+    let nodo = screen.getByLabelText("Institución de salud").parent;
+    let estilo: Record<string, unknown> = {};
+    while (nodo && estilo.flexBasis === undefined) {
+      estilo = StyleSheet.flatten(nodo.props.style) ?? {};
+      nodo = nodo.parent;
+    }
+    expect(estilo.flexBasis).toBe(FIELD_BASIS);
+    expect(estilo.minWidth).toBe(0);
   });
 
   // CHG-077: los datos del sector salud son opcionales pero van juntos.
