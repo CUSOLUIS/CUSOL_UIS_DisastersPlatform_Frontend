@@ -37,6 +37,7 @@ import {
 } from "./features/operational-map/dataSource";
 import { operationalMapDemoData } from "./features/operational-map/demoData";
 import { getHumanMapDemoOverview } from "./features/operational-map/humanMapDemoData";
+import { minLegibleFontSize } from "./typography";
 import type {
   HumanMapDataSource,
   HumanMapQuery,
@@ -118,6 +119,12 @@ describe("App universal", () => {
     expect(prometeoLogo.props.source).toBeTruthy();
     expect(logoStyle.width).toBe("100%");
     const toolTitle = within(lockup).getByText("CUSOL DISASTER PLATFORM");
+    // CHG-118: la leyenda acompaña al título dentro del bloque de
+    // marca, legible (no por debajo del piso de la portada).
+    const motto = within(lockup).getByText("SOLO EL PUEBLO SALVA AL PUEBLO");
+    expect(StyleSheet.flatten(motto.props.style).fontSize).toBeGreaterThanOrEqual(
+      minLegibleFontSize,
+    );
     expect(StyleSheet.flatten(toolTitle.props.style).marginTop).toBeGreaterThan(0);
     expect(screen.queryByText("DISASTER INTELLIGENCE SYSTEM")).toBeNull();
   });
@@ -317,9 +324,11 @@ describe("App universal", () => {
     expect(shouldStackPriorityLayout(1079)).toBe(true);
     expect(shouldCenterEntryContent(1380)).toBe(true);
     expect(shouldCenterEntryContent(1079)).toBe(false);
-    expect(getDashboardEntryMinHeight(900, false)).toBe(776);
-    expect(getDashboardEntryMinHeight(900, false, true)).toBe(734);
-    expect(getDashboardEntryMinHeight(900, true)).toBe(740);
+    // CHG-118: el encabezado creció 17 px con la leyenda, así que la
+    // portada de entrada reserva esos 17 px menos de pantalla.
+    expect(getDashboardEntryMinHeight(900, false)).toBe(759);
+    expect(getDashboardEntryMinHeight(900, false, true)).toBe(717);
+    expect(getDashboardEntryMinHeight(900, true)).toBe(723);
     expect(getLiveRecordsMinHeight(900, 124)).toBe(720);
     expect(getLiveRecordsMinHeight(100, 160)).toBe(0);
     expect(

@@ -74,10 +74,18 @@ interface HumanImpactDashboardProps {
 const numberFormatter = new Intl.NumberFormat("es-CO");
 
 export const PRIORITY_LAYOUT_BREAKPOINT = 1080;
-export const DASHBOARD_HEADER_HEIGHT = 124;
-export const DASHBOARD_STACKED_NAV_HEADER_HEIGHT = 166;
-export const DASHBOARD_COMPACT_HEADER_HEIGHT = 160;
+// CHG-118: las tres suben 17 px, la caja de la leyenda del encabezado
+// (14 de interlineado + 3 de separación). No son decorativas: de aquí
+// sale el alto de la portada de entrada y el de la transmisión en
+// vivo, así que una leyenda que crezca el encabezado sin avisar a
+// estas constantes deja la portada sin caber en la pantalla.
+export const DASHBOARD_HEADER_HEIGHT = 141;
+export const DASHBOARD_STACKED_NAV_HEADER_HEIGHT = 183;
+export const DASHBOARD_COMPACT_HEADER_HEIGHT = 177;
 export const DASHBOARD_TOOL_TITLE = "CUSOL DISASTER PLATFORM";
+
+// CHG-118: leyenda del encabezado, pedida por el usuario.
+export const DASHBOARD_HEADER_MOTTO = "SOLO EL PUEBLO SALVA AL PUEBLO";
 export const CUSOL_INSTAGRAM_URL = "https://www.instagram.com/cusol_uis/";
 export const PROMETEO_INSTAGRAM_URL = "https://www.instagram.com/prometeo.uis/";
 
@@ -661,6 +669,17 @@ export function Header({
               ]}
             >
               {DASHBOARD_TOOL_TITLE}
+            </Text>
+            {/* CHG-118: leyenda del encabezado. Se lee (font(11), el
+                piso de legibilidad de la portada) y va apagada para
+                acompañar sin competir con la navegación. */}
+            <Text
+              style={[
+                styles.brandMotto,
+                narrow && styles.brandMottoNarrow,
+              ]}
+            >
+              {DASHBOARD_HEADER_MOTTO}
             </Text>
           </View>
 
@@ -1316,6 +1335,8 @@ const styles = StyleSheet.create({
   brandToolTitle: { marginTop: 7, color: colors.ink, fontFamily: fontFamilies.mono, fontSize: 7.5, fontWeight: "900", letterSpacing: 1.8, lineHeight: 10, textAlign: "center" },
   brandToolTitleCompact: { marginTop: 6, fontSize: 6.5, letterSpacing: 1.35, lineHeight: 9 },
   brandToolTitleNarrow: { marginTop: 5, fontSize: 5.5, letterSpacing: 0.8, lineHeight: 7 },
+  brandMotto: { marginTop: 3, color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: font(11), fontWeight: "700", letterSpacing: 0.6, lineHeight: 14, textAlign: "center" },
+  brandMottoNarrow: { letterSpacing: 0.2 },
   headerNavigation: {
     minWidth: 0,
     flexGrow: 1,
