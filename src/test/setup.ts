@@ -19,6 +19,10 @@ process.env.EXPO_PUBLIC_MY_SPACE_DATA_MODE = "demo";
 jest.mock("react-native-safe-area-context", () => ({
   SafeAreaProvider: ({ children }: PropsWithChildren) => children,
   SafeAreaView: ({ children }: PropsWithChildren) => children,
+  // CHG-112: sin insets por defecto, para que ninguna prueba existente
+  // cambie de comportamiento. Quien necesite un dispositivo con muesca
+  // sustituye este mock en su propio archivo.
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
 
 jest.mock("../hooks/useReducedMotion", () => ({

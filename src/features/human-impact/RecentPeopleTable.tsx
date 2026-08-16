@@ -10,6 +10,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, fontFamilies } from "../../theme";
 import type {
   HumanStatus,
@@ -65,11 +66,25 @@ const dateFormatter = new Intl.DateTimeFormat("es-CO", {
 const numberFormatter = new Intl.NumberFormat("es-CO");
 const expandedPageSizes = peoplePageSizes.filter((size) => size !== 5);
 
+// CHG-112: el padding vertical de la barra del modal vive aquí porque
+// el inset superior se suma a él; si solo estuviera en la hoja de
+// estilos, el cálculo tendría que leerla y se desincronizaría.
+const modalToolbarPaddingY = 15;
+
 export function RecentPeopleTable({
   dataSource,
   viewportMinHeight,
 }: RecentPeopleTableProps) {
   const { width } = useWindowDimensions();
+  // CHG-112: el modal se abre con `statusBarTranslucent`, así que su
+  // ventana empieza DEBAJO de la barra de estado del sistema y la barra
+  // superior chocaba con el reloj y los iconos. Se usa el hook y no
+  // `SafeAreaView` —el resto de la app sí usa el componente— porque
+  // dentro de un `Modal` de React Native, en Android, el componente no
+  // recibe los insets: el modal es otra ventana y no hay proveedor
+  // dentro. El hook lee los del proveedor raíz, que son los de la
+  // ventana y valen igual para el modal a pantalla completa.
+  const insets = useSafeAreaInsets();
   const compact = width < 820;
   const [query, setQuery] = useState("");
   const [serverQuery, setServerQuery] = useState("");
@@ -445,7 +460,14 @@ export function RecentPeopleTable({
         accessibilityViewIsModal
         accessibilityLabel="Ventana ampliada de personas publicables"
       >
-        <View style={[styles.modalToolbar, compact && styles.modalToolbarCompact]}>
+        <View
+          testID="expanded-people-toolbar"
+          style={[
+            styles.modalToolbar,
+            compact && styles.modalToolbarCompact,
+            { paddingTop: modalToolbarPaddingY + insets.top },
+          ]}
+        >
           <View style={styles.modalHeading}>
             <Text style={styles.modalEyebrow}>CONSULTA AMPLIADA</Text>
             <Text style={styles.modalTitle} accessibilityRole="header">
@@ -606,7 +628,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 24,
     paddingHorizontal: 32,
-    paddingVertical: 15,
+    paddingVertical: modalToolbarPaddingY,
     borderBottomWidth: 1,
     borderBottomColor: colors.line,
     backgroundColor: "rgba(8, 14, 25, 0.98)",
