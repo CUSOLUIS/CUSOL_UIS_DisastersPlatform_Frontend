@@ -15,6 +15,7 @@ import type {
   OperationalMapPoint,
 } from "./types";
 import { useWebMapMouseInteractions } from "./webMapMouseInteractions";
+import { useNativeMapTouchInteractions } from "./nativeMapTouchInteractions";
 
 interface ProjectedPoint {
   point: OperationalMapPoint;
@@ -84,6 +85,16 @@ export function FallbackMapCanvas({
       })),
     onZoomBy: changeZoom,
   });
+  // CHG-121: paneo y pellizco también en Android/iOS, donde los
+  // manejadores DOM de arriba son inertes.
+  const nativeTouchHandlers = useNativeMapTouchInteractions({
+    onPanBy: (deltaX, deltaY) =>
+      setPanOffset((current) => ({
+        x: current.x + deltaX,
+        y: current.y + deltaY,
+      })),
+    onZoomBy: changeZoom,
+  });
 
   useEffect(() => {
     if (zoom === 1) {
@@ -101,6 +112,7 @@ export function FallbackMapCanvas({
   return (
     <View
       ref={attachMouseInteractions}
+      {...nativeTouchHandlers}
       style={[
         styles.canvas,
         compact && styles.canvasCompact,

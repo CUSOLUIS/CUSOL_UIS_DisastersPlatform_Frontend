@@ -26,6 +26,7 @@ import type {
   OperationalMapPoint,
 } from "./types";
 import { useWebMapMouseInteractions } from "./webMapMouseInteractions";
+import { useNativeMapTouchInteractions } from "./nativeMapTouchInteractions";
 import {
   COLOMBIA_CENTER,
   COLOMBIA_BOUNDS,
@@ -120,6 +121,15 @@ export function OsmWebMapCanvas(props: OperationalMapCanvasProps) {
       ),
     onZoomBy: changeZoom,
   });
+  // CHG-121: en Android/iOS los manejadores DOM de arriba son inertes;
+  // el paneo y el pellizco los aporta el responder nativo.
+  const nativeTouchHandlers = useNativeMapTouchInteractions({
+    onPanBy: (deltaX, deltaY) =>
+      setCenter((current) =>
+        panGeographicCenter(current, zoom, deltaX, deltaY),
+      ),
+    onZoomBy: changeZoom,
+  });
 
   useEffect(() => {
     if (zoom === initialZoom) {
@@ -192,6 +202,7 @@ export function OsmWebMapCanvas(props: OperationalMapCanvasProps) {
       accessibilityLabel={`Mapa OpenStreetMap con ${props.points.length} puntos operativos`}
       onLayout={handleLayout}
       ref={attachMouseInteractions}
+      {...nativeTouchHandlers}
       style={[
         styles.canvas,
         props.compact && styles.canvasCompact,

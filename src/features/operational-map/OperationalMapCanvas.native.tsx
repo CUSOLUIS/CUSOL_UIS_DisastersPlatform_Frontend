@@ -5,6 +5,7 @@ import { colors, fontFamilies } from "../../theme";
 import { categoryMeta } from "./categoryMeta";
 import { CategoryMarkerIcon } from "./CategoryMarkerIcon";
 import { FallbackMapCanvas } from "./FallbackMapCanvas";
+import { OsmWebMapCanvas } from "./OsmWebMapCanvas";
 import { HumanMapMarkerIcon } from "./HumanMapMarkerIcon";
 import { humanFeatureAccessibilityLabel } from "./humanStatusMeta";
 import { MapZoomControls } from "./MapZoomControls";
@@ -38,9 +39,8 @@ export function OperationalMapCanvas({
   // CHG-074: en Android react-native-maps SOLO funciona con Google Maps
   // y exige una API key en el manifest; sin ella, inflar MapView tumba
   // la app entera al abrir (crash nativo, no capturable en JS). Sin la
-  // clave configurada se usa el canvas propio, que no depende de
-  // Google. En iOS el proveedor por defecto es Apple Maps y no la
-  // necesita.
+  // clave configurada, MapView jamás se monta. En iOS el proveedor por
+  // defecto es Apple Maps y no la necesita.
   const androidWithoutGoogleKey =
     platformOs === "android" && !googleMapsNativeEnabled;
 
@@ -72,10 +72,14 @@ export function OperationalMapCanvas({
     return () => controller.abort();
   }, []);
 
-  if (
-    androidWithoutGoogleKey ||
-    (!googleMapsNativeEnabled && osmStatus === "failed")
-  ) {
+  // CHG-121: en Android sin clave el mapa real lo pinta el lienzo de
+  // teselas propio (CARTO, CHG-109), que no depende de Google y si las
+  // teselas fallan degrada por sí mismo al lienzo neutro.
+  if (androidWithoutGoogleKey) {
+    return <OsmWebMapCanvas {...props} />;
+  }
+
+  if (!googleMapsNativeEnabled && osmStatus === "failed") {
     return <FallbackMapCanvas {...props} />;
   }
 

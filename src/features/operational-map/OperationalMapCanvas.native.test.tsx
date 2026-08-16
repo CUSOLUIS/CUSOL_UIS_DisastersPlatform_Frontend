@@ -1,8 +1,11 @@
 /**
  * CHG-074 — En Android, react-native-maps exige Google Maps con API
  * key; sin la clave configurada, montar MapView tumba la app al abrir
- * (crash nativo). Sin clave, el canvas nativo debe renderizar el
- * FallbackMapCanvas y JAMÁS montar MapView.
+ * (crash nativo). Sin clave, MapView JAMÁS se monta.
+ *
+ * CHG-121 — Que no haya clave ya no condena a Android al lienzo neutro:
+ * el mapa real lo pinta el lienzo de teselas propio (CARTO, CHG-109),
+ * construido solo con primitivas de React Native.
  */
 
 import { render, screen } from "@testing-library/react-native";
@@ -58,12 +61,16 @@ afterEach(() => {
   mockMapViewMounted.mockClear();
 });
 
-it("en Android sin clave de Google usa el canvas propio y no monta MapView", () => {
+it("en Android sin clave de Google pinta teselas reales y no monta MapView", () => {
   render(<OperationalMapCanvas {...canvasProps()} platformOs="android" />);
 
   expect(mockMapViewMounted).not.toHaveBeenCalled();
   expect(screen.queryByTestId("native-map-view")).toBeNull();
-  // El fallback dibuja los marcadores por su cuenta.
+  // CHG-121: el lienzo de teselas propio pinta el mapa real…
+  expect(
+    screen.getAllByTestId(/^osm-tile-/, { includeHiddenElements: true }).length,
+  ).toBeGreaterThan(0);
+  // …y dibuja los marcadores por su cuenta.
   expect(
     screen.getByTestId("map-marker-10000000-0000-4000-8000-000000000001"),
   ).toBeTruthy();

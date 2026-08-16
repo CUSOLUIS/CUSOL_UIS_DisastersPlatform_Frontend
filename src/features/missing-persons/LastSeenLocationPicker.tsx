@@ -19,6 +19,7 @@ import {
 } from "../operational-map/visitorLocation";
 import { setLastKnownVisitorLocation } from "../operational-map/visitorPresence";
 import { useWebMapMouseInteractions } from "../operational-map/webMapMouseInteractions";
+import { useNativeMapTouchInteractions } from "../operational-map/nativeMapTouchInteractions";
 import {
   COLOMBIA_CENTER,
   OSM_MAX_ZOOM,
@@ -121,6 +122,13 @@ export function LastSeenLocationPicker({
   };
 
   const attachMapInteractions = useWebMapMouseInteractions({
+    onPanBy: (deltaX, deltaY) =>
+      setCenter((current) => panGeographicCenter(current, zoom, deltaX, deltaY)),
+    onZoomBy: changeZoom,
+  });
+  // CHG-121: en Android/iOS los manejadores DOM son inertes; el paneo
+  // y el pellizco del mapa los aporta el responder nativo.
+  const nativeTouchHandlers = useNativeMapTouchInteractions({
     onPanBy: (deltaX, deltaY) =>
       setCenter((current) => panGeographicCenter(current, zoom, deltaX, deltaY)),
     onZoomBy: changeZoom,
@@ -286,6 +294,7 @@ export function LastSeenLocationPicker({
         accessibilityLabel="Mapa para fijar la última ubicación conocida"
         onLayout={handleLayout}
         ref={attachMapInteractions}
+        {...nativeTouchHandlers}
         style={styles.map}
       >
         <View style={styles.tileLayer} accessibilityElementsHidden>
