@@ -469,7 +469,7 @@ export function MissingPersonReportForm({
 
             <FormSection code="03" title="Características físicas" description="Agrega detalles visuales que permitan reconocer a la persona." onPosition={registerSection}>
               <FieldGrid>
-                <FormField label="Estatura aproximada (cm)" value={draft.heightCm} onChangeText={(value) => setField("heightCm", value)} keyboardType="number-pad" />
+                <FormField label="Estatura aproximada (cm)" invalid={invalidFields.has("heightCm")} value={draft.heightCm} onChangeText={(value) => setField("heightCm", value)} keyboardType="number-pad" />
                 <FormField label="Contextura" value={draft.build} onChangeText={(value) => setField("build", value)} />
                 <FormField label="Tono de piel" value={draft.skinTone} onChangeText={(value) => setField("skinTone", value)} />
                 <FormField label="Cabello" value={draft.hairDescription} onChangeText={(value) => setField("hairDescription", value)} />
@@ -600,6 +600,11 @@ export interface DraftIssue {
   message: string;
 }
 
+// CHG-121: espejo de `height_cm` en el contrato del backend
+// (`ge=30, le=250`).
+export const MIN_HEIGHT_CM = 30;
+export const MAX_HEIGHT_CM = 250;
+
 export function collectDraftIssues(
   draft: MissingPersonReportDraft,
   photos: SelectedPhoto[],
@@ -664,6 +669,24 @@ export function collectDraftIssues(
       push(
         "birthDate",
         `La fecha de nacimiento implica una edad mayor a ${MAX_APPROXIMATE_AGE} años.`,
+      );
+    }
+  }
+  // CHG-121: espejo del contrato del backend (30–250 cm). Sin esta
+  // regla, "1.75" viajaba mutilado como 1 y "abc" se descartaba en
+  // silencio; el único aviso llegaba del servicio, genérico y tras el
+  // viaje completo. `Number` en vez de `parseInt` para que un valor
+  // con decimales o letras falle en lugar de mutilarse.
+  if (draft.heightCm.trim()) {
+    const heightCm = Number(draft.heightCm.trim());
+    if (
+      !Number.isInteger(heightCm) ||
+      heightCm < MIN_HEIGHT_CM ||
+      heightCm > MAX_HEIGHT_CM
+    ) {
+      push(
+        "heightCm",
+        `La estatura debe ser un número en centímetros entre ${MIN_HEIGHT_CM} y ${MAX_HEIGHT_CM} (ej. 170).`,
       );
     }
   }

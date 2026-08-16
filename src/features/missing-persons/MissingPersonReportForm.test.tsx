@@ -599,6 +599,81 @@ describe("Encabezado y espaciado del reporte (CHG-097)", () => {
     );
   });
 
+  // CHG-121 — El banner mostraba la clave técnica `heightCm`: la
+  // estatura no se validaba localmente ("abc" se descartaba en
+  // silencio, "1.75" viajaba mutilado como 1) y el campo era de los
+  // pocos sin la prop `invalid`, así que nunca se resaltaba.
+  it("valida la estatura antes de enviar: mensaje claro, resaltado y sin viaje", async () => {
+    const submitReport = jest.fn();
+    render(
+      <MissingPersonReportForm
+        onBack={jest.fn()}
+        pickPhotos={async () => [validPhoto]}
+        submitReport={submitReport}
+      />,
+    );
+
+    fireEvent.changeText(
+      screen.getByLabelText("Estatura aproximada (cm)"),
+      "1.75",
+    );
+    await completarReporteMinimo();
+
+    expect(
+      await screen.findByText(
+        /La estatura debe ser un número en centímetros entre 30 y 250/,
+      ),
+    ).toBeTruthy();
+    expect(submitReport).not.toHaveBeenCalled();
+    const estatura = screen.getByLabelText("Estatura aproximada (cm)");
+    expect(StyleSheet.flatten(estatura.props.style).borderColor).toBe(
+      colors.reported,
+    );
+  });
+
+  it("acepta estatura vacía o válida y rechaza lo que el contrato rechazaría", () => {
+    const heightIssues = (heightCm: string) =>
+      collectDraftIssues({ ...initialDraft, heightCm }, []).filter(
+        (issue) => issue.field === "heightCm",
+      );
+
+    expect(heightIssues("")).toHaveLength(0);
+    expect(heightIssues("170")).toHaveLength(0);
+    expect(heightIssues("30")).toHaveLength(0);
+    expect(heightIssues("250")).toHaveLength(0);
+    ["abc", "1.75", "170abc", "29", "251"].forEach((valor) => {
+      expect(heightIssues(valor)).toHaveLength(1);
+    });
+  });
+
+  it("resalta la estatura cuando el servicio la rechaza", async () => {
+    const submitReport = jest
+      .fn()
+      .mockRejectedValue(
+        new ReportRejectedError("Revisa los campos: Estatura.", [
+          "heightCm",
+        ]),
+      );
+    render(
+      <MissingPersonReportForm
+        onBack={jest.fn()}
+        pickPhotos={async () => [validPhoto]}
+        submitReport={submitReport}
+      />,
+    );
+
+    await completarReporteMinimo();
+    await waitFor(() => expect(submitReport).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.getByText(/Revisa los campos: Estatura\./)).toBeTruthy(),
+    );
+
+    const estatura = screen.getByLabelText("Estatura aproximada (cm)");
+    expect(StyleSheet.flatten(estatura.props.style).borderColor).toBe(
+      colors.reported,
+    );
+  });
+
   // CHG-115 — La captura mostraba "2004-11-23" junto a "Edad
   // aproximada 12": dos campos describiendo el mismo hecho y sin nada
   // que los atara.
