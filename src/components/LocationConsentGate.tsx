@@ -31,6 +31,9 @@ export interface LocationWatchSubscription {
 }
 
 export interface LocationWatcher {
+  // CHG-110: estado actual del permiso, sin pedirlo. Es lo que permite
+  // saber si el aviso ya se aceptó en una sesión anterior.
+  getPermissionStatus?(): Promise<boolean>;
   requestPermission(): Promise<boolean>;
   watch(
     onSample: (sample: {
@@ -44,6 +47,11 @@ export interface LocationWatcher {
 async function loadExpoLocationWatcher(): Promise<LocationWatcher> {
   const location = await import("expo-location");
   return {
+    async getPermissionStatus() {
+      // Consulta sin abrir el diálogo del sistema.
+      const response = await location.getForegroundPermissionsAsync();
+      return response.granted;
+    },
     async requestPermission() {
       const response = await location.requestForegroundPermissionsAsync();
       return response.granted;
@@ -66,7 +74,15 @@ async function loadExpoLocationWatcher(): Promise<LocationWatcher> {
   };
 }
 
-type GateStatus = "consent" | "requesting" | "denied" | "ready";
+// CHG-110: "checking" es el estado inicial mientras se consulta el
+// permiso. Antes se arrancaba en "consent", así que el aviso aparecía
+// en cada apertura aunque el permiso llevara meses concedido.
+type GateStatus =
+  | "checking"
+  | "consent"
+  | "requesting"
+  | "denied"
+  | "ready";
 
 export function LocationConsentGate({
   children,
@@ -83,7 +99,7 @@ export function LocationConsentGate({
     detectRuntimeContext(platformOs),
   ).requireLocationConsentGate;
   const [status, setStatus] = useState<GateStatus>(
-    gateRequired ? "consent" : "ready",
+    gateRequired ? "checking" : "ready",
   );
   const subscriptionRef = useRef<LocationWatchSubscription | null>(null);
   const mountedRef = useRef(true);
@@ -97,15 +113,8 @@ export function LocationConsentGate({
     [],
   );
 
-  const accept = useCallback(async () => {
-    setStatus("requesting");
-    try {
-      const active = await loadWatcher();
-      const granted = await active.requestPermission();
-      if (!granted) {
-        if (mountedRef.current) setStatus("denied");
-        return;
-      }
+  const startWatching = useCallback(
+    async (active: LocationWatcher) => {
       subscriptionRef.current?.remove();
       subscriptionRef.current = await active.watch((sample) => {
         const center = {
@@ -118,13 +127,69 @@ export function LocationConsentGate({
         });
       });
       if (mountedRef.current) setStatus("ready");
+    },
+    [],
+  );
+
+  // CHG-110: al abrir la app se consulta el permiso vigente antes de
+  // decidir. El permiso del sistema es la persistencia: si sigue
+  // concedido, el aviso ya se aceptó y no se vuelve a mostrar; si el
+  // usuario lo revocó desde los ajustes, reaparece. Una bandera propia
+  // podría contradecir al sistema y dejar la app bloqueada o pidiendo
+  // permisos que ya no tiene.
+  useEffect(() => {
+    if (!gateRequired) return;
+    let cancelled = false;
+
+    const resolveInitialStatus = async () => {
+      try {
+        const active = await loadWatcher();
+        const alreadyGranted = await active.getPermissionStatus?.();
+        if (cancelled || !mountedRef.current) return;
+        if (alreadyGranted) {
+          await startWatching(active);
+          return;
+        }
+        setStatus("consent");
+      } catch {
+        // Sin proveedor de ubicación disponible no se bloquea el uso.
+        if (!cancelled && mountedRef.current) setStatus("ready");
+      }
+    };
+
+    void resolveInitialStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [gateRequired, loadWatcher, startWatching]);
+
+  const accept = useCallback(async () => {
+    setStatus("requesting");
+    try {
+      const active = await loadWatcher();
+      const granted = await active.requestPermission();
+      if (!granted) {
+        if (mountedRef.current) setStatus("denied");
+        return;
+      }
+      await startWatching(active);
     } catch {
       // Sin proveedor de ubicación disponible no se bloquea el uso.
       if (mountedRef.current) setStatus("ready");
     }
-  }, [loadWatcher]);
+  }, [loadWatcher, startWatching]);
 
   if (status === "ready") return <>{children}</>;
+
+  // CHG-110: mientras se resuelve el permiso no se pinta el aviso, que
+  // era lo que hacía parpadear el consentimiento a quien ya lo dio.
+  if (status === "checking") {
+    return (
+      <View style={styles.root} testID="location-consent-checking">
+        <ActivityIndicator size="large" color={colors.cyan} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root} testID="location-consent-gate">
