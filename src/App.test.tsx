@@ -118,7 +118,8 @@ describe("App universal", () => {
     expect(prometeoLogo.props.resizeMode).toBe("contain");
     expect(prometeoLogo.props.source).toBeTruthy();
     expect(logoStyle.width).toBe("100%");
-    const toolTitle = within(lockup).getByText("CUSOL DISASTER PLATFORM");
+    // CHG-123: el nombre visible es "Cusol Disaster App".
+    const toolTitle = within(lockup).getByText("CUSOL DISASTER APP");
     // CHG-118: la leyenda acompaña al título dentro del bloque de
     // marca, legible (no por debajo del piso de la portada).
     const motto = within(lockup).getByText("SOLO EL PUEBLO SALVA AL PUEBLO");
@@ -127,6 +128,29 @@ describe("App universal", () => {
     );
     expect(StyleSheet.flatten(toolTitle.props.style).marginTop).toBeGreaterThan(0);
     expect(screen.queryByText("DISASTER INTELLIGENCE SYSTEM")).toBeNull();
+  });
+
+  it("los accesos de sesión no se recortan en pantallas compactas (CHG-122)", async () => {
+    render(<App dataSource={demoDataSource} />);
+
+    // jest-expo renderiza a 750 px de ancho, es decir en modo compacto.
+    const primaryRow = await screen.findByTestId("header-primary-row");
+    const authActions = screen.getByTestId("header-auth-actions");
+    const rowStyle = StyleSheet.flatten(primaryRow.props.style);
+    const actionsStyle = StyleSheet.flatten(authActions.props.style);
+
+    // La fila envuelve y el bloque de accesos puede ocupar la fila
+    // envuelta entera manteniendo la alineación a la derecha, así que
+    // los botones bajan completos en vez de salirse del viewport.
+    expect(rowStyle.flexWrap).toBe("wrap");
+    expect(actionsStyle.flexGrow).toBe(1);
+    expect(actionsStyle.justifyContent).toBe("flex-end");
+    expect(
+      within(authActions).getByRole("button", { name: "Iniciar sesión" }),
+    ).toBeTruthy();
+    expect(
+      within(authActions).getByRole("button", { name: "Registrarse" }),
+    ).toBeTruthy();
   });
 
   it("abre los Instagram de CUSOL y Prometeo con la misma interacción", async () => {
@@ -619,7 +643,7 @@ describe("App universal", () => {
     const footerStyle = StyleSheet.flatten(footer.props.style);
     expect(footerStyle.marginTop).toBeGreaterThanOrEqual(24);
     expect(footerStyle.backgroundColor).toBe("#010204");
-    expect(within(footer).getByText("CUSOL DISASTER PLATFORM")).toBeTruthy();
+    expect(within(footer).getByText("CUSOL DISASTER APP")).toBeTruthy();
     expect(
       within(footer).getByText(/verifica la fuente, la fecha y el estado antes de actuar/i),
     ).toBeTruthy();

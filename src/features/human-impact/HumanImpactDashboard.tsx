@@ -82,7 +82,8 @@ export const PRIORITY_LAYOUT_BREAKPOINT = 1080;
 export const DASHBOARD_HEADER_HEIGHT = 141;
 export const DASHBOARD_STACKED_NAV_HEADER_HEIGHT = 183;
 export const DASHBOARD_COMPACT_HEADER_HEIGHT = 177;
-export const DASHBOARD_TOOL_TITLE = "CUSOL DISASTER PLATFORM";
+// CHG-123: el nombre visible de la plataforma es "Cusol Disaster App".
+export const DASHBOARD_TOOL_TITLE = "CUSOL DISASTER APP";
 
 // CHG-118: leyenda del encabezado, pedida por el usuario.
 export const DASHBOARD_HEADER_MOTTO = "SOLO EL PUEBLO SALVA AL PUEBLO";
@@ -479,7 +480,7 @@ function PlatformFooter({
         <View style={[styles.footerMain, compact && styles.footerMainCompact]}>
           <View style={styles.footerIdentity}>
             <Text style={styles.footerEyebrow}>CENTRO DIGITAL DE AYUDA Y MONITOREO</Text>
-            <Text style={styles.footerTitle}>CUSOL DISASTER PLATFORM</Text>
+            <Text style={styles.footerTitle}>CUSOL DISASTER APP</Text>
             <Text style={styles.footerDescription}>
               Información pública y trazable para localizar personas, coordinar ayudas y
               comprender la respuesta humanitaria ante emergencias y desastres.
@@ -617,6 +618,7 @@ export function Header({
         ]}
       >
         <View
+          testID="header-primary-row"
           style={[
             styles.headerPrimary,
             stackedNavigation && styles.headerPrimaryStacked,
@@ -716,6 +718,7 @@ export function Header({
             </Pressable>
           )}
           <View
+            testID="header-auth-actions"
             style={[
               styles.authActions,
               compact && styles.authActionsCompact,
@@ -1307,7 +1310,10 @@ const styles = StyleSheet.create({
     gap: 24,
   },
   headerPrimaryStacked: { gap: 12 },
-  headerPrimaryCompact: { gap: 8 },
+  // CHG-122: en compacto la fila envuelve para que los accesos de
+  // sesión bajen completos a su propia fila en vez de recortarse
+  // fuera de la pantalla por la derecha.
+  headerPrimaryCompact: { gap: 8, flexWrap: "wrap" },
   headerPrimaryNarrow: { gap: 4 },
   brand: { flexShrink: 0, alignItems: "center", justifyContent: "center" },
   brandLogoFrame: {
@@ -1414,7 +1420,9 @@ const styles = StyleSheet.create({
   },
   headerNavigationTextDesktop: { fontSize: 11, letterSpacing: 0.85 },
   authActions: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 9 },
-  authActionsCompact: { gap: 6 },
+  // CHG-122: el bloque puede crecer para ocupar la fila envuelta
+  // entera manteniendo los botones alineados a la derecha.
+  authActionsCompact: { gap: 6, flexGrow: 1, justifyContent: "flex-end" },
   authActionsNarrow: { gap: 4 },
   // CHG-051: chip de sesión activa en el encabezado.
   sessionChipHolder: {

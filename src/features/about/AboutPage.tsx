@@ -99,7 +99,7 @@ export function AboutPage({ onBack }: AboutPageProps) {
                   </View>
                 </RevealGroupContainer>
               </LinearGradient>
-              <Text style={styles.identityTitle}>CUSOL DISASTER PLATFORM</Text>
+              <Text style={styles.identityTitle}>CUSOL DISASTER APP</Text>
             </View>
 
             <View style={styles.heroCopy}>
@@ -193,7 +193,7 @@ export function AboutPage({ onBack }: AboutPageProps) {
               Abrir la tecnología. Humanizar los datos.
             </Text>
             <Text style={styles.convergenceText}>
-              La propuesta de CUSOL Disaster Platform combina principios de apertura,
+              La propuesta de Cusol Disaster App combina principios de apertura,
               trazabilidad y colaboración con una lectura responsable de las emergencias.
               La tecnología organiza información; las decisiones humanas conservan la
               responsabilidad, la verificación y el cuidado de las personas.
@@ -244,7 +244,7 @@ export function AboutPage({ onBack }: AboutPageProps) {
           </View>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>CUSOL DISASTER PLATFORM · UIS</Text>
+            <Text style={styles.footerText}>CUSOL DISASTER APP · UIS</Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Volver a la portada"

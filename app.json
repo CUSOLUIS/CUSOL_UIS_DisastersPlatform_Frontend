@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "CUSOL Desastres Colombia",
+    "name": "Cusol Disaster App",
     "slug": "cusol-disasters-colombia",
     "scheme": "cusoldisasters",
     "version": "0.1.0",
@@ -28,7 +28,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "CUSOL Desastres comparte tu ubicación mientras la app está en uso para coordinar la respuesta a emergencias."
+          "locationWhenInUsePermission": "Cusol Disaster App comparte tu ubicación mientras la app está en uso para coordinar la respuesta a emergencias."
         }
       ]
     ],

@@ -21,7 +21,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 
   return {
     ...config,
-    name: config.name ?? "CUSOL Desastres Colombia",
+    name: config.name ?? "Cusol Disaster App",
     slug: config.slug ?? "cusol-disasters-colombia",
     plugins,
   };
