@@ -6,6 +6,7 @@ import {
   initialDraft,
   MissingPersonReportForm,
 } from "./MissingPersonReportForm";
+import { ageFromBirthDate } from "./ageFromBirthDate";
 import { ReportRejectedError } from "./reportSubmission";
 import { MAX_PHOTO_BYTES, validateAndMergePhotos } from "./photoValidation";
 import type { SelectedPhoto } from "./reportTypes";
@@ -596,6 +597,52 @@ describe("Encabezado y espaciado del reporte (CHG-097)", () => {
     expect(StyleSheet.flatten(telefono.props.style).borderColor).toBe(
       colors.reported,
     );
+  });
+
+  // CHG-115 — La captura mostraba "2004-11-23" junto a "Edad
+  // aproximada 12": dos campos describiendo el mismo hecho y sin nada
+  // que los atara.
+  it("deriva la edad de la fecha de nacimiento y la deja de solo lectura", () => {
+    render(<MissingPersonReportForm onBack={jest.fn()} />);
+
+    fireEvent.press(
+      screen.getByRole("button", { name: "Elegir fecha de nacimiento" }),
+    );
+    fireEvent.press(screen.getByRole("button", { name: "Año 2004" }));
+    fireEvent.press(screen.getByRole("button", { name: "Mes NOV de 2004" }));
+    fireEvent.press(screen.getByRole("button", { name: "Día 23" }));
+
+    const edad = screen.getByLabelText("Edad aproximada");
+    expect(edad.props.value).toBe(String(ageFromBirthDate("2004-11-23")));
+    expect(edad.props.editable).toBe(false);
+  });
+
+  it("devuelve la edad a mano al borrar la fecha de nacimiento", () => {
+    render(<MissingPersonReportForm onBack={jest.fn()} />);
+
+    fireEvent.press(
+      screen.getByRole("button", { name: "Elegir fecha de nacimiento" }),
+    );
+    fireEvent.press(screen.getByRole("button", { name: "Año 2004" }));
+    fireEvent.press(screen.getByRole("button", { name: "Mes NOV de 2004" }));
+    fireEvent.press(screen.getByRole("button", { name: "Día 23" }));
+
+    // El borrado vive dentro del desplegable, que se cerró al elegir.
+    fireEvent.press(
+      screen.getByRole("button", { name: "Elegir fecha de nacimiento" }),
+    );
+    fireEvent.press(
+      screen.getByRole("button", { name: "Borrar fecha de nacimiento" }),
+    );
+
+    // Sin fecha, la edad aproximada es el único dato disponible y se
+    // captura a mano: es el caso normal en una desaparición.
+    const edad = screen.getByLabelText("Edad aproximada");
+    expect(edad.props.value).toBe("");
+    expect(edad.props.editable).toBe(true);
+
+    fireEvent.changeText(edad, "34");
+    expect(screen.getByLabelText("Edad aproximada").props.value).toBe("34");
   });
 
   it("separa los bloques de campo de forma uniforme", () => {

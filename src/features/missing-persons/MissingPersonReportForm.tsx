@@ -56,6 +56,7 @@ import {
   MAX_PHOTO_COUNT,
   validateAndMergePhotos,
 } from "./photoValidation";
+import { MAX_APPROXIMATE_AGE, ageFromBirthDate } from "./ageFromBirthDate";
 import {
   ReportRejectedError,
   createIdempotencyKey,
@@ -234,6 +235,20 @@ export function MissingPersonReportForm({
     value: MissingPersonReportDraft[Key],
   ) => setDraft((current) => ({ ...current, [key]: value }));
 
+  // CHG-115: la edad es un dato derivado mientras haya fecha de
+  // nacimiento. Se calculan las dos a la vez para que el borrador
+  // nunca contenga una pareja que se contradiga; al borrar la fecha,
+  // la edad vuelve a quedar libre y en blanco, que es como se captura
+  // cuando quien reporta no conoce la fecha exacta.
+  const setBirthDate = (value: string) =>
+    setDraft((current) => ({
+      ...current,
+      birthDate: value,
+      approximateAge: value
+        ? (ageFromBirthDate(value)?.toString() ?? "")
+        : "",
+    }));
+
   const selectPhotos = async () => {
     setSelectingPhotos(true);
     try {
@@ -382,8 +397,8 @@ export function MissingPersonReportForm({
                   />
                 )}
                 <FormField label="Alias o nombre conocido" value={draft.aliases} onChangeText={(value) => setField("aliases", value)} />
-                <DatePickerField label="Fecha de nacimiento" accessibilityLabel="Elegir fecha de nacimiento" clearAccessibilityLabel="Borrar fecha de nacimiento" testID="birth-date-calendar" value={draft.birthDate} onChange={(value) => setField("birthDate", value)} />
-                <FormField label="Edad aproximada" value={draft.approximateAge} onChangeText={(value) => setField("approximateAge", value)} keyboardType="number-pad" />
+                <DatePickerField label="Fecha de nacimiento" accessibilityLabel="Elegir fecha de nacimiento" clearAccessibilityLabel="Borrar fecha de nacimiento" testID="birth-date-calendar" value={draft.birthDate} onChange={setBirthDate} invalid={invalidFields.has("birthDate")} />
+                <FormField label="Edad aproximada" hint={draft.birthDate ? "calculada" : undefined} editable={!draft.birthDate} placeholder={draft.birthDate ? "" : "Escribe aquí"} invalid={invalidFields.has("approximateAge")} value={draft.approximateAge} onChangeText={(value) => setField("approximateAge", value)} keyboardType="number-pad" />
                 <ChoiceChipsField label="Sexo" options={SEX_OPTIONS} value={draft.genderIdentity} onChange={(value) => setField("genderIdentity", value)} />
                 <SelectListField label="Nacionalidad" options={NATIONALITY_OPTIONS} value={draft.nationality} onChange={(value) => setField("nationality", value)} searchable searchPlaceholder="Busca tu nacionalidad" />
               </FieldGrid>
@@ -642,6 +657,13 @@ export function collectDraftIssues(
       push("birthDate", "La fecha de nacimiento no puede estar en el futuro.");
     } else if (draft.birthDate < "1900-01-01") {
       push("birthDate", "La fecha de nacimiento no puede ser anterior a 1900.");
+    } else if ((ageFromBirthDate(draft.birthDate) ?? 0) > MAX_APPROXIMATE_AGE) {
+      // CHG-115: el servicio y la base topan la edad en 120; guardarla
+      // recortada devolvería a tener un dato que miente.
+      push(
+        "birthDate",
+        `La fecha de nacimiento implica una edad mayor a ${MAX_APPROXIMATE_AGE} años.`,
+      );
     }
   }
   if (draft.genderIdentity && !(SEX_OPTIONS as readonly string[]).includes(draft.genderIdentity)) {
@@ -727,6 +749,8 @@ type FormFieldProps = {
   // CHG-113: marcador propio para los campos donde conviene decir qué
   // se espera, o que pueden dejarse en blanco.
   placeholder?: string;
+  // CHG-115: los campos derivados de otro no se editan a mano.
+  editable?: boolean;
 };
 
 function FormField({
@@ -735,6 +759,7 @@ function FormField({
   multiline = false,
   invalid = false,
   placeholder = "Escribe aquí",
+  editable = true,
   ...inputProps
 }: FormFieldProps) {
   return (
@@ -748,8 +773,9 @@ function FormField({
         placeholder={placeholder}
         placeholderTextColor="#4b586d"
         multiline={multiline}
+        editable={editable}
         textAlignVertical={multiline ? "top" : "center"}
-        style={[styles.fieldInput, multiline && styles.fieldInputMultiline, invalid && styles.fieldInputInvalid]}
+        style={[styles.fieldInput, multiline && styles.fieldInputMultiline, invalid && styles.fieldInputInvalid, !editable && styles.fieldInputDerived]}
         {...inputProps}
       />
     </View>
@@ -1048,6 +1074,9 @@ const styles = StyleSheet.create({
   // CHG-083: resaltado del campo con error.
   fieldInputInvalid: { borderColor: colors.reported, backgroundColor: "rgba(255,103,136,0.06)" },
   fieldLabelInvalid: { color: colors.reported },
+  // CHG-115: un campo derivado se lee, no se escribe; el fondo lo dice
+  // antes de que la persona intente teclear en él.
+  fieldInputDerived: { backgroundColor: "rgba(137,166,207,0.07)", color: colors.inkSoft },
   // CHG-073: selectores de lista cerrada y mini agenda.
   choiceRow: { flexDirection: "row", gap: 8 },
   choiceChip: { flex: 1, minHeight: 48, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(137,166,207,0.22)", borderRadius: 8, backgroundColor: "rgba(5,9,17,0.72)" },
