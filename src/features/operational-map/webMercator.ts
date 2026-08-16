@@ -1,3 +1,5 @@
+import { tileUrl } from "./tileProvider";
+
 export const TILE_SIZE = 256;
 // Límite del servidor público de teselas de OpenStreetMap (z19 ≈ edificaciones).
 export const OSM_MAX_ZOOM = 19;
@@ -52,7 +54,7 @@ export function buildTilePlacements(
     for (let tileY = startY; tileY <= endY; tileY += 1) {
       placements.push({
         key: `${zoom}-${tileX}-${tileY}`,
-        uri: `https://tile.openstreetmap.org/${zoom}/${wrappedX}/${tileY}.png`,
+        uri: tileUrl(zoom, wrappedX, tileY),
         left: tileX * TILE_SIZE - viewportLeft,
         top: tileY * TILE_SIZE - viewportTop,
       });

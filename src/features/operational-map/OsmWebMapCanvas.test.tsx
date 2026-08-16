@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react-native";
 import { operationalMapDemoData } from "./demoData";
 import { OsmWebMapCanvas } from "./OsmWebMapCanvas";
+import { tileProvider } from "./tileProvider";
 import { COLOMBIA_BOUNDS } from "./webMercator";
 
 afterEach(() => {
@@ -27,8 +28,10 @@ describe("Respaldo web OpenStreetMap", () => {
       ),
     ).toBeTruthy();
     expect(
+      // CHG-109: la atribución la declara el proveedor de teselas; al
+      // dejar los servidores voluntarios de OSM, CARTO se suma a ella.
       screen.getByRole("link", {
-        name: "Atribución de OpenStreetMap contributors",
+        name: `Atribución de ${tileProvider.attribution}`,
       }),
     ).toBeTruthy();
     expect(

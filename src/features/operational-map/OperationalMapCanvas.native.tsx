@@ -10,12 +10,13 @@ import { humanFeatureAccessibilityLabel } from "./humanStatusMeta";
 import { MapZoomControls } from "./MapZoomControls";
 import { OsmAttribution } from "./OsmAttribution";
 import type { OperationalMapCanvasProps } from "./types";
+import { probeTileUrl, tileProvider } from "./tileProvider";
 
 const googleMapsNativeEnabled =
   process.env.EXPO_PUBLIC_GOOGLE_MAPS_NATIVE_ENABLED === "true";
 const osmTilesDisabled =
   process.env.EXPO_PUBLIC_OSM_TILES_DISABLED === "true";
-const osmProbeUrl = "https://tile.openstreetmap.org/0/0/0.png";
+const osmProbeUrl = probeTileUrl();
 
 const darkMapStyle = [
   { elementType: "geometry", stylers: [{ color: "#0b1320" }] },
@@ -123,7 +124,7 @@ export function OperationalMapCanvas({
       >
         {!googleMapsNativeEnabled && (
           <UrlTile
-            urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+            urlTemplate={tileProvider.urlTemplate.replace("{s}", tileProvider.subdomains[0] ?? "")}
             maximumNativeZ={19}
             maximumZ={19}
             minimumZ={4}

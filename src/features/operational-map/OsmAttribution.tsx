@@ -1,17 +1,18 @@
 import { Linking, Pressable, StyleSheet, Text } from "react-native";
 import { colors, fontFamilies } from "../../theme";
+import { tileProvider } from "./tileProvider";
 
 export function OsmAttribution() {
   return (
     <Pressable
       accessibilityRole="link"
-      accessibilityLabel="Atribución de OpenStreetMap contributors"
+      accessibilityLabel={`Atribución de ${tileProvider.attribution}`}
       onPress={() => {
-        void Linking.openURL("https://www.openstreetmap.org/copyright");
+        void Linking.openURL(tileProvider.attributionUrl);
       }}
       style={({ pressed }) => [styles.attribution, pressed && styles.pressed]}
     >
-      <Text style={styles.text}>© OpenStreetMap contributors</Text>
+      <Text style={styles.text}>{tileProvider.attribution}</Text>
     </Pressable>
   );
 }
