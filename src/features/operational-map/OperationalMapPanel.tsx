@@ -784,7 +784,7 @@ const styles = StyleSheet.create({
   legend: { gap: 8, padding: 10, borderWidth: 1, borderColor: colors.line, borderRadius: 9, backgroundColor: "rgba(9,15,26,0.86)" },
   legendHeading: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 6 },
   legendTitle: { color: colors.ink, fontFamily: fontFamilies.mono, fontSize: font(11), fontWeight: "800", letterSpacing: 0.8 },
-  legendHint: { color: colors.inkDim, fontSize: 8 },
+  legendHint: { color: colors.inkDim, fontSize: font(11) },
   filters: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   filter: {
     minWidth: 210,
@@ -816,7 +816,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 1,
   },
-  mapTime: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 7 },
+  mapTime: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: font(11) },
   detail: {
     position: "relative",
     flexDirection: "row",
@@ -840,10 +840,10 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   detailTitle: { color: colors.ink, fontSize: font(11), fontWeight: "700" },
-  detailLocation: { marginTop: 3, color: colors.inkSoft, fontSize: 9 },
+  detailLocation: { marginTop: 3, color: colors.inkSoft, fontSize: font(11) },
   detailDescription: { maxWidth: 660, marginTop: 6, color: colors.inkSoft, fontSize: font(11), lineHeight: 17 },
   detailMeta: { alignItems: "flex-end", gap: 2 },
-  detailMetaText: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 7 },
+  detailMetaText: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: font(11) },
   noSelection: {
     minHeight: 70,
     alignItems: "center",
@@ -852,7 +852,7 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: 8,
   },
-  noSelectionText: { color: colors.inkDim, fontSize: 10 },
+  noSelectionText: { color: colors.inkDim, fontSize: font(11) },
   state: {
     minHeight: 430,
     alignItems: "center",
