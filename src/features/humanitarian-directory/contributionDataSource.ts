@@ -41,6 +41,15 @@ async function getActorKindFromApi(
       `No fue posible comprobar la sesión (estado ${response.status}).`,
     );
   }
+  // CHG-124: la bandera viaja en /auth/me desde CHG-077; con ella el
+  // formulario muestra el aviso del sector salud. El rol efectivo lo
+  // resuelve el gateway contra identity — esto solo informa la UI.
+  try {
+    const body = (await response.json()) as { isHealthSector?: unknown };
+    if (body.isHealthSector === true) return "health_sector";
+  } catch {
+    // Cuerpo ilegible: la sesión sigue siendo válida.
+  }
   return "authenticated";
 }
 
@@ -94,7 +103,9 @@ export function contributionEndpoint(
   contribution: CommunityContribution,
   actorKind: ContributionActorKind,
 ): string {
-  const audience = actorKind === "authenticated" ? "me" : "public";
+  // CHG-124: el sector salud aporta con su cuenta (canal "me"); solo
+  // el anónimo usa el canal público.
+  const audience = actorKind === "anonymous" ? "public" : "me";
   return contribution.kind === "missing_person_status"
     ? `/api/v1/${audience}/missing-persons/${contribution.targetId}/status-reports`
     : `/api/v1/${audience}/aid-locations/${contribution.targetId}/ratings`;

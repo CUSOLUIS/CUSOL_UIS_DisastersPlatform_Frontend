@@ -235,9 +235,11 @@ export function CommunityContributionForm({
             <Text style={styles.actorText}>
               {actorError
                 ? "MODALIDAD NO DISPONIBLE"
-                : actorKind === "authenticated"
-                  ? "CON SESIÓN"
-                  : "APORTE PÚBLICO"}
+                : actorKind === "health_sector"
+                  ? "SECTOR SALUD · CON SESIÓN"
+                  : actorKind === "authenticated"
+                    ? "CON SESIÓN"
+                    : "APORTE PÚBLICO"}
             </Text>
           )}
         </View>
@@ -255,6 +257,21 @@ export function CommunityContributionForm({
             : "Las estrellas expresan una experiencia ciudadana; no certifican oficialmente el lugar y solo afectan el promedio tras revisión."}
         </Text>
       </View>
+
+      {/* CHG-124: aviso visible solo para el perfil del sector salud —
+          su reporte no pasa por revisión informal: el desenlace se
+          aplica de inmediato (CHG-077) y un fallecimiento queda como
+          muerte CONFIRMADA en el sistema. */}
+      {isPerson && actorKind === "health_sector" && (
+        <View style={styles.healthNotice} accessibilityRole="alert" testID="health-sector-notice">
+          <Text style={styles.healthTitle}>AVISO · PERFIL DEL SECTOR SALUD</Text>
+          <Text style={styles.healthText}>
+            {outcome === "deceased"
+              ? "Al emitir este reporte bajo tu perfil del sector salud verificado, la persona quedará categorizada directamente como “Muerto confirmado” en el sistema, sin fase intermedia de revisión informal."
+              : "Con tu perfil del sector salud verificado, el desenlace que declares se aplica de inmediato al estado público de la persona, sin fase intermedia de revisión informal."}
+          </Text>
+        </View>
+      )}
 
       {isPerson ? (
         <View style={styles.fieldGroup}>
@@ -437,6 +454,9 @@ const styles = StyleSheet.create({
   safetyNotice: { gap: 5, padding: 14, borderLeftWidth: 3, borderLeftColor: colors.reported, backgroundColor: "rgba(255,103,136,0.06)" },
   safetyTitle: { color: colors.reported, fontFamily: fontFamilies.mono, fontSize: 8, fontWeight: "900", letterSpacing: 0.7 },
   safetyText: { color: colors.inkSoft, fontSize: 11, lineHeight: 17 },
+  healthNotice: { gap: 5, padding: 14, borderLeftWidth: 3, borderLeftColor: colors.cyan, backgroundColor: "rgba(81,229,255,0.06)" },
+  healthTitle: { color: colors.cyan, fontFamily: fontFamilies.mono, fontSize: 8, fontWeight: "900", letterSpacing: 0.7 },
+  healthText: { color: colors.inkSoft, fontSize: 11, lineHeight: 17 },
   fieldGroup: { gap: 9 },
   fieldLabel: { color: colors.ink, fontSize: 12, fontWeight: "800" },
   segmented: { flexDirection: "row", flexWrap: "wrap", gap: 8 },

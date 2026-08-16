@@ -127,7 +127,14 @@ export type CommunityContribution =
   | MissingPersonStatusContribution
   | AidLocationRatingContribution;
 
-export type ContributionActorKind = "anonymous" | "authenticated";
+// CHG-124: `health_sector` es una sesión autenticada cuyo perfil de
+// salud verificado hace que el desenlace declarado se aplique de
+// inmediato (CHG-077) y que un fallecimiento quede como muerte
+// CONFIRMADA; el formulario lo usa para mostrar el aviso.
+export type ContributionActorKind =
+  | "anonymous"
+  | "authenticated"
+  | "health_sector";
 
 export interface CommunityContributionReceipt {
   id: string;
