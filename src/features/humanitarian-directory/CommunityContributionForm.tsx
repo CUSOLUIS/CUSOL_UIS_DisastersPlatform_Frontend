@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { colors, fontFamilies } from "../../theme";
+import { communityTextIssue } from "./textQuality";
 import {
   ALLOWED_PHOTO_HELP,
   ALLOWED_PHOTO_MIME_TYPES,
@@ -111,6 +112,12 @@ export function CommunityContributionForm({
       validationErrors.push(
         `Describe la situación con al menos ${minimumLength} caracteres.`,
       );
+    } else {
+      // CHG-107: la longitud la cumplían treinta letras iguales.
+      const issue = communityTextIssue(description);
+      if (issue) {
+        validationErrors.push(issue);
+      }
     }
     if (isPerson && photos.length === 0) {
       validationErrors.push("Adjunta al menos una fotografía como evidencia privada.");
