@@ -37,10 +37,13 @@ const CARTO_LIGHT: TileProvider = {
 };
 
 const configuredTemplate = process.env.EXPO_PUBLIC_MAP_TILE_URL?.trim();
-const configuredSubdomains = process.env.EXPO_PUBLIC_MAP_TILE_SUBDOMAINS
-  ?.split(",")
-  .map((item) => item.trim())
-  .filter(Boolean);
+// El tipo de `process.env` depende de los tipos que traiga el árbol de
+// dependencias, así que el parámetro se anota: sin ello, en una
+// instalación limpia `split` devuelve `any[]` y el compilador falla.
+const configuredSubdomains: string[] | undefined =
+  process.env.EXPO_PUBLIC_MAP_TILE_SUBDOMAINS?.split(",")
+    .map((item: string) => item.trim())
+    .filter((item: string) => item.length > 0);
 const configuredAttribution =
   process.env.EXPO_PUBLIC_MAP_TILE_ATTRIBUTION?.trim();
 
