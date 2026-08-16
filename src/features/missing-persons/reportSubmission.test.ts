@@ -110,6 +110,27 @@ describe("Payload del reporte de persona perdida", () => {
     expect(payload).not.toHaveProperty("reviewAcknowledged");
   });
 
+  // CHG-113 — Quien reporta puede no saber con qué ropa salió la
+  // persona: el campo viaja solo si tiene contenido, para que el
+  // expediente quede sin dato en vez de con un "no sé" escrito.
+  it("omite la vestimenta cuando se deja en blanco", () => {
+    const payload = buildReportPayload({
+      ...completeDraft,
+      clothingDescription: "   ",
+    });
+
+    expect(payload).not.toHaveProperty("clothingDescription");
+  });
+
+  it("envía la vestimenta recortada cuando sí se conoce", () => {
+    const payload = buildReportPayload({
+      ...completeDraft,
+      clothingDescription: "  Chaqueta amarilla  ",
+    });
+
+    expect(payload.clothingDescription).toBe("Chaqueta amarilla");
+  });
+
   it("descarta una coordenada solitaria y edades ilegibles", () => {
     const payload = buildReportPayload({
       ...completeDraft,

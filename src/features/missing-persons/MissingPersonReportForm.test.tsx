@@ -1,7 +1,11 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { StyleSheet } from "react-native";
 import { colors } from "../../theme";
-import { MissingPersonReportForm } from "./MissingPersonReportForm";
+import {
+  collectDraftIssues,
+  initialDraft,
+  MissingPersonReportForm,
+} from "./MissingPersonReportForm";
 import { MAX_PHOTO_BYTES, validateAndMergePhotos } from "./photoValidation";
 import type { SelectedPhoto } from "./reportTypes";
 
@@ -233,7 +237,7 @@ describe("Reporte de persona perdida", () => {
       ["Departamento *", "Cundinamarca"],
       ["Municipio *", "Soacha"],
       ["Dirección *", "Parque central"],
-      ["Vestimenta *", "Chaqueta amarilla"],
+      ["Vestimenta", "Chaqueta amarilla"],
       ["Circunstancias de la desaparición *", "Se perdió contacto durante la evacuación"],
       ["Nombre completo *", "Ana Rojas"],
       ["Relación con la persona *", "Hermana"],
@@ -492,10 +496,29 @@ describe("Encabezado y espaciado del reporte (CHG-097)", () => {
     expect(onHome).toHaveBeenCalled();
   });
 
+  // CHG-113 — La vestimenta dejó de ser obligatoria: quien denuncia
+  // muchas veces no la conoce y el formulario le obligaba a escribir
+  // "no sé" para poder publicar.
+  it("permite publicar sin vestimenta y no la marca como obligatoria", () => {
+    render(<MissingPersonReportForm onBack={jest.fn()} />);
+
+    expect(screen.queryByLabelText("Vestimenta *")).toBeNull();
+    expect(screen.getByLabelText("Vestimenta")).toBeTruthy();
+
+    const faltantes = collectDraftIssues(
+      { ...initialDraft, clothingDescription: "" },
+      [],
+    ).map((issue) => issue.field);
+
+    expect(faltantes).not.toContain("clothingDescription");
+    // El resto de obligatorios sigue exigiéndose.
+    expect(faltantes).toContain("circumstances");
+  });
+
   it("separa los bloques de campo de forma uniforme", () => {
     render(<MissingPersonReportForm onBack={jest.fn()} />);
 
-    const vestimenta = screen.getByLabelText("Vestimenta *");
+    const vestimenta = screen.getByLabelText("Vestimenta");
     const circunstancias = screen.getByLabelText(
       "Circunstancias de la desaparición *",
     );

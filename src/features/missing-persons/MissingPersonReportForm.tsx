@@ -68,7 +68,9 @@ import type {
   TransportMode,
 } from "./reportTypes";
 
-const initialDraft: MissingPersonReportDraft = {
+// CHG-113: se exporta para que las pruebas puedan partir de un
+// borrador vacío al comprobar qué campos siguen siendo obligatorios.
+export const initialDraft: MissingPersonReportDraft = {
   firstNames: "",
   lastNames: "",
   aliases: "",
@@ -407,7 +409,7 @@ export function MissingPersonReportForm({
                   }))
                 }
               />
-              <FormField label="Vestimenta *" invalid={invalidFields.has("clothingDescription")} multiline value={draft.clothingDescription} onChangeText={(value) => setField("clothingDescription", value)} />
+              <FormField label="Vestimenta" placeholder="Ej. Camiseta azul, jeans negros (opcional si no lo sabes)" invalid={invalidFields.has("clothingDescription")} multiline value={draft.clothingDescription} onChangeText={(value) => setField("clothingDescription", value)} />
               <FormField label="Circunstancias de la desaparición *" invalid={invalidFields.has("circumstances")} multiline value={draft.circumstances} onChangeText={(value) => setField("circumstances", value)} />
               {/* CHG-094: contexto del desplazamiento — qué llevaba,
                   cómo se movilizaba y con quién. */}
@@ -577,7 +579,6 @@ export function collectDraftIssues(
     ["department", "Ingresa el departamento."],
     ["municipality", "Ingresa el municipio."],
     ["lastSeenArea", "Ingresa la dirección donde fue vista."],
-    ["clothingDescription", "Describe la vestimenta."],
     ["circumstances", "Describe las circunstancias."],
     ["reporterName", "Ingresa el nombre del reportante."],
     ["reporterRelationship", "Indica la relación con la persona."],
@@ -704,9 +705,19 @@ type FormFieldProps = {
   maxLength?: number;
   // CHG-083: resaltado inline del campo con error.
   invalid?: boolean;
+  // CHG-113: marcador propio para los campos donde conviene decir qué
+  // se espera, o que pueden dejarse en blanco.
+  placeholder?: string;
 };
 
-function FormField({ label, hint, multiline = false, invalid = false, ...inputProps }: FormFieldProps) {
+function FormField({
+  label,
+  hint,
+  multiline = false,
+  invalid = false,
+  placeholder = "Escribe aquí",
+  ...inputProps
+}: FormFieldProps) {
   return (
     <View style={[styles.field, multiline && styles.fieldWide]}>
       <View style={styles.fieldLabelRow}>
@@ -715,7 +726,7 @@ function FormField({ label, hint, multiline = false, invalid = false, ...inputPr
       </View>
       <TextInput
         accessibilityLabel={label}
-        placeholder="Escribe aquí"
+        placeholder={placeholder}
         placeholderTextColor="#4b586d"
         multiline={multiline}
         textAlignVertical={multiline ? "top" : "center"}

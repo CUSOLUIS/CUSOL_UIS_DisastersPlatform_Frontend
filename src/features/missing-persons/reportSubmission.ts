@@ -37,6 +37,9 @@ const OPTIONAL_TEXT_FIELDS = [
   "distinctiveMarks",
   "medicalInformation",
   "lastSeenTime",
+  // CHG-113: la vestimenta puede no conocerse; si va en blanco no
+  // viaja, para que el expediente quede sin dato en vez de con "no sé".
+  "clothingDescription",
   "additionalDescription",
   "reporterPhone",
   "reporterEmail",
@@ -70,7 +73,6 @@ export function buildReportPayload(
     department: draft.department.trim(),
     municipality: draft.municipality.trim(),
     lastSeenArea: draft.lastSeenArea.trim(),
-    clothingDescription: draft.clothingDescription.trim(),
     circumstances: draft.circumstances.trim(),
     reporterName: draft.reporterName.trim(),
     reporterRelationship: draft.reporterRelationship.trim(),
