@@ -50,6 +50,22 @@ export function isValidPhone(value: string): boolean {
   return total >= PHONE_MIN_DIGITS && total <= PHONE_MAX_DIGITS;
 }
 
+// CHG-114 — Limpieza antes de enviar.
+//
+// El cliente ignora los separadores para validar, pero el servicio
+// valida la cadena tal cual con un patrón que exige terminar en
+// dígito. Un teléfono escrito con un guion, un punto o un paréntesis
+// al final —"3001234567-"— pasaba aquí y lo rechazaba el servicio con
+// un "Revisa los campos: reporterPhone." que quien reporta no puede
+// interpretar. Un separador suelto en los extremos es un descuido de
+// tecleo, no un número distinto: se quita al enviar y se conserva el
+// formato que la persona escribió. Solo estorban los del final: el
+// patrón del servicio sí admite separadores antes del primer dígito,
+// así que "(300) 123-4567" es válido y hay que dejarlo intacto.
+export function sanitizePhone(value: string): string {
+  return value.trim().replace(/[\s().-]+$/, "");
+}
+
 // Mensaje único: el mismo texto en los tres formularios que piden
 // teléfono, para que el usuario no reciba explicaciones distintas del
 // mismo problema.

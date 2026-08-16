@@ -57,6 +57,7 @@ import {
   validateAndMergePhotos,
 } from "./photoValidation";
 import {
+  ReportRejectedError,
   createIdempotencyKey,
   submitMissingPersonReport,
   type SubmitReportOptions,
@@ -247,6 +248,19 @@ export function MissingPersonReportForm({
     }
   };
 
+  // CHG-083/CHG-114: desplaza a la sección del campo señalado, venga
+  // el señalamiento de la validación local o del rechazo del servicio.
+  const scrollToField = (field: string) => {
+    const section = FIELD_SECTIONS[field];
+    const offset = section ? sectionOffsets.current[section] : undefined;
+    if (offset !== undefined) {
+      scrollRef.current?.scrollTo({
+        y: Math.max(0, offset - 16),
+        animated: true,
+      });
+    }
+  };
+
   const submit = async () => {
     const issues = collectDraftIssues(draft, photos);
     setFormErrors(
@@ -257,14 +271,7 @@ export function MissingPersonReportForm({
     setInvalidFields(new Set(issues.map((issue) => issue.field)));
     if (issues.length > 0) {
       // CHG-083: scroll suave a la sección del primer campo con error.
-      const section = FIELD_SECTIONS[issues[0].field];
-      const offset = section ? sectionOffsets.current[section] : undefined;
-      if (offset !== undefined) {
-        scrollRef.current?.scrollTo({
-          y: Math.max(0, offset - 16),
-          animated: true,
-        });
-      }
+      scrollToField(issues[0].field);
       return;
     }
 
@@ -286,6 +293,18 @@ export function MissingPersonReportForm({
           ? error.message
           : "No fue posible enviar el reporte. Intenta nuevamente.",
       ]);
+      // CHG-114: hasta ahora el rechazo del servicio era un texto
+      // suelto al pie: no resaltaba nada y dejaba al usuario buscando
+      // el campo por su cuenta entre seis secciones.
+      if (error instanceof ReportRejectedError && error.fields.length > 0) {
+        setInvalidFields(new Set(error.fields));
+        const ubicable = error.fields.find(
+          (field) => FIELD_SECTIONS[field] !== undefined,
+        );
+        if (ubicable) {
+          scrollToField(ubicable);
+        }
+      }
     } finally {
       setSubmitting(false);
     }

@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import { sanitizePhone } from "../contact/phoneValidation";
 import {
   UpstreamOutageError,
   isRetryableStatus,
@@ -56,7 +57,12 @@ export function buildBuildingReportPayload(
   };
 
   OPTIONAL_TEXT_FIELDS.forEach((field) => {
-    const value = draft[field].trim();
+    // CHG-114: mismo cuidado que en el reporte de persona; un
+    // separador al final del teléfono lo rechazaba el servicio.
+    const value =
+      field === "reporterPhone"
+        ? sanitizePhone(draft[field])
+        : draft[field].trim();
     if (value) {
       payload[field] = value;
     }

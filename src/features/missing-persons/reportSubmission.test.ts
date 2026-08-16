@@ -1,4 +1,5 @@
 import {
+  ReportRejectedError,
   buildReportPayload,
   createIdempotencyKey,
   submitMissingPersonReport,
@@ -113,6 +114,17 @@ describe("Payload del reporte de persona perdida", () => {
   // CHG-113 — Quien reporta puede no saber con qué ropa salió la
   // persona: el campo viaja solo si tiene contenido, para que el
   // expediente quede sin dato en vez de con un "no sé" escrito.
+  // CHG-114 — Un separador al final pasaba la validación local y lo
+  // rechazaba el servicio, que exige terminar en dígito.
+  it("limpia los separadores del final del teléfono", () => {
+    const payload = buildReportPayload({
+      ...completeDraft,
+      reporterPhone: "+57 (300) 123-4567-",
+    });
+
+    expect(payload.reporterPhone).toBe("+57 (300) 123-4567");
+  });
+
   it("omite la vestimenta cuando se deja en blanco", () => {
     const payload = buildReportPayload({
       ...completeDraft,
@@ -341,6 +353,47 @@ describe("reintento ante una caída del backend (CHG-101)", () => {
       }),
     ).rejects.toThrow(/reporterPhone/);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  // CHG-114 — El rechazo llega con las claves de los campos, que es lo
+  // que permite al formulario resaltarlos y desplazarse hasta ellos.
+  it("el rechazo del servicio conserva las claves de los campos", async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      jsonResponse(
+        {
+          detail: "Revisa los campos: Teléfono del reportante.",
+          fields: ["reporterPhone"],
+        },
+        422,
+      ),
+    ) as unknown as typeof fetch;
+
+    const error = await submitMissingPersonReport(completeDraft, [photo], {
+      requestBaseUrl: "http://api.test",
+      idempotencyKey: "clave-idempotente-0003",
+      wait: async () => undefined,
+    }).catch((rejection: unknown) => rejection);
+
+    expect(error).toBeInstanceOf(ReportRejectedError);
+    expect((error as ReportRejectedError).fields).toEqual(["reporterPhone"]);
+    expect((error as Error).message).toBe(
+      "Revisa los campos: Teléfono del reportante.",
+    );
+  });
+
+  it("un rechazo sin claves no inventa ninguna", async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue(jsonResponse({ detail: "Datos inválidos." }, 422)) as
+      unknown as typeof fetch;
+
+    const error = await submitMissingPersonReport(completeDraft, [photo], {
+      requestBaseUrl: "http://api.test",
+      idempotencyKey: "clave-idempotente-0004",
+      wait: async () => undefined,
+    }).catch((rejection: unknown) => rejection);
+
+    expect((error as ReportRejectedError).fields).toEqual([]);
   });
 
   it("si el backend sigue caído, el error llega tras agotar los intentos", async () => {

@@ -10,6 +10,7 @@ import {
   countPhoneDigits,
   isValidPhone,
   normalizePhone,
+  sanitizePhone,
 } from "./phoneValidation";
 
 describe("teléfonos válidos", () => {
@@ -72,5 +73,22 @@ describe("normalización", () => {
     expect("+57 300 123 4567".length).toBeLessThanOrEqual(
       PHONE_MAX_INPUT_LENGTH,
     );
+  });
+});
+
+// CHG-114 — El cliente ignora los separadores al validar, pero el
+// patrón del servicio exige terminar en dígito: un guion final pasaba
+// aquí y lo rechazaba allá con un mensaje que nadie podía interpretar.
+describe("limpieza antes de enviar", () => {
+  it("quita los separadores del final", () => {
+    expect(sanitizePhone("3001234567-")).toBe("3001234567");
+    expect(sanitizePhone("+57 (300) 123-4567.")).toBe("+57 (300) 123-4567");
+    expect(sanitizePhone("  +57 300 123 4567  ")).toBe("+57 300 123 4567");
+  });
+
+  it("respeta los separadores interiores y el paréntesis inicial", () => {
+    // El servicio los admite antes del primer dígito; quitarlos
+    // cambiaría un teléfono que ya era válido.
+    expect(sanitizePhone("(300) 123-4567")).toBe("(300) 123-4567");
   });
 });

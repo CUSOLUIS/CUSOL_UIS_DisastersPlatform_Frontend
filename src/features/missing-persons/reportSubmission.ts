@@ -4,6 +4,7 @@ import {
   isRetryableStatus,
   retryOnUpstreamOutage,
 } from "../reporting/retryOnUpstreamOutage";
+import { sanitizePhone } from "../contact/phoneValidation";
 import { getLastKnownVisitorLocation } from "../operational-map/visitorPresence";
 import type {
   MissingPersonReportDraft,
@@ -85,7 +86,12 @@ export function buildReportPayload(
   };
 
   OPTIONAL_TEXT_FIELDS.forEach((field) => {
-    const value = draft[field].trim();
+    // CHG-114: un separador suelto al final del teléfono pasaba la
+    // validación local y lo rechazaba el servicio.
+    const value =
+      field === "reporterPhone"
+        ? sanitizePhone(draft[field])
+        : draft[field].trim();
     if (value) {
       payload[field] = value;
     }
@@ -146,14 +152,40 @@ const ERROR_MESSAGES_BY_STATUS: Record<number, string> = {
   503: "El servicio de reportes no está disponible en este momento. Intenta más tarde.",
 };
 
-async function extractProblemDetail(response: Response): Promise<string | null> {
+// CHG-114: el rechazo del servicio viaja con las claves de los campos
+// que falló, para que el formulario pueda resaltarlos y desplazarse
+// hasta el primero en vez de dejar al usuario buscándolo a mano.
+export class ReportRejectedError extends Error {
+  readonly fields: readonly string[];
+
+  constructor(message: string, fields: readonly string[] = []) {
+    super(message);
+    this.name = "ReportRejectedError";
+    this.fields = fields;
+  }
+}
+
+async function extractProblem(
+  response: Response,
+): Promise<{ detail: string | null; fields: string[] }> {
   try {
-    const problem = (await response.json()) as { detail?: unknown };
-    return typeof problem.detail === "string" && problem.detail
-      ? problem.detail
-      : null;
+    const problem = (await response.json()) as {
+      detail?: unknown;
+      fields?: unknown;
+    };
+    return {
+      detail:
+        typeof problem.detail === "string" && problem.detail
+          ? problem.detail
+          : null,
+      fields: Array.isArray(problem.fields)
+        ? problem.fields.filter(
+            (field): field is string => typeof field === "string",
+          )
+        : [],
+    };
   } catch {
-    return null;
+    return { detail: null, fields: [] };
   }
 }
 
@@ -260,11 +292,12 @@ export async function submitMissingPersonReport(
   });
 
   if (!response.ok) {
-    const detail = await extractProblemDetail(response);
-    throw new Error(
-      detail ??
+    const problem = await extractProblem(response);
+    throw new ReportRejectedError(
+      problem.detail ??
         ERROR_MESSAGES_BY_STATUS[response.status] ??
         `El envío del reporte respondió con estado ${response.status}.`,
+      problem.fields,
     );
   }
 

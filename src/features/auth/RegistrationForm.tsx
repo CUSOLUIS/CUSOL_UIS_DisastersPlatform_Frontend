@@ -17,6 +17,7 @@ import {
   PHONE_FORMAT_MESSAGE,
   PHONE_MAX_INPUT_LENGTH,
   isValidPhone,
+  sanitizePhone,
 } from "../contact/phoneValidation";
 import { authDataSource } from "./dataSource";
 import type {
@@ -407,7 +408,8 @@ export function toRegistrationInput(
     firstNames: draft.firstNames.trim(),
     lastNames: draft.lastNames.trim(),
     email: draft.email.trim().toLocaleLowerCase("es-CO"),
-    phone: draft.phone.trim() || null,
+    // CHG-114: sin separadores al final, que el servicio rechaza.
+    phone: sanitizePhone(draft.phone) || null,
     department: draft.department.trim(),
     municipality: draft.municipality.trim(),
     requestedAccountType: draft.requestedAccountType,

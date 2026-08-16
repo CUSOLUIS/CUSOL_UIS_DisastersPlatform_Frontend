@@ -6,6 +6,7 @@ import {
   initialDraft,
   MissingPersonReportForm,
 } from "./MissingPersonReportForm";
+import { ReportRejectedError } from "./reportSubmission";
 import { MAX_PHOTO_BYTES, validateAndMergePhotos } from "./photoValidation";
 import type { SelectedPhoto } from "./reportTypes";
 
@@ -20,6 +21,52 @@ afterEach(() => {
   cleanup();
   jest.restoreAllMocks();
 });
+
+// CHG-114: rellenar el reporte mínimo publicable, tal como lo hace la
+// prueba de publicación, para poder ejercitar la respuesta del envío.
+async function completarReporteMinimo() {
+  const values: Array<[string, string]> = [
+    ["Nombres *", "Valentina"],
+    ["Apellidos *", "Rojas"],
+    ["Departamento *", "Cundinamarca"],
+    ["Municipio *", "Soacha"],
+    ["Dirección *", "Parque central"],
+    ["Circunstancias de la desaparición *", "Se perdió contacto durante la evacuación"],
+    ["Nombre completo *", "Ana Rojas"],
+    ["Relación con la persona *", "Hermana"],
+    ["Teléfono privado", "3001234567"],
+  ];
+  values.forEach(([label, value]) =>
+    fireEvent.changeText(screen.getByLabelText(label), value),
+  );
+
+  fireEvent.press(
+    screen.getByRole("button", {
+      name: "Elegir fecha de la última visualización",
+    }),
+  );
+  fireEvent.press(screen.getByRole("button", { name: "Año 2026" }));
+  fireEvent.press(screen.getByRole("button", { name: "Mes AGO de 2026" }));
+  fireEvent.press(screen.getByRole("button", { name: "Día 11" }));
+
+  fireEvent.press(
+    screen.getByRole("button", {
+      name: "Seleccionar una o varias fotografías",
+    }),
+  );
+  await screen.findByText("foto-valentina.jpg");
+  fireEvent.press(
+    screen.getByRole("checkbox", {
+      name: "Confirmo que la información es veraz según mi conocimiento.",
+    }),
+  );
+  fireEvent.press(
+    screen.getByRole("checkbox", {
+      name: "Confirmo que tengo autorización para compartir estas fotografías.",
+    }),
+  );
+  fireEvent.press(screen.getByRole("button", { name: "Publicar reporte" }));
+}
 
 describe("Reporte de persona perdida", () => {
   // CHG-078 — Con sesión activa el formulario deja de tratar al
@@ -513,6 +560,42 @@ describe("Encabezado y espaciado del reporte (CHG-097)", () => {
     expect(faltantes).not.toContain("clothingDescription");
     // El resto de obligatorios sigue exigiéndose.
     expect(faltantes).toContain("circumstances");
+  });
+
+  // CHG-114 — El rechazo del servicio dejaba un texto al pie con la
+  // clave interna del campo y nada más: ni resaltado ni desplazamiento.
+  it("resalta el campo que el servicio rechazó", async () => {
+    const submitReport = jest
+      .fn()
+      .mockRejectedValue(
+        new ReportRejectedError(
+          "Revisa los campos: Teléfono del reportante.",
+          ["reporterPhone"],
+        ),
+      );
+
+    render(
+      <MissingPersonReportForm
+        onBack={jest.fn()}
+        pickPhotos={async () => [validPhoto]}
+        submitReport={submitReport}
+      />,
+    );
+
+    await completarReporteMinimo();
+
+    await waitFor(() => expect(submitReport).toHaveBeenCalled());
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Revisa los campos: Teléfono del reportante\./),
+      ).toBeTruthy(),
+    );
+
+    const telefono = screen.getByLabelText("Teléfono privado");
+    expect(StyleSheet.flatten(telefono.props.style).borderColor).toBe(
+      colors.reported,
+    );
   });
 
   it("separa los bloques de campo de forma uniforme", () => {
