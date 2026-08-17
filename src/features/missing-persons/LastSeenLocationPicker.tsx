@@ -332,6 +332,27 @@ export function LastSeenLocationPicker({
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.helper}>{helper}</Text>
 
+      {/* CHG-144: paso a paso para que la dirección se llene bien. */}
+      <View style={styles.legend} testID="address-fill-legend">
+        <Text style={styles.legendTitle}>CÓMO SE LLENA LA DIRECCIÓN</Text>
+        <Text style={styles.legendStep}>
+          1 · Escribe arriba departamento, municipio y la dirección o lugar de
+          referencia.
+        </Text>
+        <Text style={styles.legendStep}>
+          2 · Pulsa «CRUZAR DIRECCIÓN»: la busca en el mapa y lista las
+          coincidencias.
+        </Text>
+        <Text style={styles.legendStep}>
+          3 · Elige la coincidencia correcta: se fija el muñequito y la
+          dirección queda completa.
+        </Text>
+        <Text style={styles.legendAlt}>
+          ¿Estás en el lugar? Usa el GPS y luego «COLOCAR MUÑEQUITO» para
+          llenarla desde tu ubicación.
+        </Text>
+      </View>
+
       <View style={styles.actionsRow}>
         <Pressable
           accessibilityRole="button"
@@ -622,6 +643,29 @@ const styles = StyleSheet.create({
     letterSpacing: 1.1,
   },
   helper: { color: colors.inkSoft, fontSize: 12, lineHeight: 18 },
+  // CHG-144: mini-leyenda del paso a paso para llenar la dirección.
+  legend: {
+    borderWidth: 1,
+    borderColor: "rgba(81,229,255,0.18)",
+    borderRadius: 8,
+    padding: 10,
+    gap: 4,
+    backgroundColor: "rgba(5,9,17,0.45)",
+  },
+  legendTitle: {
+    color: colors.cyan,
+    fontFamily: fontFamilies.mono,
+    fontSize: 8,
+    letterSpacing: 0.9,
+    marginBottom: 2,
+  },
+  legendStep: { color: colors.inkSoft, fontSize: 11, lineHeight: 16 },
+  legendAlt: {
+    color: colors.inkDim,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 4,
+  },
   actionsRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   actionButton: {
     paddingHorizontal: 14,

@@ -425,6 +425,22 @@ describe("Cobertura del radio de aviso (CHG-134)", () => {
   });
 });
 
+// CHG-144 — Mini-leyenda del paso a paso para llenar la dirección.
+describe("Mini-leyenda de la dirección (CHG-144)", () => {
+  it("muestra los pasos para llenar la dirección sobre los botones", () => {
+    render(<ControlledPicker addressQuery="" />);
+
+    expect(screen.getByTestId("address-fill-legend")).toBeTruthy();
+    expect(screen.getByText("CÓMO SE LLENA LA DIRECCIÓN")).toBeTruthy();
+    expect(screen.getByText(/1 · Escribe arriba departamento/)).toBeTruthy();
+    expect(screen.getByText(/2 · Pulsa «CRUZAR DIRECCIÓN»/)).toBeTruthy();
+    expect(
+      screen.getByText(/3 · Elige la coincidencia correcta/),
+    ).toBeTruthy();
+    expect(screen.getByText(/COLOCAR MUÑEQUITO.*desde tu ubicación/s)).toBeTruthy();
+  });
+});
+
 // CHG-141 — Modo punto azul: el GPS ya no coloca el muñequito ni toca
 // la dirección; muestra dónde cree el dispositivo que estás, y
 // «COLOCAR MUÑEQUITO» convierte ese punto en el marcador exacto.
