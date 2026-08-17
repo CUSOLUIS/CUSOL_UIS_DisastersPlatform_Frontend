@@ -13,7 +13,6 @@ import {
 } from "../missing-persons/reportSubmission";
 import type { SelectedPhoto } from "../missing-persons/reportTypes";
 import { searchAddressCandidates } from "../missing-persons/geocoding";
-import { getLastKnownVisitorLocation } from "../operational-map/visitorPresence";
 import type { HelpRequestDraft, HelpRequestReceipt } from "./types";
 
 // CHG-125 — Envío de la solicitud «Necesitamos ayuda»: mismo canal que
@@ -57,13 +56,13 @@ export function buildHelpRequestPayload(
     }
   }
 
-  // CHG-066: instantánea de la ubicación de quien solicita (si concedió
-  // el permiso); viaja cifrada y solo la ve super_admin.
-  const snapshot = getLastKnownVisitorLocation();
-  if (snapshot) {
-    payload.reporterLatitude = snapshot.latitude;
-    payload.reporterLongitude = snapshot.longitude;
-  }
+  // CHG-136: aquí NO viaja la instantánea del reportante
+  // (reporterLatitude/reporterLongitude). Ese patrón es del reporte de
+  // persona (CHG-066, cifrado para super_admin); la solicitud de ayuda
+  // es pública por diseño (DEC-125-12), su backend rechaza campos
+  // desconocidos, y desde la auto-ubicación (CHG-130) casi siempre
+  // había instantánea: por eso el envío moría con 422 «latitud,
+  // longitud del reportante» — un campo que el formulario ni pide.
 
   return payload;
 }

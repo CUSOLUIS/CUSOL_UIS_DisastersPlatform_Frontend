@@ -6,6 +6,10 @@ import {
   buildHelpRequestPayload,
   resolveDraftCoordinates,
 } from "./reportSubmission";
+import {
+  resetVisitorPresenceForTests,
+  setLastKnownVisitorLocation,
+} from "../operational-map/visitorPresence";
 import type { HelpRequestDraft } from "./types";
 
 const draft: HelpRequestDraft = {
@@ -42,6 +46,21 @@ describe("buildHelpRequestPayload (CHG-130)", () => {
         durationUnit: "days",
       }).durationHours,
     ).toBe(720);
+  });
+
+  // CHG-136 — La instantánea del reportante JAMÁS viaja en la
+  // solicitud de ayuda: el backend la rechaza (extra=forbid) y con la
+  // auto-ubicación de CHG-130 casi siempre existía, lo que bloqueaba
+  // el envío con un 422 por campos que el formulario ni pide.
+  it("no adjunta la instantánea del reportante aunque exista", () => {
+    setLastKnownVisitorLocation({ latitude: 7.12, longitude: -73.12 });
+    try {
+      const payload = buildHelpRequestPayload(draft);
+      expect(payload.reporterLatitude).toBeUndefined();
+      expect(payload.reporterLongitude).toBeUndefined();
+    } finally {
+      resetVisitorPresenceForTests();
+    }
   });
 
   it("sin coordenadas el payload no las incluye (CHG-127)", () => {
