@@ -6,6 +6,7 @@ import {
   waitFor,
 } from "@testing-library/react-native";
 import { HelpRequestForm, collectHelpRequestIssues, initialHelpRequestDraft } from "./HelpRequestForm";
+import { resetVisitorPresenceForTests } from "../operational-map/visitorPresence";
 import type { HelpRequestReceipt } from "./types";
 
 // El formulario dispara geocodificación inversa de mejor esfuerzo al
@@ -19,6 +20,9 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   jest.restoreAllMocks();
+  // CHG-130: la auto-ubicación consulta la última posición conocida;
+  // ningún test debe heredar la de otro.
+  resetVisitorPresenceForTests();
 });
 
 const anonymousSession = {
@@ -31,7 +35,8 @@ describe("collectHelpRequestIssues (CHG-125)", () => {
     address: "Vereda El Salado, Piedecuesta",
     latitude: "6.98710",
     longitude: "-73.04980",
-    durationHours: "12",
+    durationValue: "12",
+    durationUnit: "hours" as const,
     truthConfirmed: true,
   };
 
@@ -47,7 +52,7 @@ describe("collectHelpRequestIssues (CHG-125)", () => {
       expect.arrayContaining([
         "description",
         "address",
-        "durationHours",
+        "durationValue",
         "truthConfirmed",
       ]),
     );
@@ -75,16 +80,40 @@ describe("collectHelpRequestIssues (CHG-125)", () => {
     (["0", "73", "100", "-4", "2.5", "abc"] as const).forEach((hours) => {
       const issues = collectHelpRequestIssues({
         ...validDraft,
-        durationHours: hours,
+        durationValue: hours,
       });
-      expect(issues.map((issue) => issue.field)).toContain("durationHours");
+      expect(issues.map((issue) => issue.field)).toContain("durationValue");
     });
     expect(
-      collectHelpRequestIssues({ ...validDraft, durationHours: "72" }),
+      collectHelpRequestIssues({ ...validDraft, durationValue: "72" }),
     ).toEqual([]);
     expect(
-      collectHelpRequestIssues({ ...validDraft, durationHours: "1" }),
+      collectHelpRequestIssues({ ...validDraft, durationValue: "1" }),
     ).toEqual([]);
+  });
+
+  // CHG-130: con la unidad en días rigen los límites de días (1-30).
+  it("valida la vigencia en días con sus propios límites", () => {
+    const inDays = { ...validDraft, durationUnit: "days" as const };
+    expect(
+      collectHelpRequestIssues({ ...inDays, durationValue: "2" }),
+    ).toEqual([]);
+    expect(
+      collectHelpRequestIssues({ ...inDays, durationValue: "30" }),
+    ).toEqual([]);
+    (["0", "31", "-1", "1.5"] as const).forEach((days) => {
+      const issues = collectHelpRequestIssues({
+        ...inDays,
+        durationValue: days,
+      });
+      expect(issues.map((issue) => issue.field)).toContain("durationValue");
+    });
+    // 72 es válido en horas pero excede el tope de 30 días.
+    expect(
+      collectHelpRequestIssues({ ...inDays, durationValue: "72" }).map(
+        (issue) => issue.field,
+      ),
+    ).toContain("durationValue");
   });
 
   it("rechaza descripciones demasiado cortas", () => {
@@ -153,7 +182,7 @@ describe("HelpRequestForm (CHG-125)", () => {
         name: "Colocar el muñequito en el centro del mapa",
       }),
     );
-    fireEvent.changeText(screen.getByLabelText("Vigencia en horas *"), "12");
+    fireEvent.changeText(screen.getByLabelText("Vigencia *"), "12");
     fireEvent.press(
       screen.getByRole("checkbox", {
         name: "Confirmo que la solicitud es real y de buena fe.",
@@ -167,7 +196,7 @@ describe("HelpRequestForm (CHG-125)", () => {
     await waitFor(() => expect(submitRequest).toHaveBeenCalledTimes(1));
     const [draft, photos] = submitRequest.mock.calls[0];
     expect(photos).toEqual([]);
-    expect(draft.durationHours).toBe("12");
+    expect(draft.durationValue).toBe("12");
     expect(draft.latitude).not.toBe("");
     expect(draft.longitude).not.toBe("");
 
@@ -202,7 +231,7 @@ describe("HelpRequestForm (CHG-125)", () => {
       screen.getByLabelText("Dirección *"),
       "Vereda El Salado, Piedecuesta",
     );
-    fireEvent.changeText(screen.getByLabelText("Vigencia en horas *"), "12");
+    fireEvent.changeText(screen.getByLabelText("Vigencia *"), "12");
     fireEvent.press(
       screen.getByRole("checkbox", {
         name: "Confirmo que la solicitud es real y de buena fe.",
@@ -222,7 +251,7 @@ describe("HelpRequestForm (CHG-125)", () => {
     expect(screen.getByText("HR-2026-DEMO0002")).toBeTruthy();
   });
 
-  it("ofrece «¿Dónde estoy?» y fija el punto con el GPS", async () => {
+  it("ubica al entrar y «¿Dónde estoy?» vuelve a leer la posición", async () => {
     const locateVisitor = jest
       .fn()
       .mockResolvedValue({ latitude: 7.1398, longitude: -73.1211 });
@@ -234,13 +263,18 @@ describe("HelpRequestForm (CHG-125)", () => {
       />,
     );
 
-    fireEvent.press(
-      await screen.findByRole("button", { name: "¿Dónde estoy?" }),
-    );
-
+    // CHG-130: al entrar a la funcionalidad se intenta la ubicación
+    // una vez y el punto queda fijado sin tocar nada.
     await waitFor(() => expect(locateVisitor).toHaveBeenCalledTimes(1));
     expect(
       await screen.findByText(/PUNTO FIJADO · LAT 7\.13980/),
     ).toBeTruthy();
+
+    // El botón sigue disponible y RELEE la posición (la primera lectura
+    // pudo ser imprecisa o la persona pudo moverse).
+    fireEvent.press(
+      await screen.findByRole("button", { name: "¿Dónde estoy?" }),
+    );
+    await waitFor(() => expect(locateVisitor).toHaveBeenCalledTimes(2));
   });
 });

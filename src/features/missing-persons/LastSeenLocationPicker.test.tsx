@@ -1,11 +1,16 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { useState } from "react";
 import type { GeographicCenter } from "../operational-map/webMercator";
+import {
+  resetVisitorPresenceForTests,
+  setLastKnownVisitorLocation,
+} from "../operational-map/visitorPresence";
 import { LastSeenLocationPicker } from "./LastSeenLocationPicker";
 
 afterEach(() => {
   cleanup();
   jest.restoreAllMocks();
+  resetVisitorPresenceForTests();
 });
 
 function ControlledPicker({
@@ -15,6 +20,7 @@ function ControlledPicker({
   locateVisitor,
   onAddressResolved,
   resolveAddress,
+  autoLocateOnEntry,
 }: {
   addressQuery: string;
   searchCandidates?: (query: string) => Promise<
@@ -24,6 +30,7 @@ function ControlledPicker({
   locateVisitor?: () => Promise<GeographicCenter>;
   onAddressResolved?: jest.Mock;
   resolveAddress?: jest.Mock;
+  autoLocateOnEntry?: boolean;
 }) {
   const [value, setValue] = useState<GeographicCenter | null>(null);
   return (
@@ -38,10 +45,10 @@ function ControlledPicker({
       locateVisitor={locateVisitor}
       onAddressResolved={onAddressResolved}
       resolveAddress={resolveAddress}
+      autoLocateOnEntry={autoLocateOnEntry}
     />
   );
 }
-
 describe("Selector de última ubicación", () => {
   it("cruza la dirección, lista coincidencias y fija el muñequito al elegir una", async () => {
     const onChangeSpy = jest.fn();
@@ -276,5 +283,95 @@ describe("autocompletado de dirección desde el mapa", () => {
       department: null,
     });
     expect(resolveAddress).not.toHaveBeenCalled();
+  });
+});
+
+// CHG-130 — Al entrar a «Necesitamos ayuda» se intenta UNA vez obtener
+// la ubicación; el rechazo no bloquea y los demás formularios no
+// prellenan (autoLocateOnEntry es opt-in).
+describe("Auto-ubicación al entrar (CHG-130)", () => {
+  it("con autoLocateOnEntry pide la posición al montar y fija el punto", async () => {
+    const onChangeSpy = jest.fn();
+    const locateVisitor = jest
+      .fn()
+      .mockResolvedValue({ latitude: 7.1398, longitude: -73.1211 });
+
+    render(
+      <ControlledPicker
+        addressQuery=""
+        onChangeSpy={onChangeSpy}
+        locateVisitor={locateVisitor}
+        autoLocateOnEntry
+      />,
+    );
+
+    await waitFor(() => expect(locateVisitor).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(onChangeSpy).toHaveBeenCalledWith({
+        latitude: 7.1398,
+        longitude: -73.1211,
+      }),
+    );
+  });
+
+  it("con posición ya conocida la usa sin pedir permiso de nuevo", async () => {
+    const onChangeSpy = jest.fn();
+    const locateVisitor = jest.fn();
+    setLastKnownVisitorLocation({ latitude: 6.98, longitude: -73.05 });
+
+    render(
+      <ControlledPicker
+        addressQuery=""
+        onChangeSpy={onChangeSpy}
+        locateVisitor={locateVisitor}
+        autoLocateOnEntry
+      />,
+    );
+
+    await waitFor(() =>
+      expect(onChangeSpy).toHaveBeenCalledWith({
+        latitude: 6.98,
+        longitude: -73.05,
+      }),
+    );
+    expect(locateVisitor).not.toHaveBeenCalled();
+  });
+
+  it("si el permiso se niega no bloquea: queda el aviso y el flujo manual", async () => {
+    const onChangeSpy = jest.fn();
+    const locateVisitor = jest
+      .fn()
+      .mockRejectedValue(new Error("Permiso de ubicación denegado."));
+
+    render(
+      <ControlledPicker
+        addressQuery=""
+        onChangeSpy={onChangeSpy}
+        locateVisitor={locateVisitor}
+        autoLocateOnEntry
+      />,
+    );
+
+    await waitFor(() => expect(locateVisitor).toHaveBeenCalledTimes(1));
+    expect(
+      await screen.findByText("Permiso de ubicación denegado."),
+    ).toBeTruthy();
+    expect(onChangeSpy).not.toHaveBeenCalled();
+    // Un solo intento: no hay bucles de re-solicitud.
+    expect(locateVisitor).toHaveBeenCalledTimes(1);
+    // El flujo manual sigue disponible.
+    expect(
+      screen.getByRole("button", {
+        name: "Colocar el muñequito en el centro del mapa",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("sin autoLocateOnEntry no pide nada al montar", () => {
+    const locateVisitor = jest.fn();
+    render(
+      <ControlledPicker addressQuery="" locateVisitor={locateVisitor} />,
+    );
+    expect(locateVisitor).not.toHaveBeenCalled();
   });
 });

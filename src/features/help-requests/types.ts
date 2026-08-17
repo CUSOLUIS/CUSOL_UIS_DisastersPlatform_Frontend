@@ -3,9 +3,15 @@
 // consulta (DEC-125-02): el frontend solo pinta el contador.
 
 // Espejo del contrato (`HelpRequestInput`): vigencia acotada en
-// servidor, el cliente valida lo mismo antes de enviar.
+// servidor, el cliente valida lo mismo antes de enviar. CHG-130: la
+// vigencia se expresa en horas (1-72) o días (1-30); al enviar, los
+// días se convierten a horas (tope del contrato: 720).
 export const MIN_DURATION_HOURS = 1;
 export const MAX_DURATION_HOURS = 72;
+export const MIN_DURATION_DAYS = 1;
+export const MAX_DURATION_DAYS = 30;
+
+export type DurationUnit = "hours" | "days";
 export const MIN_DESCRIPTION_LENGTH = 10;
 export const MAX_DESCRIPTION_LENGTH = 1000;
 export const MIN_ADDRESS_LENGTH = 5;
@@ -18,7 +24,10 @@ export interface HelpRequestDraft {
   address: string;
   latitude: string;
   longitude: string;
-  durationHours: string;
+  // CHG-130: valor numérico + unidad; al enviar se convierte a horas
+  // (`durationHours` del contrato).
+  durationValue: string;
+  durationUnit: DurationUnit;
   truthConfirmed: boolean;
 }
 

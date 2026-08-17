@@ -33,10 +33,14 @@ export type HelpRequestPayload = Record<string, string | number>;
 export function buildHelpRequestPayload(
   draft: HelpRequestDraft,
 ): HelpRequestPayload {
+  // CHG-130: el contrato viaja siempre en horas; los días se
+  // convierten aquí (el backend valida 1-720 igualmente).
+  const durationValue = Number.parseInt(draft.durationValue.trim(), 10);
   const payload: HelpRequestPayload = {
     description: draft.description.trim(),
     address: draft.address.trim(),
-    durationHours: Number.parseInt(draft.durationHours.trim(), 10),
+    durationHours:
+      draft.durationUnit === "days" ? durationValue * 24 : durationValue,
   };
 
   const latitude = Number.parseFloat(draft.latitude.trim());

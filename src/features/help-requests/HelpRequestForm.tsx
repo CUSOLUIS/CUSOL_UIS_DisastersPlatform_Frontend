@@ -43,10 +43,12 @@ import { submitHelpRequest } from "./reportSubmission";
 import {
   MAX_ADDRESS_LENGTH,
   MAX_DESCRIPTION_LENGTH,
+  MAX_DURATION_DAYS,
   MAX_DURATION_HOURS,
   MAX_HELP_REQUEST_PHOTOS,
   MIN_ADDRESS_LENGTH,
   MIN_DESCRIPTION_LENGTH,
+  MIN_DURATION_DAYS,
   MIN_DURATION_HOURS,
   type HelpRequestDraft,
   type HelpRequestReceipt,
@@ -60,7 +62,8 @@ export const initialHelpRequestDraft: HelpRequestDraft = {
   address: "",
   latitude: "",
   longitude: "",
-  durationHours: "",
+  durationValue: "",
+  durationUnit: "hours",
   truthConfirmed: false,
 };
 
@@ -122,17 +125,23 @@ export function collectHelpRequestIssues(
     push("location", "Las coordenadas del punto están fuera de rango.");
   }
 
-  const rawHours = draft.durationHours.trim();
-  const hours = Number(rawHours);
+  // CHG-130: la vigencia se valida según la unidad elegida; al enviar
+  // los días se convierten a horas (mismo tope del backend: 720).
+  const rawDuration = draft.durationValue.trim();
+  const durationNumber = Number(rawDuration);
+  const durationLimits =
+    draft.durationUnit === "days"
+      ? { min: MIN_DURATION_DAYS, max: MAX_DURATION_DAYS, label: "días" }
+      : { min: MIN_DURATION_HOURS, max: MAX_DURATION_HOURS, label: "horas" };
   if (
-    !rawHours ||
-    !Number.isInteger(hours) ||
-    hours < MIN_DURATION_HOURS ||
-    hours > MAX_DURATION_HOURS
+    !rawDuration ||
+    !Number.isInteger(durationNumber) ||
+    durationNumber < durationLimits.min ||
+    durationNumber > durationLimits.max
   ) {
     push(
-      "durationHours",
-      `Indica la vigencia en horas enteras, entre ${MIN_DURATION_HOURS} y ${MAX_DURATION_HOURS}.`,
+      "durationValue",
+      `Indica la vigencia en ${durationLimits.label} enteros, entre ${durationLimits.min} y ${durationLimits.max}.`,
     );
   }
 
@@ -150,7 +159,8 @@ const FIELD_SECTIONS: Record<string, string> = {
   location: "02",
   latitude: "02",
   longitude: "02",
-  durationHours: "03",
+  durationValue: "03",
+  durationUnit: "03",
   photos: "04",
   truthConfirmed: "05",
 };
@@ -365,7 +375,7 @@ export function HelpRequestForm({
               considerations={[
                 "La descripción, la dirección y el punto del mapa son públicos: así la comunidad sabe dónde hace falta ayuda.",
                 "No incluyas datos personales sensibles en la descripción; esta solicitud no reemplaza la línea de emergencias 123.",
-                "Define una vigencia realista en horas: al vencer, la solicitud desaparece automáticamente de todos los espacios.",
+                "Define una vigencia realista en horas o días: al vencer, la solicitud desaparece automáticamente de todos los espacios.",
               ]}
               onRegister={onRegister}
               onLogin={onLogin}
@@ -429,6 +439,7 @@ export function HelpRequestForm({
                 title="UBICACIÓN EN EL MAPA · OPCIONAL"
                 helper="Si puedes, cruza la dirección escrita arriba con el mapa, toca «¿Dónde estoy?» para usar tu GPS, o arrastra el muñequito hasta el lugar exacto. Con la dirección escrita basta."
                 locateActionLabel="¿Dónde estoy?"
+                autoLocateOnEntry
               />
               {invalidFields.has("location") && (
                 <Text style={styles.errorText} accessibilityRole="alert">
@@ -440,19 +451,65 @@ export function HelpRequestForm({
             <FormSection
               code="03"
               title="Vigencia"
-              description="Cuántas horas debe permanecer visible la solicitud."
+              description="Cuánto tiempo debe permanecer visible la solicitud, en horas o días."
               onPosition={registerSection}
             >
               <FieldGrid>
                 <FormField
-                  label="Vigencia en horas *"
-                  hint={`Entre ${MIN_DURATION_HOURS} y ${MAX_DURATION_HOURS} horas`}
-                  invalid={invalidFields.has("durationHours")}
-                  value={draft.durationHours}
-                  onChangeText={(value) => setField("durationHours", value)}
+                  label="Vigencia *"
+                  hint={
+                    draft.durationUnit === "days"
+                      ? `Entre ${MIN_DURATION_DAYS} y ${MAX_DURATION_DAYS} días`
+                      : `Entre ${MIN_DURATION_HOURS} y ${MAX_DURATION_HOURS} horas`
+                  }
+                  invalid={invalidFields.has("durationValue")}
+                  value={draft.durationValue}
+                  onChangeText={(value) => setField("durationValue", value)}
                   keyboardType="number-pad"
                 />
               </FieldGrid>
+              {/* CHG-130: unidad de la vigencia (horas o días). */}
+              <View
+                style={styles.unitRow}
+                accessibilityRole="radiogroup"
+                accessibilityLabel="Unidad de la vigencia"
+              >
+                {(
+                  [
+                    { unit: "hours", label: "HORAS" },
+                    { unit: "days", label: "DÍAS" },
+                  ] as const
+                ).map(({ unit, label }) => (
+                  <Pressable
+                    key={unit}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`Vigencia en ${label.toLocaleLowerCase("es-CO")}`}
+                    accessibilityState={{
+                      selected: draft.durationUnit === unit,
+                    }}
+                    onPress={() =>
+                      setDraft((current) => ({
+                        ...current,
+                        durationUnit: unit,
+                      }))
+                    }
+                    style={[
+                      styles.unitOption,
+                      draft.durationUnit === unit && styles.unitOptionSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.unitOptionText,
+                        draft.durationUnit === unit &&
+                          styles.unitOptionTextSelected,
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
               <Text style={styles.fieldNote}>
                 Al vencer, la solicitud deja de mostrarse automáticamente en
                 el mapa, la portada y los espacios personales. El control lo
@@ -883,6 +940,27 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,103,136,0.06)",
   },
   fieldNote: { color: colors.inkDim, fontSize: 10, lineHeight: 16 },
+  // CHG-130: selector de unidad de la vigencia (horas/días).
+  unitRow: { flexDirection: "row", gap: 10 },
+  unitOption: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "rgba(81,229,255,0.35)",
+    backgroundColor: "rgba(81,229,255,0.08)",
+  },
+  unitOptionSelected: {
+    borderColor: colors.cyan,
+    backgroundColor: "rgba(81,229,255,0.22)",
+  },
+  unitOptionText: {
+    color: colors.cyan,
+    fontFamily: fontFamilies.mono,
+    fontSize: 10,
+    letterSpacing: 0.8,
+  },
+  unitOptionTextSelected: { color: colors.ink },
   photoRules: {
     gap: 4,
     padding: 15,

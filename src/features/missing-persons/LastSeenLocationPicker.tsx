@@ -17,7 +17,10 @@ import {
   getBrowserGeolocation,
   requestVisitorLocation,
 } from "../operational-map/visitorLocation";
-import { setLastKnownVisitorLocation } from "../operational-map/visitorPresence";
+import {
+  getLastKnownVisitorLocation,
+  setLastKnownVisitorLocation,
+} from "../operational-map/visitorPresence";
 import { useWebMapMouseInteractions } from "../operational-map/webMapMouseInteractions";
 import { useNativeMapTouchInteractions } from "../operational-map/nativeMapTouchInteractions";
 import {
@@ -32,7 +35,7 @@ import {
   type CanvasSize,
   type GeographicCenter,
 } from "../operational-map/webMercator";
-import { useDraggableMarker } from "./draggableMarker";
+import { useDraggableMarker, useNativeMarkerDrag } from "./draggableMarker";
 import {
   reverseGeocode,
   searchAddressCandidates,
@@ -61,6 +64,15 @@ export interface LastSeenLocationPickerProps {
   // CHG-125: botón visible de GPS junto a las acciones («¿Dónde
   // estoy?»); el control ◎ del lienzo sigue disponible igual.
   locateActionLabel?: string;
+  // CHG-130: al entrar a la funcionalidad se intenta UNA vez obtener
+  // la ubicación del dispositivo y prellenar punto/dirección. La
+  // última posición conocida (portón de la app, «Ubícame» previo) se
+  // usa sin volver a pedir permiso; si no hay, se pide como con el
+  // botón. El rechazo no bloquea: queda el aviso no invasivo del
+  // control ◎ y la dirección manual. Opt-in: los demás formularios
+  // (p. ej. persona desaparecida) no deben prellenar con la posición
+  // de quien reporta.
+  autoLocateOnEntry?: boolean;
 }
 
 export function LastSeenLocationPicker({
@@ -74,6 +86,7 @@ export function LastSeenLocationPicker({
   title = "UBICACIÓN EN EL MAPA · OPCIONAL",
   helper = "Cruza la dirección escrita arriba con el mapa, fija tu ubicación con el botón ◎ del GPS, o arrastra el muñequito hasta el lugar exacto.",
   locateActionLabel,
+  autoLocateOnEntry = false,
 }: LastSeenLocationPickerProps) {
   const [zoom, setZoom] = useState(MIN_ZOOM);
   const [center, setCenter] = useState<GeographicCenter>(COLOMBIA_CENTER);
@@ -151,6 +164,15 @@ export function LastSeenLocationPicker({
       }
     },
   });
+  // CHG-130: en Android/iOS el arrastre lo aporta el responder nativo;
+  // en web devuelve {} y siguen mandando los pointer events de arriba.
+  const nativeMarkerDragHandlers = useNativeMarkerDrag({
+    onDragBy: (deltaX, deltaY) => {
+      if (value) {
+        onChange(movePointByScreenDelta(value, zoom, deltaX, deltaY));
+      }
+    },
+  });
 
   const runSearch = async () => {
     setSearching(true);
@@ -197,6 +219,29 @@ export function LastSeenLocationPicker({
       setLocating(false);
     }
   };
+
+  // CHG-130: intento único al montar. Con posición conocida (portón de
+  // la app o un «Ubícame» anterior) se prellena sin diálogo; sin ella
+  // se pide una vez. Nunca se repite ni bloquea el formulario: si el
+  // permiso se niega queda el aviso no invasivo del control ◎ y la
+  // dirección manual.
+  const autoLocateDoneRef = useRef(false);
+  useEffect(() => {
+    if (!autoLocateOnEntry || autoLocateDoneRef.current || value) {
+      return;
+    }
+    autoLocateDoneRef.current = true;
+    const known = getLastKnownVisitorLocation();
+    if (known) {
+      onChange(known);
+      setCenter(known);
+      setZoom(CANDIDATE_ZOOM);
+      return;
+    }
+    if (locateAvailable) {
+      void locateMe();
+    }
+  }, []);
 
   const selectCandidate = (candidate: AddressCandidate) => {
     const point = {
@@ -363,6 +408,7 @@ export function LastSeenLocationPicker({
             accessibilityRole="button"
             accessibilityLabel="Muñequito de ubicación. Mantén presionado y arrástralo hasta la dirección"
             ref={attachMarkerDrag}
+            {...nativeMarkerDragHandlers}
             style={[styles.marker, { left: markerPlacement.left, top: markerPlacement.top }]}
             testID="last-seen-marker"
           >

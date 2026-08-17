@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  PanResponder,
+  Platform,
+  type GestureResponderEvent,
+  type GestureResponderHandlers,
+} from "react-native";
 
 export interface DraggableMarkerCallbacks {
   onDragBy: (deltaX: number, deltaY: number) => void;
@@ -124,4 +130,53 @@ export function useDraggableMarker(callbacks: DraggableMarkerCallbacks) {
   );
 
   return attach;
+}
+
+// CHG-130 — Arrastre del muñequito en Android/iOS. Los manejadores DOM
+// de arriba jamás se enganchan en nativo (el ref de un View no expone
+// addEventListener, igual que en CHG-121 con el lienzo). Un dedo sobre
+// el muñequito lo arrastra; el gesto es del marcador desde el primer
+// toque y ningún ancestro desplazable lo arrebata a mitad de arrastre.
+export function useNativeMarkerDrag(
+  callbacks: DraggableMarkerCallbacks,
+): GestureResponderHandlers | Record<string, never> {
+  const callbacksRef = useRef(callbacks);
+  callbacksRef.current = callbacks;
+
+  return useMemo(() => {
+    if (Platform.OS === "web") {
+      return {};
+    }
+
+    let last: { x: number; y: number } | null = null;
+    const point = (event: GestureResponderEvent) => ({
+      x: event.nativeEvent.pageX,
+      y: event.nativeEvent.pageY,
+    });
+
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: (event) => {
+        last = point(event);
+      },
+      onPanResponderMove: (event) => {
+        const current = point(event);
+        if (last) {
+          const deltaX = current.x - last.x;
+          const deltaY = current.y - last.y;
+          if (deltaX !== 0 || deltaY !== 0) {
+            callbacksRef.current.onDragBy(deltaX, deltaY);
+          }
+        }
+        last = current;
+      },
+      onPanResponderRelease: () => {
+        last = null;
+      },
+      onPanResponderTerminate: () => {
+        last = null;
+      },
+    }).panHandlers;
+  }, []);
 }
