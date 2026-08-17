@@ -468,6 +468,11 @@ export function HelpRequestForm({
                 helper="Si puedes, cruza la dirección escrita arriba con el mapa, toca «¿Dónde estoy?» para usar tu GPS, o arrastra el muñequito hasta el lugar exacto. Con la dirección escrita basta."
                 locateActionLabel="¿Dónde estoy?"
                 autoLocateOnEntry
+                previewRadiusKm={
+                  Number.isInteger(Number(draft.notificationRadiusKm.trim()))
+                    ? Number(draft.notificationRadiusKm.trim())
+                    : null
+                }
               />
               {invalidFields.has("location") && (
                 <Text style={styles.errorText} accessibilityRole="alert">

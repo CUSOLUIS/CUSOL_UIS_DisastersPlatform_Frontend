@@ -21,6 +21,7 @@ function ControlledPicker({
   onAddressResolved,
   resolveAddress,
   autoLocateOnEntry,
+  previewRadiusKm,
 }: {
   addressQuery: string;
   searchCandidates?: (query: string) => Promise<
@@ -31,6 +32,7 @@ function ControlledPicker({
   onAddressResolved?: jest.Mock;
   resolveAddress?: jest.Mock;
   autoLocateOnEntry?: boolean;
+  previewRadiusKm?: number | null;
 }) {
   const [value, setValue] = useState<GeographicCenter | null>(null);
   return (
@@ -46,6 +48,7 @@ function ControlledPicker({
       onAddressResolved={onAddressResolved}
       resolveAddress={resolveAddress}
       autoLocateOnEntry={autoLocateOnEntry}
+      previewRadiusKm={previewRadiusKm}
     />
   );
 }
@@ -373,5 +376,48 @@ describe("Auto-ubicación al entrar (CHG-130)", () => {
       <ControlledPicker addressQuery="" locateVisitor={locateVisitor} />,
     );
     expect(locateVisitor).not.toHaveBeenCalled();
+  });
+});
+
+// CHG-134 — La cobertura del radio de aviso se dibuja alrededor del
+// muñequito a escala real (al acercar el mapa a nivel de calle).
+describe("Cobertura del radio de aviso (CHG-134)", () => {
+  it("dibuja el círculo al fijar el punto con radio definido", async () => {
+    const searchCandidates = jest.fn(async () => [
+      { label: "Parque García Rovira, Bucaramanga", latitude: 7.1148, longitude: -73.1268 },
+    ]);
+    render(
+      <ControlledPicker
+        addressQuery="Parque García Rovira, Bucaramanga"
+        searchCandidates={searchCandidates}
+        previewRadiusKm={5}
+      />,
+    );
+
+    fireEvent.press(
+      screen.getByRole("button", { name: "Cruzar la dirección escrita con el mapa" }),
+    );
+    fireEvent.press(await screen.findByTestId("address-candidate-0"));
+
+    // Al elegir la candidata el zoom llega a nivel de calle (z17): el
+    // círculo de 5 km cabe en el rango dibujable.
+    expect(screen.getByTestId("picker-alert-radius")).toBeTruthy();
+  });
+
+  it("sin radio no hay círculo", async () => {
+    const searchCandidates = jest.fn(async () => [
+      { label: "Parque García Rovira, Bucaramanga", latitude: 7.1148, longitude: -73.1268 },
+    ]);
+    render(
+      <ControlledPicker
+        addressQuery="Parque García Rovira, Bucaramanga"
+        searchCandidates={searchCandidates}
+      />,
+    );
+    fireEvent.press(
+      screen.getByRole("button", { name: "Cruzar la dirección escrita con el mapa" }),
+    );
+    fireEvent.press(await screen.findByTestId("address-candidate-0"));
+    expect(screen.queryByTestId("picker-alert-radius")).toBeNull();
   });
 });

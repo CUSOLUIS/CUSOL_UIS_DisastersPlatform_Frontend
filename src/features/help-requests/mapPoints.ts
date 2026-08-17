@@ -29,6 +29,8 @@ export function helpRequestsToMapPoints(
       locationLabel: request.address,
       latitude: request.latitude,
       longitude: request.longitude,
+      // CHG-134: el radio de aviso se dibuja en el mapa a escala.
+      alertRadiusKm: request.notificationRadiusKm ?? undefined,
       coordinatePrecision: "exact" as const,
       verificationStatus: "unverified" as const,
       relatedDisasterId: null,

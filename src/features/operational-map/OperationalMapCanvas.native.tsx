@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE, UrlTile } from "react-native-maps";
+import MapView, { Circle, Marker, PROVIDER_GOOGLE, UrlTile } from "react-native-maps";
 import { colors, fontFamilies } from "../../theme";
 import { categoryMeta } from "./categoryMeta";
 import { CategoryMarkerIcon } from "./CategoryMarkerIcon";
@@ -137,6 +137,24 @@ export function OperationalMapCanvas({
             zIndex={0}
           />
         )}
+        {/* CHG-134: radio de aviso de las solicitudes de ayuda, a
+            escala real sobre el mapa nativo. */}
+        {props.points
+          .filter((point) => point.alertRadiusKm)
+          .map((point) => (
+            <Circle
+              key={`radius-${point.id}`}
+              center={{
+                latitude: point.latitude,
+                longitude: point.longitude,
+              }}
+              radius={(point.alertRadiusKm ?? 0) * 1000}
+              strokeColor={colors.emergency}
+              strokeWidth={1.5}
+              fillColor="rgba(255,77,94,0.10)"
+              zIndex={1}
+            />
+          ))}
         {props.points.map((point) => {
           const meta = categoryMeta[point.category];
           const selected = props.selectedId === point.id;

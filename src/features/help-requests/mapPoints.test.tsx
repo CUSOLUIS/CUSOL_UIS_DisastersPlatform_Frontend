@@ -35,6 +35,16 @@ describe("helpRequestsToMapPoints (CHG-125, DEC-125-10)", () => {
     expect(helpRequestIdFromPointId("otro-punto")).toBeNull();
   });
 
+  // CHG-134: el radio de aviso llega al punto del mapa para dibujarse.
+  it("proyecta el radio de aviso cuando la solicitud lo define", () => {
+    const [withRadius] = helpRequestsToMapPoints([
+      { ...request, notificationRadiusKm: 15 },
+    ]);
+    expect(withRadius.alertRadiusKm).toBe(15);
+    const [withoutRadius] = helpRequestsToMapPoints([request]);
+    expect(withoutRadius.alertRadiusKm).toBeUndefined();
+  });
+
   // CHG-127 / DEC-127-02: sin par de coordenadas no hay marcador; la
   // solicitud sigue viva en dashboard, transmisión y Mi espacio.
   it("omite del mapa las solicitudes que llegaron solo con dirección", () => {

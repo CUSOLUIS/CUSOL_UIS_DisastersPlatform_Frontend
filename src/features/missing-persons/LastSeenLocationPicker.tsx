@@ -28,6 +28,7 @@ import {
   OSM_MAX_ZOOM,
   TILE_SIZE,
   buildTilePlacements,
+  kilometersToPixels,
   latitudeToWorldY,
   longitudeToWorldX,
   movePointByScreenDelta,
@@ -73,6 +74,9 @@ export interface LastSeenLocationPickerProps {
   // (p. ej. persona desaparecida) no deben prellenar con la posición
   // de quien reporta.
   autoLocateOnEntry?: boolean;
+  // CHG-134: radio de aviso (km) dibujado a escala alrededor del
+  // muñequito, para ver la cobertura mientras se elige.
+  previewRadiusKm?: number | null;
 }
 
 export function LastSeenLocationPicker({
@@ -87,6 +91,7 @@ export function LastSeenLocationPicker({
   helper = "Cruza la dirección escrita arriba con el mapa, fija tu ubicación con el botón ◎ del GPS, o arrastra el muñequito hasta el lugar exacto.",
   locateActionLabel,
   autoLocateOnEntry = false,
+  previewRadiusKm = null,
 }: LastSeenLocationPickerProps) {
   const [zoom, setZoom] = useState(MIN_ZOOM);
   const [center, setCenter] = useState<GeographicCenter>(COLOMBIA_CENTER);
@@ -403,6 +408,39 @@ export function LastSeenLocationPicker({
           error={locateError}
         />
 
+        {/* CHG-134: cobertura del radio de aviso mientras se elige;
+            mismo criterio de escala que el mapa principal. */}
+        {markerPlacement &&
+          value &&
+          previewRadiusKm != null &&
+          previewRadiusKm > 0 &&
+          (() => {
+            const radiusPx = kilometersToPixels(
+              previewRadiusKm,
+              value.latitude,
+              zoom,
+            );
+            if (radiusPx < 6 || radiusPx > 6000) {
+              return null;
+            }
+            return (
+              <View
+                pointerEvents="none"
+                testID="picker-alert-radius"
+                style={[
+                  styles.alertRadius,
+                  {
+                    left: markerPlacement.left - radiusPx,
+                    top: markerPlacement.top - radiusPx,
+                    width: radiusPx * 2,
+                    height: radiusPx * 2,
+                    borderRadius: radiusPx,
+                  },
+                ]}
+              />
+            );
+          })()}
+
         {markerPlacement && (
           <View
             accessibilityRole="button"
@@ -546,6 +584,14 @@ const styles = StyleSheet.create({
   },
   tileLayer: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 },
   tile: { position: "absolute", width: TILE_SIZE, height: TILE_SIZE },
+  // CHG-134: círculo de cobertura del radio de aviso.
+  alertRadius: {
+    position: "absolute",
+    zIndex: 3,
+    borderWidth: 1.5,
+    borderColor: colors.emergency,
+    backgroundColor: "rgba(255,77,94,0.10)",
+  },
   marker: {
     position: "absolute",
     width: 44,

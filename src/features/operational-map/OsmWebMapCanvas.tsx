@@ -33,6 +33,7 @@ import {
   OSM_MAX_ZOOM as MAX_ZOOM,
   TILE_SIZE,
   buildTilePlacements,
+  kilometersToPixels,
   latitudeToWorldY,
   longitudeToWorldX,
   panGeographicCenter,
@@ -305,6 +306,41 @@ export function OsmWebMapCanvas(props: OperationalMapCanvasProps) {
         error={visitorLocationError}
       />
 
+      {/* CHG-134: el radio de aviso de una solicitud «Necesitamos
+          ayuda» se dibuja a escala real bajo su marcador. Fuera de un
+          rango razonable de píxeles no se pinta: minúsculo no dice
+          nada y gigante (zoom muy cercano) cubriría todo el lienzo. */}
+      {markers.map(({ point, left, top }) => {
+        if (!point.alertRadiusKm) {
+          return null;
+        }
+        const radiusPx = kilometersToPixels(
+          point.alertRadiusKm,
+          point.latitude,
+          zoom,
+        );
+        if (radiusPx < 6 || radiusPx > 6000) {
+          return null;
+        }
+        return (
+          <View
+            key={`radius-${point.id}`}
+            pointerEvents="none"
+            testID={`map-alert-radius-${point.id}`}
+            style={[
+              styles.alertRadius,
+              {
+                left: left - radiusPx,
+                top: top - radiusPx,
+                width: radiusPx * 2,
+                height: radiusPx * 2,
+                borderRadius: radiusPx,
+              },
+            ]}
+          />
+        );
+      })}
+
       {markers.map(({ point, left, top }) => {
         const meta = categoryMeta[point.category];
         const selected = props.selectedId === point.id;
@@ -485,6 +521,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginLeft: -21,
     marginTop: -25,
+  },
+  // CHG-134: círculo del radio de aviso, bajo los marcadores.
+  alertRadius: {
+    position: "absolute",
+    zIndex: 1,
+    borderWidth: 1.5,
+    borderColor: colors.emergency,
+    backgroundColor: "rgba(255,77,94,0.10)",
   },
   markerSelected: { zIndex: 3 },
   humanMarker: {

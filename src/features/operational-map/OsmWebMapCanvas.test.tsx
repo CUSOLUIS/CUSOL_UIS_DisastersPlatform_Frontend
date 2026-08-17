@@ -169,3 +169,62 @@ it("conserva la vista anterior debajo mientras cargan las teselas del nuevo zoom
     }).length,
   ).toBeGreaterThan(0);
 });
+
+// CHG-134 — El radio de aviso de una solicitud «Necesitamos ayuda» se
+// dibuja a escala real bajo su marcador; sin radio no hay círculo.
+describe("Radio de aviso en el lienzo (CHG-134)", () => {
+  const helpPoint = {
+    id: "help_request:b2000000-0000-4000-8000-000000000009",
+    category: "help_request" as const,
+    title: "Necesitamos ayuda",
+    locationLabel: "Vereda El Salado, Piedecuesta",
+    latitude: 6.9871,
+    longitude: -73.0498,
+    // 100 km ≈ 21 px al zoom nacional: visible sin acercar.
+    alertRadiusKm: 100,
+    coordinatePrecision: "exact" as const,
+    verificationStatus: "unverified" as const,
+    relatedDisasterId: null,
+    description: "Se necesita ayuda urgente.",
+    source: { name: "Solicitud ciudadana", sourceType: "citizen" as const, url: null },
+    updatedAt: "2026-08-17T10:00:00Z",
+  };
+
+  it("dibuja el círculo del radio y no bloquea la interacción", () => {
+    render(
+      <OsmWebMapCanvas
+        compact={false}
+        onSelect={jest.fn()}
+        points={[helpPoint]}
+        selectedId={null}
+      />,
+    );
+    const circle = screen.getByTestId(`map-alert-radius-${helpPoint.id}`);
+    expect(circle).toBeTruthy();
+    expect(circle.props.pointerEvents).toBe("none");
+  });
+
+  it("sin radio de aviso no hay círculo", () => {
+    render(
+      <OsmWebMapCanvas
+        compact={false}
+        onSelect={jest.fn()}
+        points={[{ ...helpPoint, alertRadiusKm: undefined }]}
+        selectedId={null}
+      />,
+    );
+    expect(screen.queryByTestId(/^map-alert-radius-/)).toBeNull();
+  });
+
+  it("a escala nacional un radio minúsculo no se pinta (ruido visual)", () => {
+    render(
+      <OsmWebMapCanvas
+        compact={false}
+        onSelect={jest.fn()}
+        points={[{ ...helpPoint, alertRadiusKm: 2 }]}
+        selectedId={null}
+      />,
+    );
+    expect(screen.queryByTestId(/^map-alert-radius-/)).toBeNull();
+  });
+});

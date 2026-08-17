@@ -142,3 +142,21 @@ export function movePointByScreenDelta(
 ): GeographicCenter {
   return panGeographicCenter(point, zoom, -deltaX, -deltaY);
 }
+
+// CHG-134 — Radio geográfico a píxeles del lienzo: metros por píxel de
+// la proyección Web Mercator en esa latitud y nivel de zoom. Con esto
+// el radio de aviso de una solicitud se dibuja a escala real.
+const EARTH_CIRCUMFERENCE_METERS = 40_075_016.686;
+
+export function kilometersToPixels(
+  kilometers: number,
+  latitude: number,
+  zoom: number,
+): number {
+  const worldSize = TILE_SIZE * 2 ** zoom;
+  const metersPerPixel =
+    (EARTH_CIRCUMFERENCE_METERS *
+      Math.cos((latitude * Math.PI) / 180)) /
+    worldSize;
+  return (kilometers * 1000) / metersPerPixel;
+}
