@@ -3,9 +3,29 @@
 import {
   APP_DOWNLOAD_URL,
   APP_UPDATE_MANIFEST_URL,
+  embeddedAppRevision,
   fetchLatestAppRevision,
   updateRequired,
 } from "./appUpdate";
+import { EMBEDDED_APP_REVISION } from "./appRevision";
+
+describe("revisión embebida (CHG-128)", () => {
+  it("en el repo el archivo generado es null y el portón queda inactivo", () => {
+    // CI sobreescribe appRevision.ts con el sha del build; aquí (web,
+    // desarrollo, pruebas) no hay revisión y el portón no actúa.
+    expect(EMBEDDED_APP_REVISION).toBeNull();
+    expect(embeddedAppRevision()).toBeNull();
+  });
+
+  it("la variable de entorno sirve de respaldo para builds manuales", () => {
+    process.env.EXPO_PUBLIC_APP_REVISION = "  shaManual42  ";
+    try {
+      expect(embeddedAppRevision()).toBe("shaManual42");
+    } finally {
+      delete process.env.EXPO_PUBLIC_APP_REVISION;
+    }
+  });
+});
 
 describe("updateRequired (CHG-128)", () => {
   it("solo exige actualizar con confirmación positiva de otra revisión", () => {

@@ -53,6 +53,15 @@ jobs:
       - name: Instalar dependencias
         run: npm ci --no-audit --no-fund
 
+      # CHG-128: la revisión viaja en un archivo generado, no solo en la
+      # variable de entorno — el inlining de babel no llegó al bundle en
+      # el build real de CI y el APK salió sin revisión embebida.
+      - name: Embeber la revisión del build
+        run: |
+          printf '// Generado por el workflow Android APK (CHG-128).\nexport const EMBEDDED_APP_REVISION: string | null = "%s";\n' \
+            "$GITHUB_SHA" > src/features/app-update/appRevision.ts
+          cat src/features/app-update/appRevision.ts
+
       - name: Generar proyecto nativo de Android
         run: npx expo prebuild --platform android --no-install
 

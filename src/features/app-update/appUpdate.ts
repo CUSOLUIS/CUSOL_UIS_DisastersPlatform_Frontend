@@ -6,6 +6,8 @@
 // continúa — bloquear por un fallo de red dejaría inservible una app
 // de emergencias justo cuando más se necesita.
 
+import { EMBEDDED_APP_REVISION } from "./appRevision";
+
 const productionBaseUrl = (
   process.env.EXPO_PUBLIC_API_BASE_URL ?? "https://cusoldisasterplatform.com"
 ).replace(/\/$/, "");
@@ -16,10 +18,15 @@ export const APP_DOWNLOAD_URL = `${productionBaseUrl}/descargas/cusol-disasters.
 const FETCH_TIMEOUT_MS = 8_000;
 
 // Solo los APK compilados por CI llevan revisión; web, desarrollo
-// local y pruebas no, y en esos casos el portón queda inactivo.
+// local y pruebas no, y en esos casos el portón queda inactivo. La
+// fuente principal es el archivo generado (appRevision.ts, que CI
+// sobreescribe antes de compilar); la variable de entorno queda como
+// respaldo para builds manuales.
 export function embeddedAppRevision(): string | null {
-  const revision = process.env.EXPO_PUBLIC_APP_REVISION?.trim();
-  return revision ? revision : null;
+  const fromEnv = process.env.EXPO_PUBLIC_APP_REVISION?.trim();
+  if (fromEnv) return fromEnv;
+  const fromFile = EMBEDDED_APP_REVISION?.trim();
+  return fromFile ? fromFile : null;
 }
 
 export async function fetchLatestAppRevision(
