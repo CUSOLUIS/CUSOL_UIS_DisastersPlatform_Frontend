@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { AdminApiError, adminDataSource } from "./dataSource";
 import { HelpRequestsAdminSection } from "./HelpRequestsAdminSection";
+import { PlatformResetSection } from "./PlatformResetSection";
 import { SystemMetricsSection } from "./SystemMetricsSection";
 import type {
   AdminAccountDetail,
@@ -55,6 +56,8 @@ const SECTION_OPTIONS: Array<{
   { value: "system", label: "Sistema", code: "06" },
   // CHG-138: gestión de solicitudes «Necesitamos ayuda».
   { value: "helpRequests", label: "Solicitudes", code: "07" },
+  // CHG-139: reinicio absoluto de la plataforma.
+  { value: "reset", label: "Reinicio", code: "08" },
 ];
 
 const KIND_LABELS: Record<AdminSubmissionKind, string> = {
@@ -333,6 +336,11 @@ export function AdminDashboard({
                 eliminarlo una a una o vaciar la base. */}
             {section === "helpRequests" && (
               <HelpRequestsAdminSection dataSource={protectedDataSource} />
+            )}
+            {/* CHG-139: reinicio absoluto — zona de peligro con frase
+                de confirmación escrita. */}
+            {section === "reset" && (
+              <PlatformResetSection dataSource={protectedDataSource} />
             )}
           </ScrollView>
         </View>
@@ -754,7 +762,7 @@ function AuditSection({ dataSource, refreshKey }: { dataSource: AdminDataSource;
   const [query, setQuery] = useState(""); const [page, setPage] = useState<AdminAuditPage | null>(null); const [offset, setOffset] = useState(0); const [error, setError] = useState<string | null>(null); const [loading, setLoading] = useState(false);
   const load = useCallback(async () => { setLoading(true); setError(null); try { setPage(await dataSource.listAudit({ q: query.trim() || undefined, limit: 25, offset })); } catch (caught: unknown) { setError(messageOf(caught)); } finally { setLoading(false); } }, [dataSource, offset, query]);
   useEffect(() => { void load(); }, [load, refreshKey]);
-  return <View style={styles.sectionContent}><SectionHeading code="04" title="Auditoría administrativa" description="Trazabilidad de acciones y resultados sin contraseñas, tokens ni payloads privados." /><TextInput accessibilityLabel="Buscar auditoría" value={query} onChangeText={(value) => { setQuery(value); setOffset(0); }} placeholder="Actor, acción, recurso o motivo" placeholderTextColor="#536074" style={styles.searchInput} />{error && <InlineError message={error} onRetry={() => void load()} />}{loading && !page ? <InlineLoading label="Cargando auditoría" /> : <View style={styles.auditList}>{page?.items.map((event) => <View key={event.id} style={styles.auditCard}><View style={styles.auditTop}><Text style={styles.auditAction}>{humanize(event.action)}</Text><Text style={[styles.auditResult, event.result === "success" ? styles.resultSuccess : styles.resultFailed]}>{event.result.toUpperCase()}</Text></View><Text style={styles.auditActor}>{event.actorDisplayName}</Text><Text style={styles.auditMeta}>{humanize(event.resourceKind)} · {event.resourceId.slice(0, 8)}… · {formatDateTime(event.occurredAt)}</Text>{event.reasonSummary && <Text style={styles.auditReason}>{event.reasonSummary}</Text>}</View>)}{page?.items.length === 0 && <EmptyText text="No hay eventos para esta búsqueda." />}{page && <Pagination total={page.total} limit={page.limit} offset={page.offset} onChange={setOffset} />}</View>}</View>;
+  return <View style={styles.sectionContent}><SectionHeading code="04" title="Auditoría administrativa" description="Trazabilidad de acciones y resultados sin contraseñas, tokens ni payloads privados." /><TextInput accessibilityLabel="Buscar auditoría" value={query} onChangeText={(value) => { setQuery(value); setOffset(0); }} placeholder="Actor, acción, recurso o motivo" placeholderTextColor="#536074" style={styles.searchInput} />{error && <InlineError message={error} onRetry={() => void load()} />}{loading && !page ? <InlineLoading label="Cargando auditoría" /> : <View style={styles.auditList}>{page?.items.map((event) => <View key={event.id} style={styles.auditCard}><View style={styles.auditTop}><Text style={styles.auditAction}>{humanize(event.action)}</Text><Text style={[styles.auditResult, event.result === "success" ? styles.resultSuccess : styles.resultFailed]}>{event.result.toUpperCase()}</Text></View><Text style={styles.auditActor}>{event.actorDisplayName}</Text><Text style={styles.auditMeta}>{humanize(event.resourceKind)} · {event.resourceId ? `${event.resourceId.slice(0, 8)}…` : "global"} · {formatDateTime(event.occurredAt)}</Text>{event.reasonSummary && <Text style={styles.auditReason}>{event.reasonSummary}</Text>}</View>)}{page?.items.length === 0 && <EmptyText text="No hay eventos para esta búsqueda." />}{page && <Pagination total={page.total} limit={page.limit} offset={page.offset} onChange={setOffset} />}</View>}</View>;
 }
 
 function FilterRow<Value extends string>({ label, value, options, labels, onChange, allowAll = true }: { label: string; value: Value | undefined; options: Value[]; labels: Record<Value, string>; onChange: (value: Value | undefined) => void; allowAll?: boolean }) {

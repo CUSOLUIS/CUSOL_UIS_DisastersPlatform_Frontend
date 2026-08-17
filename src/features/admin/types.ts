@@ -8,7 +8,9 @@ export type AdminSection =
   | "presence"
   | "system"
   // CHG-138: gestión de solicitudes «Necesitamos ayuda».
-  | "helpRequests";
+  | "helpRequests"
+  // CHG-139: reinicio absoluto de la plataforma.
+  | "reset";
 export type AdminSubmissionKind =
   | "missing_person_report"
   | "unverified_building_report"
@@ -206,7 +208,8 @@ export interface AdminAuditEvent {
   actorDisplayName: string;
   action: string;
   resourceKind: string;
-  resourceId: string;
+  // CHG-139: null en actos globales (vaciados, reinicio).
+  resourceId: string | null;
   result: "success" | "denied" | "failed";
   reasonSummary: string | null;
   occurredAt: string;
@@ -294,6 +297,16 @@ export interface AdminHelpRequestDeleteReceipt {
   deleted: number;
 }
 
+// CHG-139 — Reinicio absoluto: la frase exacta que exige el gateway y
+// el recibo con los conteos de ambos servicios.
+export const PLATFORM_RESET_CONFIRMATION = "REINICIAR TODO";
+
+export interface AdminPlatformResetReceipt {
+  tablesCleared: number;
+  accountsDeleted: number;
+  generatedAt: string;
+}
+
 export interface AdminDataSource {
   transport: "api" | "demo";
   getCurrentAccount(signal?: AbortSignal): Promise<AuthenticatedAccount>;
@@ -350,5 +363,7 @@ export interface AdminDataSource {
   listHelpRequests(signal?: AbortSignal): Promise<AdminHelpRequestPage>;
   deleteHelpRequest(id: string): Promise<AdminHelpRequestDeleteReceipt>;
   purgeHelpRequests(): Promise<AdminHelpRequestDeleteReceipt>;
+  // CHG-139: reinicio absoluto (frase de confirmación obligatoria).
+  resetPlatform(confirm: string): Promise<AdminPlatformResetReceipt>;
   logout(): Promise<void>;
 }

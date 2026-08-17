@@ -191,6 +191,11 @@ function createDataSource(
     }),
     deleteHelpRequest: jest.fn().mockResolvedValue({ deleted: 1 }),
     purgeHelpRequests: jest.fn().mockResolvedValue({ deleted: 0 }),
+    resetPlatform: jest.fn().mockResolvedValue({
+      tablesCleared: 21,
+      accountsDeleted: 6,
+      generatedAt: "2026-08-17T12:00:00Z",
+    }),
     logout: jest.fn().mockResolvedValue(undefined),
   };
 }

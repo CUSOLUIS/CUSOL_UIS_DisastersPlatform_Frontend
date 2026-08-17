@@ -195,3 +195,43 @@ it("marca resuelta una alerta activa", async () => {
     ),
   );
 });
+
+// CHG-139 — El acceso a la consola vive en Mi espacio, solo para
+// super_admin; cerrarlo navega a /administracion.
+it("muestra la consola de administración solo al super_admin", async () => {
+  const onOpenAdmin = jest.fn();
+  const onClose = jest.fn();
+  render(
+    <MySpacePanel
+      visible
+      onClose={onClose}
+      dataSource={createDataSource()}
+      geocode={geocode}
+      isSuperAdmin
+      onOpenAdmin={onOpenAdmin}
+    />,
+  );
+
+  fireEvent.press(
+    await screen.findByLabelText("Abrir la consola de administración"),
+  );
+  expect(onClose).toHaveBeenCalled();
+  expect(onOpenAdmin).toHaveBeenCalledTimes(1);
+});
+
+it("sin rol super_admin no existe el acceso a la consola", async () => {
+  render(
+    <MySpacePanel
+      visible
+      onClose={jest.fn()}
+      dataSource={createDataSource()}
+      geocode={geocode}
+      onOpenAdmin={jest.fn()}
+    />,
+  );
+
+  expect(await screen.findByText("Persona De Prueba")).toBeTruthy();
+  expect(
+    screen.queryByLabelText("Abrir la consola de administración"),
+  ).toBeNull();
+});

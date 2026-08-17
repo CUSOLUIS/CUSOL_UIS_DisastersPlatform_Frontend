@@ -84,9 +84,14 @@ export function MySpacePanel({
   helpRequests = helpRequestsDataSource,
   geocode = searchAddressCandidates,
   locate = requestVisitorLocation,
+  isSuperAdmin = false,
+  onOpenAdmin,
 }: {
   visible: boolean;
   onClose: () => void;
+  // CHG-139: acceso directo a la consola, solo para super_admin.
+  isSuperAdmin?: boolean;
+  onOpenAdmin?: () => void;
   dataSource?: MySpaceDataSource;
   // CHG-125 / DEC-125-09 y DEC-125-11: las solicitudes activas se
   // notifican dentro del espacio personal con su acción de atender.
@@ -148,6 +153,24 @@ export function MySpacePanel({
               <Text style={styles.closeText}>×</Text>
             </Pressable>
           </View>
+
+          {/* CHG-139: la consola de administración se alcanza desde el
+              espacio personal; nadie más ve este acceso. */}
+          {isSuperAdmin && onOpenAdmin && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Abrir la consola de administración"
+              onPress={() => {
+                onClose();
+                onOpenAdmin();
+              }}
+              style={styles.adminButton}
+            >
+              <Text style={styles.adminButtonText}>
+                CONSOLA DE ADMINISTRACIÓN →
+              </Text>
+            </Pressable>
+          )}
 
           <View style={styles.tabs}>
             <Pressable
@@ -556,6 +579,23 @@ function VolunteersSection({
 }
 
 const styles = StyleSheet.create({
+  // CHG-139: acceso del super_admin a la consola.
+  adminButton: {
+    minHeight: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(81,229,255,0.4)",
+    borderRadius: 8,
+    backgroundColor: "rgba(81,229,255,0.08)",
+  },
+  adminButtonText: {
+    color: colors.cyan,
+    fontFamily: fontFamilies.mono,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.9,
+  },
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(3, 6, 12, 0.86)",

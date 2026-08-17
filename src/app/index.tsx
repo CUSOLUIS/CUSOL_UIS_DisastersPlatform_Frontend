@@ -12,6 +12,7 @@ export default function HomeRoute() {
       onLogin={() => router.push("/iniciar-sesion")}
       onRegister={() => router.push("/registrarse")}
       onAbout={() => router.push("/quienes-somos")}
+      onOpenAdmin={() => router.push("/administracion")}
       onReportMissingPerson={() => router.push("/reportar-persona-perdida")}
       onReportUnverifiedBuilding={() =>
         router.push("/reportar-edificio-sin-verificar")

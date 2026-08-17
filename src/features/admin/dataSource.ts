@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import { authDataSource } from "../auth/dataSource";
+import { PLATFORM_RESET_CONFIRMATION } from "./types";
 import type {
   AdminAccountDetail,
   AdminAccountPage,
@@ -9,6 +10,7 @@ import type {
   AdminHelpRequest,
   AdminHelpRequestDeleteReceipt,
   AdminHelpRequestPage,
+  AdminPlatformResetReceipt,
   AdminSystemMetrics,
   AdminVisitorPresencePage,
   AdminEvidenceAccessGrant,
@@ -176,6 +178,12 @@ const apiAdminDataSource: AdminDataSource = {
     apiRequest<AdminHelpRequestDeleteReceipt>(
       "/api/v1/admin/help-requests",
       { method: "DELETE" },
+    ),
+  // CHG-139: reinicio absoluto de la plataforma.
+  resetPlatform: (confirm) =>
+    apiRequest<AdminPlatformResetReceipt>(
+      "/api/v1/admin/platform-reset",
+      { method: "POST", body: JSON.stringify({ confirm }) },
     ),
   logout: authDataSource.logout,
 };
@@ -775,6 +783,19 @@ export const demoAdminDataSource: AdminDataSource = {
     const deleted = demoHelpRequests.length;
     demoHelpRequests.length = 0;
     return { deleted };
+  },
+  // CHG-139: en demo el reinicio vacía las colecciones sintéticas.
+  async resetPlatform(confirm) {
+    if (confirm !== PLATFORM_RESET_CONFIRMATION) {
+      throw new Error("Escribe la frase de confirmación exacta.");
+    }
+    demoHelpRequests.length = 0;
+    demoSubmissions.length = 0;
+    return {
+      tablesCleared: 21,
+      accountsDeleted: 6,
+      generatedAt: nowIso(),
+    };
   },
   logout: authDataSource.logout,
 };

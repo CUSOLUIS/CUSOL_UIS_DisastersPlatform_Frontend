@@ -68,6 +68,8 @@ interface AppProps {
   onLogin?: () => void;
   onRegister?: () => void;
   onAbout?: () => void;
+  // CHG-139: abre /administracion desde Mi espacio (super_admin).
+  onOpenAdmin?: () => void;
   // CHG-091: deep link ?buscar= hacia el buscador del directorio.
   initialDirectorySearch?: string;
   // CHG-051: origen de la sesión (inyectable en pruebas).
@@ -94,6 +96,7 @@ export function App({
   onLogin = () => undefined,
   onRegister = () => undefined,
   onAbout = () => undefined,
+  onOpenAdmin,
   initialDirectorySearch,
   authSource = authDataSource,
   changeSignal = changeSignalSource,
@@ -178,6 +181,7 @@ export function App({
         onLogin={onLogin}
         onRegister={onRegister}
         onAbout={onAbout}
+        onOpenAdmin={onOpenAdmin}
         initialDirectorySearch={initialDirectorySearch}
         sessionAccount={sessionAccount}
         onLogout={logout}
@@ -207,6 +211,7 @@ function DashboardLoader({
   onLogin,
   onRegister,
   onAbout,
+  onOpenAdmin,
   sessionAccount,
   initialDirectorySearch,
   onLogout,
@@ -228,6 +233,8 @@ function DashboardLoader({
   onLogin: () => void;
   onRegister: () => void;
   onAbout: () => void;
+  // CHG-139: abre /administracion desde Mi espacio (super_admin).
+  onOpenAdmin?: () => void;
   initialDirectorySearch?: string;
   sessionAccount: AuthenticatedAccount | null;
   onLogout: () => void;
@@ -345,6 +352,7 @@ function DashboardLoader({
       onLogin={onLogin}
       onRegister={onRegister}
       onAbout={onAbout}
+      onOpenAdmin={onOpenAdmin}
       account={sessionAccount}
       onLogout={onLogout}
     />

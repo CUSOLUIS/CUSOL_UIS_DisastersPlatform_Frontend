@@ -71,6 +71,8 @@ interface HumanImpactDashboardProps {
   onLogin: () => void;
   onRegister: () => void;
   onAbout: () => void;
+  // CHG-139: navegación a la consola (solo la usa el super_admin).
+  onOpenAdmin?: () => void;
   // CHG-091: deep link ?buscar= hacia el buscador del directorio.
   initialDirectorySearch?: string;
   // CHG-051: sesión activa visible en el encabezado, con cierre.
@@ -195,6 +197,7 @@ export function HumanImpactDashboard({
   onLogin,
   onRegister,
   onAbout,
+  onOpenAdmin,
   account = null,
   onLogout = () => undefined,
 }: HumanImpactDashboardProps) {
@@ -311,6 +314,8 @@ export function HumanImpactDashboard({
         <MySpacePanel
           visible={mySpaceOpen}
           onClose={() => setMySpaceOpen(false)}
+          isSuperAdmin={account?.assignedRole === "super_admin"}
+          onOpenAdmin={onOpenAdmin}
         />
 
         <ScrollView
