@@ -12,6 +12,7 @@ const draft: HelpRequestDraft = {
   longitude: "-73.04980",
   durationValue: "12",
   durationUnit: "hours",
+  notificationRadiusKm: "5",
   truthConfirmed: true,
 };
 
@@ -48,5 +49,19 @@ describe("buildHelpRequestPayload (CHG-130)", () => {
     });
     expect(payload.latitude).toBeUndefined();
     expect(payload.longitude).toBeUndefined();
+  });
+
+  // CHG-131: el radio viaja solo con coordenadas; sin punto se omite
+  // (el backend lo rechazaría) y vacío significa sin aviso.
+  it("incluye el radio de aviso solo cuando hay coordenadas", () => {
+    expect(buildHelpRequestPayload(draft).notificationRadiusKm).toBe(5);
+    expect(
+      buildHelpRequestPayload({ ...draft, latitude: "", longitude: "" })
+        .notificationRadiusKm,
+    ).toBeUndefined();
+    expect(
+      buildHelpRequestPayload({ ...draft, notificationRadiusKm: "" })
+        .notificationRadiusKm,
+    ).toBeUndefined();
   });
 });

@@ -329,8 +329,13 @@ describe("App universal", () => {
     expect(within(missionIntro).queryByText("humana")).toBeNull();
 
     const mainContent = screen.getByTestId("dashboard-main-content");
+    // CHG-131: el aviso de proximidad vive entre las secciones pero sin
+    // aviso no pinta nada; el orden se mide sobre las secciones con
+    // testID.
     const mainOrder = mainContent.children.flatMap((child) =>
-      typeof child === "string" ? [] : [child.props.testID],
+      typeof child === "string" || !child.props.testID
+        ? []
+        : [child.props.testID],
     );
     expect(mainOrder.slice(0, 2)).toEqual([
       "dashboard-entry-hero",

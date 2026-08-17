@@ -59,6 +59,18 @@ describe("RUNTIME_RULES", () => {
     );
   });
 
+  it("los avisos de proximidad solo existen en la app instalada (CHG-131)", () => {
+    expect(
+      rulesForRuntime("native-app").showHelpRequestProximityAlerts,
+    ).toBe(true);
+    expect(
+      rulesForRuntime("mobile-web").showHelpRequestProximityAlerts,
+    ).toBe(false);
+    expect(
+      rulesForRuntime("desktop-web").showHelpRequestProximityAlerts,
+    ).toBe(false);
+  });
+
   it("cubre los tres contextos, ni uno más", () => {
     expect(Object.keys(RUNTIME_RULES).sort()).toEqual([
       "desktop-web",

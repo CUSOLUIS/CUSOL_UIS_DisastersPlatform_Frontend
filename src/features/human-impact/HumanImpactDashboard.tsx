@@ -32,6 +32,7 @@ import type {
   CommunityContributionDataSource,
   HumanitarianDirectoryDataSource,
 } from "../humanitarian-directory/types";
+import { HelpRequestProximityAlert } from "../help-requests/HelpRequestProximityAlert";
 import { HelpRequestsSection } from "../help-requests/HelpRequestsSection";
 import { useActiveHelpRequests } from "../help-requests/useActiveHelpRequests";
 import type { HelpRequestsDataSource } from "../help-requests/types";
@@ -385,6 +386,15 @@ export function HumanImpactDashboard({
 
               <ScrollContinuationCue onPress={showMap} />
             </View>
+
+            {/* CHG-131: aviso de proximidad — en la app instalada, si
+                este dispositivo está dentro del radio de aviso de una
+                solicitud activa, el banner de emergencia aparece antes
+                que todo lo demás. Sin aviso no monta nada. */}
+            <HelpRequestProximityAlert
+              items={helpRequestsState.items}
+              style={styles.fullWidth}
+            />
 
             <View
               ref={mapRef}

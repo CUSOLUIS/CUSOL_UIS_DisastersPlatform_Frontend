@@ -41,6 +41,10 @@ export interface RuntimeRules {
   // publicada en el VPS antes de funcionar; la web siempre está al día
   // por naturaleza.
   requireLatestAppVersion: boolean;
+  // CHG-131: los avisos de proximidad de «Necesitamos ayuda» son de la
+  // app instalada (mantiene la posición vigilada por CHG-066); la web
+  // no promete avisos.
+  showHelpRequestProximityAlerts: boolean;
 }
 
 export const RUNTIME_RULES: Record<RuntimeContext, RuntimeRules> = {
@@ -48,16 +52,19 @@ export const RUNTIME_RULES: Record<RuntimeContext, RuntimeRules> = {
     showAppDownloadPromo: true,
     requireLocationConsentGate: false,
     requireLatestAppVersion: false,
+    showHelpRequestProximityAlerts: false,
   },
   "desktop-web": {
     showAppDownloadPromo: false,
     requireLocationConsentGate: false,
     requireLatestAppVersion: false,
+    showHelpRequestProximityAlerts: false,
   },
   "native-app": {
     showAppDownloadPromo: false,
     requireLocationConsentGate: true,
     requireLatestAppVersion: true,
+    showHelpRequestProximityAlerts: true,
   },
 };
 

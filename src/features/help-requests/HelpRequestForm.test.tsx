@@ -37,6 +37,7 @@ describe("collectHelpRequestIssues (CHG-125)", () => {
     longitude: "-73.04980",
     durationValue: "12",
     durationUnit: "hours" as const,
+    notificationRadiusKm: "5",
     truthConfirmed: true,
   };
 

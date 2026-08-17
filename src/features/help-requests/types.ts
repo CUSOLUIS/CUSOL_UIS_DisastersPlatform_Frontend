@@ -12,6 +12,11 @@ export const MIN_DURATION_DAYS = 1;
 export const MAX_DURATION_DAYS = 30;
 
 export type DurationUnit = "hours" | "days";
+
+// CHG-131: radio de aviso en la app instalada (km a la redonda).
+export const MIN_NOTIFICATION_RADIUS_KM = 1;
+export const MAX_NOTIFICATION_RADIUS_KM = 100;
+export const DEFAULT_NOTIFICATION_RADIUS_KM = 5;
 export const MIN_DESCRIPTION_LENGTH = 10;
 export const MAX_DESCRIPTION_LENGTH = 1000;
 export const MIN_ADDRESS_LENGTH = 5;
@@ -28,6 +33,9 @@ export interface HelpRequestDraft {
   // (`durationHours` del contrato).
   durationValue: string;
   durationUnit: DurationUnit;
+  // CHG-131: km a la redonda para el aviso en la app; vacío = sin
+  // aviso. Solo viaja si hay coordenadas.
+  notificationRadiusKm: string;
   truthConfirmed: boolean;
 }
 
@@ -47,6 +55,8 @@ export interface ActiveHelpRequest {
   // esas solicitudes no se dibujan en el mapa.
   latitude: number | null;
   longitude: number | null;
+  // CHG-131: radio de aviso en km; null si la solicitud no lo definió.
+  notificationRadiusKm: number | null;
   createdAt: string;
   expiresAt: string;
   attendersCount: number;

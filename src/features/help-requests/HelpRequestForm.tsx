@@ -41,15 +41,18 @@ import { ReportConsiderations } from "../reporting/ReportConsiderations";
 import { reportActionCatalog } from "../reporting/reportActionCatalog";
 import { submitHelpRequest } from "./reportSubmission";
 import {
+  DEFAULT_NOTIFICATION_RADIUS_KM,
   MAX_ADDRESS_LENGTH,
   MAX_DESCRIPTION_LENGTH,
   MAX_DURATION_DAYS,
   MAX_DURATION_HOURS,
   MAX_HELP_REQUEST_PHOTOS,
+  MAX_NOTIFICATION_RADIUS_KM,
   MIN_ADDRESS_LENGTH,
   MIN_DESCRIPTION_LENGTH,
   MIN_DURATION_DAYS,
   MIN_DURATION_HOURS,
+  MIN_NOTIFICATION_RADIUS_KM,
   type HelpRequestDraft,
   type HelpRequestReceipt,
 } from "./types";
@@ -64,6 +67,9 @@ export const initialHelpRequestDraft: HelpRequestDraft = {
   longitude: "",
   durationValue: "",
   durationUnit: "hours",
+  // CHG-131: radio de aviso con un valor inicial razonable; editable y
+  // borrable (vacío = sin aviso de proximidad).
+  notificationRadiusKm: String(DEFAULT_NOTIFICATION_RADIUS_KM),
   truthConfirmed: false,
 };
 
@@ -145,6 +151,23 @@ export function collectHelpRequestIssues(
     );
   }
 
+  // CHG-131: si se indica radio de aviso, debe ser un entero 1-100.
+  // Vacío es válido (sin aviso); sin coordenadas el radio no viaja.
+  const rawRadius = draft.notificationRadiusKm.trim();
+  if (rawRadius) {
+    const radius = Number(rawRadius);
+    if (
+      !Number.isInteger(radius) ||
+      radius < MIN_NOTIFICATION_RADIUS_KM ||
+      radius > MAX_NOTIFICATION_RADIUS_KM
+    ) {
+      push(
+        "notificationRadiusKm",
+        `Indica el radio de aviso en kilómetros enteros, entre ${MIN_NOTIFICATION_RADIUS_KM} y ${MAX_NOTIFICATION_RADIUS_KM}.`,
+      );
+    }
+  }
+
   if (!draft.truthConfirmed) {
     push("truthConfirmed", "Debes confirmar que la solicitud es real.");
   }
@@ -159,6 +182,7 @@ const FIELD_SECTIONS: Record<string, string> = {
   location: "02",
   latitude: "02",
   longitude: "02",
+  notificationRadiusKm: "02",
   durationValue: "03",
   durationUnit: "03",
   photos: "04",
@@ -446,6 +470,21 @@ export function HelpRequestForm({
                   Las coordenadas del punto están fuera de rango.
                 </Text>
               )}
+              {/* CHG-131: a cuántos km a la redonda se avisa en la app
+                  instalada. Requiere el punto en el mapa; sin punto el
+                  radio no viaja. */}
+              <FieldGrid>
+                <FormField
+                  label="Radio de aviso (km)"
+                  hint={`A cuántos kilómetros a la redonda se avisa en la app (${MIN_NOTIFICATION_RADIUS_KM}-${MAX_NOTIFICATION_RADIUS_KM}); requiere el punto en el mapa. Vacío = sin aviso`}
+                  invalid={invalidFields.has("notificationRadiusKm")}
+                  value={draft.notificationRadiusKm}
+                  onChangeText={(value) =>
+                    setField("notificationRadiusKm", value)
+                  }
+                  keyboardType="number-pad"
+                />
+              </FieldGrid>
             </FormSection>
 
             <FormSection

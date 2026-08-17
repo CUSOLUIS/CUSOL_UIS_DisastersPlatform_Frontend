@@ -16,6 +16,7 @@ const request: ActiveHelpRequest = {
   address: "Vereda El Salado, Piedecuesta",
   latitude: 6.9871,
   longitude: -73.0498,
+  notificationRadiusKm: null,
   createdAt: "2026-08-16T10:00:00Z",
   expiresAt: "2026-08-16T22:00:00Z",
   attendersCount: 2,

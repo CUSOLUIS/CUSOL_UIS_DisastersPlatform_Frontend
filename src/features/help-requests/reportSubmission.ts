@@ -48,6 +48,12 @@ export function buildHelpRequestPayload(
   if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
     payload.latitude = latitude;
     payload.longitude = longitude;
+    // CHG-131: el radio de aviso solo tiene sentido con coordenadas;
+    // sin punto en el mapa se omite (el backend lo rechazaría).
+    const radius = Number.parseInt(draft.notificationRadiusKm.trim(), 10);
+    if (Number.isFinite(radius)) {
+      payload.notificationRadiusKm = radius;
+    }
   }
 
   // CHG-066: instantánea de la ubicación de quien solicita (si concedió
