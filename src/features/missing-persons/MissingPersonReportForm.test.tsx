@@ -770,3 +770,28 @@ describe("Año mínimo de la última visualización (CHG-106)", () => {
     ).toBeTruthy();
   });
 });
+
+// CHG-145: un campo suelto en la columna de la sección (Acompañantes)
+// no puede llevar el `flexBasis` de la rejilla, que en el eje vertical
+// reservaba/solapaba altura sobre el bloque de arriba.
+describe("Campos autónomos sin solapamiento (CHG-145)", () => {
+  it("el campo Acompañantes ocupa el ancho completo sin flexBasis", () => {
+    render(<MissingPersonReportForm onBack={jest.fn()} />);
+
+    const container = screen.getByTestId("field-companions");
+    const style = StyleSheet.flatten(container.props.style);
+
+    expect(style.flexBasis).toBeUndefined();
+    expect(style.alignSelf).toBe("stretch");
+  });
+
+  it("un campo dentro de la rejilla conserva su flexBasis", () => {
+    render(<MissingPersonReportForm onBack={jest.fn()} />);
+
+    // «Nombres *» vive dentro de un FieldGrid: sigue siendo un ítem de
+    // rejilla con base horizontal.
+    const gridField = screen.getByTestId("field-firstnames");
+    const style = StyleSheet.flatten(gridField.props.style);
+    expect(style.flexBasis).toBe(250);
+  });
+});

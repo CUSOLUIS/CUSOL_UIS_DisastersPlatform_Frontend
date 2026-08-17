@@ -1,7 +1,7 @@
 import * as DocumentPicker from "expo-document-picker";
 import { fieldGridLayout } from "../../components/fieldGrid";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -384,7 +384,7 @@ export function MissingPersonReportForm({
 
             <FormSection code="01" title="Datos de la persona" description="Identificación básica. Los campos marcados con * son obligatorios." onPosition={registerSection}>
               <FieldGrid>
-                <FormField label="Nombres *" invalid={invalidFields.has("firstNames")} value={draft.firstNames} onChangeText={(value) => setField("firstNames", value)} autoComplete="name-given" />
+                <FormField testID="field-firstnames" label="Nombres *" invalid={invalidFields.has("firstNames")} value={draft.firstNames} onChangeText={(value) => setField("firstNames", value)} autoComplete="name-given" />
                 <FormField label="Apellidos *" invalid={invalidFields.has("lastNames")} value={draft.lastNames} onChangeText={(value) => setField("lastNames", value)} autoComplete="name-family" />
                 {duplicateSuggestions.status === "ready" && (
                   <PersonSuggestionsPanel
@@ -475,7 +475,7 @@ export function MissingPersonReportForm({
                 draft.transportMode === "other") && (
                 <FormField label="Datos del vehículo · privado" hint="Placa, marca, modelo, color" value={draft.vehicleDetails} onChangeText={(value) => setField("vehicleDetails", value)} />
               )}
-              <FormField label="Acompañantes" hint="Personas o grupos con los que se le vio por última vez" multiline value={draft.companionsDescription} onChangeText={(value) => setField("companionsDescription", value)} />
+              <FormField testID="field-companions" label="Acompañantes" hint="Personas o grupos con los que se le vio por última vez" multiline value={draft.companionsDescription} onChangeText={(value) => setField("companionsDescription", value)} />
             </FormSection>
 
             <FormSection code="03" title="Características físicas" description="Agrega detalles visuales que permitan reconocer a la persona." onPosition={registerSection}>
@@ -764,8 +764,18 @@ function FormSection({ code, title, description, children, onPosition }: { code:
   );
 }
 
+// CHG-145: marca si un campo vive dentro de la rejilla (fila) o suelto
+// en la columna de la sección. Los estilos con `flexBasis` de la
+// rejilla solo son correctos en fila; en columna reservan/solapan
+// altura (por eso «Acompañantes» se montaba sobre el bloque de arriba).
+const FieldGridContext = createContext(false);
+
 function FieldGrid({ children }: { children: React.ReactNode }) {
-  return <View style={styles.fieldGrid}>{children}</View>;
+  return (
+    <FieldGridContext.Provider value={true}>
+      <View style={styles.fieldGrid}>{children}</View>
+    </FieldGridContext.Provider>
+  );
 }
 
 type FormFieldProps = {
@@ -786,6 +796,8 @@ type FormFieldProps = {
   placeholder?: string;
   // CHG-115: los campos derivados de otro no se editan a mano.
   editable?: boolean;
+  // CHG-145: identificador opcional del contenedor del campo.
+  testID?: string;
 };
 
 function FormField({
@@ -795,10 +807,18 @@ function FormField({
   invalid = false,
   placeholder = "Escribe aquí",
   editable = true,
+  testID,
   ...inputProps
 }: FormFieldProps) {
+  const insideGrid = useContext(FieldGridContext);
+  // CHG-145: dentro de la rejilla, estilo con `flexBasis` (eje
+  // horizontal); suelto en la columna, ancho completo y alto de
+  // contenido, sin `flex*` que reserve o solape altura.
+  const containerStyle = insideGrid
+    ? [styles.field, multiline && styles.fieldWide]
+    : styles.fieldStandalone;
   return (
-    <View style={[styles.field, multiline && styles.fieldWide]}>
+    <View style={containerStyle} testID={testID}>
       <View style={styles.fieldLabelRow}>
         <Text style={[styles.fieldLabel, invalid && styles.fieldLabelInvalid]}>{label}</Text>
         {hint && <Text style={styles.fieldHint}>{hint}</Text>}
@@ -837,8 +857,9 @@ function TransportModeField({
   value: TransportMode | "";
   onChange: (value: TransportMode | "") => void;
 }) {
+  const insideGrid = useContext(FieldGridContext);
   return (
-    <View style={styles.field}>
+    <View style={insideGrid ? styles.field : styles.fieldStandalone}>
       <View style={styles.fieldLabelRow}>
         <Text style={styles.fieldLabel}>Medio de transporte</Text>
       </View>
@@ -876,8 +897,9 @@ function ChoiceChipsField({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const insideGrid = useContext(FieldGridContext);
   return (
-    <View style={styles.field}>
+    <View style={insideGrid ? styles.field : styles.fieldStandalone}>
       <View style={styles.fieldLabelRow}>
         <Text style={styles.fieldLabel}>{label}</Text>
       </View>
@@ -1103,6 +1125,11 @@ const styles = StyleSheet.create({
   fieldGrid: fieldGridLayout.grid,
   field: fieldGridLayout.field,
   fieldWide: fieldGridLayout.fieldWide,
+  // CHG-145: campo suelto en la columna de la sección — ancho completo
+  // y alto de contenido, sin el `flexBasis` de la rejilla (que en el
+  // eje vertical reservaba/solapaba altura). La separación entre
+  // bloques la da el `gap` de `sectionBody`.
+  fieldStandalone: { alignSelf: "stretch", gap: 7 },
   fieldLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   fieldLabel: { color: colors.inkSoft, fontSize: 10, fontWeight: "700" },
   fieldHint: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 8 },
