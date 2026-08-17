@@ -109,17 +109,15 @@ export function collectHelpRequestIssues(
     );
   }
 
+  // CHG-127: el punto en el mapa es opcional — la dirección escrita
+  // basta. Solo se valida el rango cuando sí hay coordenadas.
   const coordinates = parseDraftCoordinates(draft.latitude, draft.longitude);
-  if (!coordinates) {
-    push(
-      "location",
-      "Fija el punto en el mapa: cruza la dirección, usa «¿Dónde estoy?» o coloca el muñequito.",
-    );
-  } else if (
-    coordinates.latitude < -90 ||
-    coordinates.latitude > 90 ||
-    coordinates.longitude < -180 ||
-    coordinates.longitude > 180
+  if (
+    coordinates &&
+    (coordinates.latitude < -90 ||
+      coordinates.latitude > 90 ||
+      coordinates.longitude < -180 ||
+      coordinates.longitude > 180)
   ) {
     push("location", "Las coordenadas del punto están fuera de rango.");
   }
@@ -428,13 +426,13 @@ export function HelpRequestForm({
                   }))
                 }
                 locateVisitor={locateVisitor}
-                title="UBICACIÓN EN EL MAPA · OBLIGATORIA"
-                helper="Cruza la dirección escrita arriba con el mapa, toca «¿Dónde estoy?» para usar tu GPS, o arrastra el muñequito hasta el lugar exacto."
+                title="UBICACIÓN EN EL MAPA · OPCIONAL"
+                helper="Si puedes, cruza la dirección escrita arriba con el mapa, toca «¿Dónde estoy?» para usar tu GPS, o arrastra el muñequito hasta el lugar exacto. Con la dirección escrita basta."
                 locateActionLabel="¿Dónde estoy?"
               />
               {invalidFields.has("location") && (
                 <Text style={styles.errorText} accessibilityRole="alert">
-                  Fija el punto en el mapa antes de publicar la solicitud.
+                  Las coordenadas del punto están fuera de rango.
                 </Text>
               )}
             </FormSection>

@@ -10,20 +10,36 @@ export const HELP_REQUEST_POINT_PREFIX = "help_request:";
 export function helpRequestsToMapPoints(
   requests: ActiveHelpRequest[],
 ): OperationalMapPoint[] {
-  return requests.map((request) => ({
-    id: `${HELP_REQUEST_POINT_PREFIX}${request.id}`,
-    category: "help_request",
-    title: "Necesitamos ayuda",
-    locationLabel: request.address,
-    latitude: request.latitude,
-    longitude: request.longitude,
-    coordinatePrecision: "exact",
-    verificationStatus: "unverified",
-    relatedDisasterId: null,
-    description: request.description,
-    source: { name: "Solicitud ciudadana", sourceType: "citizen", url: null },
-    updatedAt: request.createdAt,
-  }));
+  // CHG-127 / DEC-127-02: las solicitudes sin coordenadas (llegaron
+  // solo con dirección escrita) no se dibujan; siguen visibles en el
+  // dashboard, la transmisión y Mi espacio.
+  return requests
+    .filter(
+      (
+        request,
+      ): request is ActiveHelpRequest & {
+        latitude: number;
+        longitude: number;
+      } => request.latitude !== null && request.longitude !== null,
+    )
+    .map((request) => ({
+      id: `${HELP_REQUEST_POINT_PREFIX}${request.id}`,
+      category: "help_request",
+      title: "Necesitamos ayuda",
+      locationLabel: request.address,
+      latitude: request.latitude,
+      longitude: request.longitude,
+      coordinatePrecision: "exact" as const,
+      verificationStatus: "unverified" as const,
+      relatedDisasterId: null,
+      description: request.description,
+      source: {
+        name: "Solicitud ciudadana",
+        sourceType: "citizen" as const,
+        url: null,
+      },
+      updatedAt: request.createdAt,
+    }));
 }
 
 export function helpRequestIdFromPointId(pointId: string): string | null {

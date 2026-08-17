@@ -39,7 +39,7 @@ describe("collectHelpRequestIssues (CHG-125)", () => {
     expect(collectHelpRequestIssues(validDraft)).toEqual([]);
   });
 
-  it("exige descripción, dirección, punto, vigencia y confirmación", () => {
+  it("exige descripción, dirección, vigencia y confirmación", () => {
     const fields = collectHelpRequestIssues(initialHelpRequestDraft).map(
       (issue) => issue.field,
     );
@@ -47,11 +47,28 @@ describe("collectHelpRequestIssues (CHG-125)", () => {
       expect.arrayContaining([
         "description",
         "address",
-        "location",
         "durationHours",
         "truthConfirmed",
       ]),
     );
+    // CHG-127: el punto en el mapa es opcional — su ausencia no bloquea.
+    expect(fields).not.toContain("location");
+  });
+
+  // CHG-127: la dirección escrita basta; sin coordenadas no hay errores.
+  it("acepta un borrador sin coordenadas", () => {
+    expect(
+      collectHelpRequestIssues({ ...validDraft, latitude: "", longitude: "" }),
+    ).toEqual([]);
+  });
+
+  it("rechaza coordenadas fuera de rango cuando sí las hay", () => {
+    const issues = collectHelpRequestIssues({
+      ...validDraft,
+      latitude: "95",
+      longitude: "-73.04980",
+    });
+    expect(issues.map((issue) => issue.field)).toContain("location");
   });
 
   it("rechaza la vigencia fuera del rango de 1 a 72 horas", () => {
@@ -95,10 +112,12 @@ describe("HelpRequestForm (CHG-125)", () => {
       await screen.findByText("Revisa la solicitud antes de continuar"),
     ).toBeTruthy();
     expect(
-      screen.getByText(
-        /Fija el punto en el mapa: cruza la dirección, usa «¿Dónde estoy\?»/,
-      ),
+      screen.getByText(/Escribe la dirección del lugar o resuélvela/),
     ).toBeTruthy();
+    // CHG-127: la ausencia del punto en el mapa ya no es un error.
+    expect(
+      screen.queryByText(/Las coordenadas del punto están fuera de rango/),
+    ).toBeNull();
   });
 
   it("publica con punto fijado desde el mapa y muestra la constancia", async () => {
@@ -154,6 +173,53 @@ describe("HelpRequestForm (CHG-125)", () => {
 
     expect(await screen.findByText("Solicitud publicada")).toBeTruthy();
     expect(screen.getByText("HR-2026-DEMO0001")).toBeTruthy();
+  });
+
+  // CHG-127: la dirección escrita basta — se publica sin fijar el punto.
+  it("publica sin punto en el mapa, solo con la dirección escrita", async () => {
+    const receipt: HelpRequestReceipt = {
+      id: "7f0e0a10-3333-4c2d-9e3f-000000000010",
+      publicCode: "HR-2026-DEMO0002",
+      status: "active",
+      receivedAt: "2026-08-17T12:00:00Z",
+      expiresAt: "2026-08-18T00:00:00Z",
+    };
+    const submitRequest = jest.fn().mockResolvedValue(receipt);
+
+    render(
+      <HelpRequestForm
+        onBack={() => undefined}
+        sessionSource={anonymousSession}
+        submitRequest={submitRequest}
+      />,
+    );
+
+    fireEvent.changeText(
+      await screen.findByLabelText("Descripción de la situación *"),
+      "Se desbordó la quebrada y hay tres familias sin salida segura.",
+    );
+    fireEvent.changeText(
+      screen.getByLabelText("Dirección *"),
+      "Vereda El Salado, Piedecuesta",
+    );
+    fireEvent.changeText(screen.getByLabelText("Vigencia en horas *"), "12");
+    fireEvent.press(
+      screen.getByRole("checkbox", {
+        name: "Confirmo que la solicitud es real y de buena fe.",
+      }),
+    );
+
+    fireEvent.press(
+      screen.getByRole("button", { name: "Publicar solicitud de ayuda" }),
+    );
+
+    await waitFor(() => expect(submitRequest).toHaveBeenCalledTimes(1));
+    const [draft] = submitRequest.mock.calls[0];
+    expect(draft.latitude).toBe("");
+    expect(draft.longitude).toBe("");
+
+    expect(await screen.findByText("Solicitud publicada")).toBeTruthy();
+    expect(screen.getByText("HR-2026-DEMO0002")).toBeTruthy();
   });
 
   it("ofrece «¿Dónde estoy?» y fija el punto con el GPS", async () => {

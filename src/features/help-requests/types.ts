@@ -34,8 +34,10 @@ export interface ActiveHelpRequest {
   id: string;
   description: string;
   address: string;
-  latitude: number;
-  longitude: number;
+  // CHG-127: null cuando la solicitud llegó solo con dirección escrita;
+  // esas solicitudes no se dibujan en el mapa.
+  latitude: number | null;
+  longitude: number | null;
   createdAt: string;
   expiresAt: string;
   attendersCount: number;

@@ -34,6 +34,20 @@ describe("helpRequestsToMapPoints (CHG-125, DEC-125-10)", () => {
     expect(helpRequestIdFromPointId("otro-punto")).toBeNull();
   });
 
+  // CHG-127 / DEC-127-02: sin par de coordenadas no hay marcador; la
+  // solicitud sigue viva en dashboard, transmisión y Mi espacio.
+  it("omite del mapa las solicitudes que llegaron solo con dirección", () => {
+    const addressOnly: ActiveHelpRequest = {
+      ...request,
+      id: "b2000000-0000-4000-8000-000000000002",
+      latitude: null,
+      longitude: null,
+    };
+    const points = helpRequestsToMapPoints([request, addressOnly]);
+    expect(points).toHaveLength(1);
+    expect(points[0].id).toBe(`help_request:${request.id}`);
+  });
+
   it("el resumen normalizado cuenta la categoría nueva sin romper overviews previos", () => {
     const merged = normalizeOperationalMapOverview({
       ...operationalMapDemoData,
