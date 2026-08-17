@@ -6,6 +6,9 @@ import type {
   AdminAuditEvent,
   AdminAuditPage,
   AdminDataSource,
+  AdminHelpRequest,
+  AdminHelpRequestDeleteReceipt,
+  AdminHelpRequestPage,
   AdminSystemMetrics,
   AdminVisitorPresencePage,
   AdminEvidenceAccessGrant,
@@ -158,8 +161,59 @@ const apiAdminDataSource: AdminDataSource = {
     apiRequest<AdminSystemMetrics>("/api/v1/admin/system-metrics", {
       signal,
     }),
+  // CHG-138: gestión de solicitudes de ayuda.
+  listHelpRequests: (signal) =>
+    apiRequest<AdminHelpRequestPage>(
+      "/api/v1/admin/help-requests?limit=200",
+      { signal },
+    ),
+  deleteHelpRequest: (id) =>
+    apiRequest<AdminHelpRequestDeleteReceipt>(
+      `/api/v1/admin/help-requests/${id}`,
+      { method: "DELETE" },
+    ),
+  purgeHelpRequests: () =>
+    apiRequest<AdminHelpRequestDeleteReceipt>(
+      "/api/v1/admin/help-requests",
+      { method: "DELETE" },
+    ),
   logout: authDataSource.logout,
 };
+
+// CHG-138 — Solicitudes demo (una activa y una expirada) mutables,
+// para ensayar el borrado uno a uno y el vaciado sin backend.
+const demoHelpRequests: AdminHelpRequest[] = [
+  {
+    id: "5d3f9a10-1111-4c2d-9e3f-000000000001",
+    publicCode: "HR-2026-DEMO0001",
+    description:
+      "Una familia quedó aislada por la creciente y necesita agua potable y ayuda para evacuar.",
+    address: "Vereda El Salado, Piedecuesta, Santander",
+    latitude: 6.9871,
+    longitude: -73.0498,
+    notificationRadiusKm: 10,
+    createdAt: new Date(Date.now() - 3_600_000).toISOString(),
+    expiresAt: new Date(Date.now() + 6 * 3_600_000).toISOString(),
+    expired: false,
+    attendersCount: 2,
+    hasPhoto: false,
+  },
+  {
+    id: "5d3f9a10-1111-4c2d-9e3f-000000000002",
+    publicCode: "HR-2026-DEMO0002",
+    description:
+      "Se necesitaban manos para remover escombros livianos en tres viviendas.",
+    address: "Barrio La Cumbre, Floridablanca, Santander",
+    latitude: 7.0703,
+    longitude: -73.0862,
+    notificationRadiusKm: null,
+    createdAt: new Date(Date.now() - 26 * 3_600_000).toISOString(),
+    expiresAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+    expired: true,
+    attendersCount: 5,
+    hasPhoto: false,
+  },
+];
 
 const demoSubmissions: AdminSubmissionDetail[] = [
   {
@@ -701,6 +755,26 @@ export const demoAdminDataSource: AdminDataSource = {
       series,
       generatedAt: nowIso(),
     });
+  },
+  // CHG-138: solicitudes demo mutables para ensayar el borrado.
+  async listHelpRequests() {
+    return clone({
+      items: demoHelpRequests,
+      total: demoHelpRequests.length,
+      generatedAt: nowIso(),
+    });
+  },
+  async deleteHelpRequest(id) {
+    const index = demoHelpRequests.findIndex((item) => item.id === id);
+    if (index >= 0) {
+      demoHelpRequests.splice(index, 1);
+    }
+    return { deleted: index >= 0 ? 1 : 0 };
+  },
+  async purgeHelpRequests() {
+    const deleted = demoHelpRequests.length;
+    demoHelpRequests.length = 0;
+    return { deleted };
   },
   logout: authDataSource.logout,
 };

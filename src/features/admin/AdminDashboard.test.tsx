@@ -183,6 +183,14 @@ function createDataSource(
       ],
       generatedAt: "2026-08-14T14:00:00Z",
     }),
+    // CHG-138: gestión de solicitudes de ayuda.
+    listHelpRequests: jest.fn().mockResolvedValue({
+      items: [],
+      total: 0,
+      generatedAt: "2026-08-17T12:00:00Z",
+    }),
+    deleteHelpRequest: jest.fn().mockResolvedValue({ deleted: 1 }),
+    purgeHelpRequests: jest.fn().mockResolvedValue({ deleted: 0 }),
     logout: jest.fn().mockResolvedValue(undefined),
   };
 }

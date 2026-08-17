@@ -6,7 +6,9 @@ export type AdminSection =
   | "accounts"
   | "audit"
   | "presence"
-  | "system";
+  | "system"
+  // CHG-138: gestión de solicitudes «Necesitamos ayuda».
+  | "helpRequests";
 export type AdminSubmissionKind =
   | "missing_person_report"
   | "unverified_building_report"
@@ -266,6 +268,32 @@ export interface AdminSystemMetrics {
   generatedAt: string;
 }
 
+// CHG-138 — Solicitud vista desde la consola (incluye expiradas).
+export interface AdminHelpRequest {
+  id: string;
+  publicCode: string;
+  description: string;
+  address: string;
+  latitude: number | null;
+  longitude: number | null;
+  notificationRadiusKm: number | null;
+  createdAt: string;
+  expiresAt: string;
+  expired: boolean;
+  attendersCount: number;
+  hasPhoto: boolean;
+}
+
+export interface AdminHelpRequestPage {
+  items: AdminHelpRequest[];
+  total: number;
+  generatedAt: string;
+}
+
+export interface AdminHelpRequestDeleteReceipt {
+  deleted: number;
+}
+
 export interface AdminDataSource {
   transport: "api" | "demo";
   getCurrentAccount(signal?: AbortSignal): Promise<AuthenticatedAccount>;
@@ -317,5 +345,10 @@ export interface AdminDataSource {
   ): Promise<AdminVisitorPresencePage>;
   // CHG-126: métricas del sistema donde corre el gateway.
   getSystemMetrics(signal?: AbortSignal): Promise<AdminSystemMetrics>;
+  // CHG-138: gestión de solicitudes de ayuda — ver TODO (activas y
+  // expiradas), borrar una a una o vaciarlas por completo.
+  listHelpRequests(signal?: AbortSignal): Promise<AdminHelpRequestPage>;
+  deleteHelpRequest(id: string): Promise<AdminHelpRequestDeleteReceipt>;
+  purgeHelpRequests(): Promise<AdminHelpRequestDeleteReceipt>;
   logout(): Promise<void>;
 }

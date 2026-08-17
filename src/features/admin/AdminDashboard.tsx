@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { AdminApiError, adminDataSource } from "./dataSource";
+import { HelpRequestsAdminSection } from "./HelpRequestsAdminSection";
 import { SystemMetricsSection } from "./SystemMetricsSection";
 import type {
   AdminAccountDetail,
@@ -52,6 +53,8 @@ const SECTION_OPTIONS: Array<{
   { value: "presence", label: "Ubicaciones", code: "05" },
   // CHG-126: métricas del sistema operativo del servidor.
   { value: "system", label: "Sistema", code: "06" },
+  // CHG-138: gestión de solicitudes «Necesitamos ayuda».
+  { value: "helpRequests", label: "Solicitudes", code: "07" },
 ];
 
 const KIND_LABELS: Record<AdminSubmissionKind, string> = {
@@ -325,6 +328,11 @@ export function AdminDashboard({
                 dataSource={protectedDataSource}
                 refreshKey={refreshKey}
               />
+            )}
+            {/* CHG-138: ver todo lo que llega de «Necesitamos ayuda» y
+                eliminarlo una a una o vaciar la base. */}
+            {section === "helpRequests" && (
+              <HelpRequestsAdminSection dataSource={protectedDataSource} />
             )}
           </ScrollView>
         </View>
