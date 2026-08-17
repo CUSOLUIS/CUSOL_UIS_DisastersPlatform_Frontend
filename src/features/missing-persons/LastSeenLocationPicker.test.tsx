@@ -22,6 +22,7 @@ function ControlledPicker({
   resolveAddress,
   autoLocateOnEntry,
   previewRadiusKm,
+  locateMode,
 }: {
   addressQuery: string;
   searchCandidates?: (query: string) => Promise<
@@ -33,6 +34,7 @@ function ControlledPicker({
   resolveAddress?: jest.Mock;
   autoLocateOnEntry?: boolean;
   previewRadiusKm?: number | null;
+  locateMode?: "marker" | "dot";
 }) {
   const [value, setValue] = useState<GeographicCenter | null>(null);
   return (
@@ -49,6 +51,7 @@ function ControlledPicker({
       resolveAddress={resolveAddress}
       autoLocateOnEntry={autoLocateOnEntry}
       previewRadiusKm={previewRadiusKm}
+      locateMode={locateMode}
     />
   );
 }
@@ -419,5 +422,158 @@ describe("Cobertura del radio de aviso (CHG-134)", () => {
     );
     fireEvent.press(await screen.findByTestId("address-candidate-0"));
     expect(screen.queryByTestId("picker-alert-radius")).toBeNull();
+  });
+});
+
+// CHG-141 — Modo punto azul: el GPS ya no coloca el muñequito ni toca
+// la dirección; muestra dónde cree el dispositivo que estás, y
+// «COLOCAR MUÑEQUITO» convierte ese punto en el marcador exacto.
+describe("Punto azul de ubicación actual (CHG-141)", () => {
+  it("el GPS muestra el punto azul sin fijar muñequito ni dirección", async () => {
+    const onChangeSpy = jest.fn();
+    const onAddressResolved = jest.fn();
+    const locateVisitor = jest
+      .fn()
+      .mockResolvedValue({ latitude: 7.1193, longitude: -73.1227 });
+
+    render(
+      <ControlledPicker
+        addressQuery=""
+        onChangeSpy={onChangeSpy}
+        locateVisitor={locateVisitor}
+        onAddressResolved={onAddressResolved}
+        locateMode="dot"
+      />,
+    );
+
+    fireEvent.press(
+      screen.getByRole("button", {
+        name: "Centrar el mapa en mi ubicación actual",
+      }),
+    );
+
+    expect(await screen.findByTestId("current-location-dot")).toBeTruthy();
+    expect(onChangeSpy).not.toHaveBeenCalled();
+    expect(onAddressResolved).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("last-seen-marker")).toBeNull();
+  });
+
+  it("COLOCAR MUÑEQUITO cae sobre el punto azul y este desaparece", async () => {
+    const onChangeSpy = jest.fn();
+    const locateVisitor = jest
+      .fn()
+      .mockResolvedValue({ latitude: 7.1193, longitude: -73.1227 });
+
+    render(
+      <ControlledPicker
+        addressQuery=""
+        onChangeSpy={onChangeSpy}
+        locateVisitor={locateVisitor}
+        locateMode="dot"
+      />,
+    );
+
+    fireEvent.press(
+      screen.getByRole("button", {
+        name: "Centrar el mapa en mi ubicación actual",
+      }),
+    );
+    await screen.findByTestId("current-location-dot");
+
+    fireEvent.press(
+      screen.getByRole("button", {
+        name: "Colocar el muñequito en el centro del mapa",
+      }),
+    );
+
+    expect(onChangeSpy).toHaveBeenCalledWith({
+      latitude: 7.1193,
+      longitude: -73.1227,
+    });
+    expect(screen.queryByTestId("current-location-dot")).toBeNull();
+    expect(screen.getByTestId("last-seen-marker")).toBeTruthy();
+  });
+});
+
+// CHG-141 — Feedback de la geocodificación inversa: «Obteniendo
+// dirección…» mientras resuelve; el fallo conserva marcador y
+// dirección con un aviso no invasivo.
+describe("Feedback de la dirección (CHG-141)", () => {
+  afterEach(() => jest.useRealTimers());
+
+  it("muestra el estado de carga y lo retira al resolver", async () => {
+    jest.useFakeTimers();
+    let resolveAddressNow: (value: {
+      label: string;
+      municipality: string | null;
+      department: string | null;
+    }) => void = () => undefined;
+    const resolveAddress = jest.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveAddressNow = resolve;
+        }),
+    );
+    const onAddressResolved = jest.fn();
+
+    render(
+      <ControlledPicker
+        addressQuery=""
+        onAddressResolved={onAddressResolved}
+        resolveAddress={resolveAddress as never}
+      />,
+    );
+
+    fireEvent.press(
+      screen.getByRole("button", {
+        name: "Colocar el muñequito en el centro del mapa",
+      }),
+    );
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+    });
+    expect(screen.getByText("Obteniendo dirección…")).toBeTruthy();
+
+    await act(async () => {
+      resolveAddressNow({
+        label: "Carrera 27 # 10-25, Bucaramanga",
+        municipality: null,
+        department: null,
+      });
+      await Promise.resolve();
+    });
+    expect(screen.queryByText("Obteniendo dirección…")).toBeNull();
+    expect(onAddressResolved).toHaveBeenCalled();
+  });
+
+  it("si la resolución falla, avisa sin borrar nada y sin bloquear", async () => {
+    jest.useFakeTimers();
+    const resolveAddress = jest
+      .fn()
+      .mockRejectedValue(new Error("proveedor caído"));
+
+    render(
+      <ControlledPicker
+        addressQuery=""
+        onAddressResolved={jest.fn()}
+        resolveAddress={resolveAddress}
+      />,
+    );
+
+    fireEvent.press(
+      screen.getByRole("button", {
+        name: "Colocar el muñequito en el centro del mapa",
+      }),
+    );
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+      await Promise.resolve();
+    });
+
+    expect(
+      screen.getByText(/No fue posible obtener la dirección de ese punto/),
+    ).toBeTruthy();
+    // El muñequito sigue puesto: nada se borra abruptamente.
+    expect(screen.getByTestId("last-seen-marker")).toBeTruthy();
   });
 });

@@ -41,6 +41,7 @@ import {
   type SessionAccountSource,
 } from "../auth/useSessionAccount";
 import { buildLastSeenQuery, parseDraftCoordinates } from "./geocoding";
+import { AddressAutocompleteField } from "./AddressAutocompleteField";
 import { LastSeenLocationPicker } from "./LastSeenLocationPicker";
 import {
   DOCUMENT_TYPE_OPTIONS,
@@ -417,8 +418,18 @@ export function MissingPersonReportForm({
                 <FormField label="Departamento *" invalid={invalidFields.has("department")} value={draft.department} onChangeText={(value) => setField("department", value)} />
                 <FormField label="Municipio *" invalid={invalidFields.has("municipality")} value={draft.municipality} onChangeText={(value) => setField("municipality", value)} />
               </FieldGrid>
-              <FormField label="Dirección *" invalid={invalidFields.has("lastSeenArea")} hint="Dirección o lugar de referencia donde fue vista" value={draft.lastSeenArea} onChangeText={(value) => setField("lastSeenArea", value)} />
+              {/* CHG-141: la dirección escrita basta; mientras se
+                  escribe aparecen sugerencias detalladas y elegir una
+                  sustituye el texto por la dirección completa. */}
+              <AddressAutocompleteField
+                label="Dirección *"
+                invalid={invalidFields.has("lastSeenArea")}
+                hint="Dirección o lugar de referencia donde fue vista"
+                value={draft.lastSeenArea}
+                onChangeText={(value) => setField("lastSeenArea", value)}
+              />
               <LastSeenLocationPicker
+                locateMode="dot"
                 addressQuery={buildLastSeenQuery(draft)}
                 value={parseDraftCoordinates(draft.lastSeenLatitude, draft.lastSeenLongitude)}
                 onChange={(coordinates) =>

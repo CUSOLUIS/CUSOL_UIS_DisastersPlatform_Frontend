@@ -45,6 +45,10 @@ import {
 } from "./geocoding";
 
 const MIN_ZOOM = 5;
+// CHG-141: un segundo DESPUÉS de soltar el muñequito se resuelve la
+// dirección. Es un debounce real: cada movimiento reinicia el
+// contador y solo la última posición vigente llega a geocodificarse.
+const RESOLVE_DEBOUNCE_MS = 1000;
 const CANDIDATE_ZOOM = 17;
 
 export interface LastSeenLocationPickerProps {
@@ -77,6 +81,13 @@ export interface LastSeenLocationPickerProps {
   // CHG-134: radio de aviso (km) dibujado a escala alrededor del
   // muñequito, para ver la cobertura mientras se elige.
   previewRadiusKm?: number | null;
+  // CHG-141: comportamiento del GPS (◎ / botón con nombre).
+  // - "marker": fija el muñequito y resuelve la dirección (flujo de
+  //   «Necesitamos ayuda», CHG-130).
+  // - "dot": solo muestra el PUNTO AZUL de «aquí cree tu dispositivo
+  //   que estás» — no toca el muñequito ni la dirección; «COLOCAR
+  //   MUÑEQUITO» lo convierte en marcador sobre esas coordenadas.
+  locateMode?: "marker" | "dot";
 }
 
 export function LastSeenLocationPicker({
@@ -92,6 +103,7 @@ export function LastSeenLocationPicker({
   locateActionLabel,
   autoLocateOnEntry = false,
   previewRadiusKm = null,
+  locateMode = "marker",
 }: LastSeenLocationPickerProps) {
   const [zoom, setZoom] = useState(MIN_ZOOM);
   const [center, setCenter] = useState<GeographicCenter>(COLOMBIA_CENTER);
@@ -103,6 +115,13 @@ export function LastSeenLocationPicker({
   // portada (CHG-055).
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
+  // CHG-141: ubicación estimada del dispositivo (punto azul); no es el
+  // muñequito ni cambia la dirección hasta que la persona lo decida.
+  const [currentLocation, setCurrentLocation] =
+    useState<GeographicCenter | null>(null);
+  // CHG-141: feedback sutil de la geocodificación inversa.
+  const [resolvingAddress, setResolvingAddress] = useState(false);
+  const [resolveError, setResolveError] = useState(false);
   const locateAvailable =
     locateVisitor !== undefined || getBrowserGeolocation() !== null;
   // CHG-086: las candidatas ya traen su dirección; el resto de
@@ -120,6 +139,11 @@ export function LastSeenLocationPicker({
     }
     let cancelled = false;
     const timer = setTimeout(() => {
+      // CHG-141: feedback sutil mientras se resuelve; si falla, el
+      // muñequito y la dirección anterior se conservan y queda un
+      // aviso no invasivo (mover de nuevo reintenta).
+      setResolvingAddress(true);
+      setResolveError(false);
       resolveAddress(value)
         .then((address) => {
           if (!cancelled) {
@@ -127,10 +151,16 @@ export function LastSeenLocationPicker({
           }
         })
         .catch(() => {
-          // Autocompletar es un mejor esfuerzo: sin dirección conocida
-          // no se interrumpe el flujo.
+          if (!cancelled) {
+            setResolveError(true);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setResolvingAddress(false);
+          }
         });
-    }, 900);
+    }, RESOLVE_DEBOUNCE_MS);
     return () => {
       cancelled = true;
       clearTimeout(timer);
@@ -208,7 +238,13 @@ export function LastSeenLocationPicker({
     setLocateError(null);
     try {
       const point = await (locateVisitor ?? requestVisitorLocation)();
-      onChange(point);
+      if (locateMode === "dot") {
+        // CHG-141: solo el punto azul; la dirección escrita no se toca
+        // sin consentimiento.
+        setCurrentLocation(point);
+      } else {
+        onChange(point);
+      }
       setCenter(point);
       setZoom(CANDIDATE_ZOOM);
       // CHG-066: la posición conocida también acompaña (cifrada) al
@@ -307,7 +343,15 @@ export function LastSeenLocationPicker({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Colocar el muñequito en el centro del mapa"
-          onPress={() => onChange(center)}
+          onPress={() => {
+            // CHG-141: si hay punto azul, el muñequito cae EXACTAMENTE
+            // sobre esas coordenadas y el punto desaparece (nunca
+            // conviven representando lo mismo).
+            const target = currentLocation ?? center;
+            onChange(target);
+            setCenter(target);
+            setCurrentLocation(null);
+          }}
           style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
         >
           <Text style={styles.actionText}>COLOCAR MUÑEQUITO</Text>
@@ -408,6 +452,26 @@ export function LastSeenLocationPicker({
           error={locateError}
         />
 
+        {/* CHG-141: punto azul — «según tu dispositivo estás aquí».
+            No es el muñequito, no se arrastra y no toca la dirección;
+            desaparece al COLOCAR MUÑEQUITO sobre él. */}
+        {currentLocation &&
+          (() => {
+            const dot = placeMarker(currentLocation, center, zoom, size);
+            return (
+              <View
+                pointerEvents="none"
+                testID="current-location-dot"
+                style={[
+                  styles.currentLocationDot,
+                  { left: dot.left, top: dot.top },
+                ]}
+              >
+                <View style={styles.currentLocationCore} />
+              </View>
+            );
+          })()}
+
         {/* CHG-134: cobertura del radio de aviso mientras se elige;
             mismo criterio de escala que el mapa principal. */}
         {markerPlacement &&
@@ -464,6 +528,18 @@ export function LastSeenLocationPicker({
 
         <OsmAttribution />
       </View>
+
+      {(resolvingAddress || resolveError) && (
+        <Text
+          style={resolveError ? styles.resolveError : styles.resolving}
+          accessibilityRole={resolveError ? "alert" : undefined}
+          testID="address-resolve-status"
+        >
+          {resolveError
+            ? "No fue posible obtener la dirección de ese punto; puedes escribirla manualmente o mover el muñequito para reintentar."
+            : "Obteniendo dirección…"}
+        </Text>
+      )}
 
       {value && (
         <View style={styles.readout}>
@@ -620,6 +696,34 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingHorizontal: 20,
   },
+  // CHG-141: punto azul de ubicación estimada del dispositivo.
+  currentLocationDot: {
+    position: "absolute",
+    width: 22,
+    height: 22,
+    marginLeft: -11,
+    marginTop: -11,
+    borderRadius: 11,
+    zIndex: 3,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(77,159,255,0.25)",
+  },
+  currentLocationCore: {
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: "#4d9fff",
+    borderWidth: 1.5,
+    borderColor: "#eaf4ff",
+  },
+  resolving: {
+    color: colors.inkDim,
+    fontFamily: fontFamilies.mono,
+    fontSize: 9,
+    letterSpacing: 0.6,
+  },
+  resolveError: { color: "#ff8f8f", fontSize: 11, lineHeight: 16 },
   readout: {
     flexDirection: "row",
     alignItems: "center",
