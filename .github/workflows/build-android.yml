@@ -26,6 +26,9 @@ env:
   EXPO_PUBLIC_MY_SPACE_DATA_MODE: api
   # CHG-125: solicitudes «Necesitamos ayuda» contra la API real.
   EXPO_PUBLIC_HELP_REQUESTS_DATA_MODE: api
+  # CHG-128: revisión embebida en el APK; el portón de actualización la
+  # compara con el manifiesto publicado junto al APK en el VPS.
+  EXPO_PUBLIC_APP_REVISION: ${{ github.sha }}
 
 jobs:
   build:
@@ -80,4 +83,13 @@ jobs:
           mkdir -p /home/cusol01/downloads
           install -m 0644 apk/app-release.apk \
             /home/cusol01/downloads/cusol-disasters.apk
+          # CHG-128: manifiesto de versión junto al APK, con la misma
+          # revisión que el build embebió. Se escribe DESPUÉS del APK
+          # para que nunca anuncie una versión que aún no se descarga.
+          printf '{"revision":"%s","publishedAt":"%s"}\n' \
+            "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > /home/cusol01/downloads/cusol-disasters.version.json.tmp
+          install -m 0644 /home/cusol01/downloads/cusol-disasters.version.json.tmp \
+            /home/cusol01/downloads/cusol-disasters.version.json
+          rm -f /home/cusol01/downloads/cusol-disasters.version.json.tmp
           ls -la /home/cusol01/downloads/

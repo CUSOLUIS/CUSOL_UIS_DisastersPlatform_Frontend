@@ -37,20 +37,27 @@ export interface RuntimeRules {
   // CHG-066: el portón obligatorio de ubicación aplica solo en la app
   // instalada; en la web el flujo es el botón del mapa.
   requireLocationConsentGate: boolean;
+  // CHG-128: la app instalada exige estar en la última versión
+  // publicada en el VPS antes de funcionar; la web siempre está al día
+  // por naturaleza.
+  requireLatestAppVersion: boolean;
 }
 
 export const RUNTIME_RULES: Record<RuntimeContext, RuntimeRules> = {
   "mobile-web": {
     showAppDownloadPromo: true,
     requireLocationConsentGate: false,
+    requireLatestAppVersion: false,
   },
   "desktop-web": {
     showAppDownloadPromo: false,
     requireLocationConsentGate: false,
+    requireLatestAppVersion: false,
   },
   "native-app": {
     showAppDownloadPromo: false,
     requireLocationConsentGate: true,
+    requireLatestAppVersion: true,
   },
 };
 

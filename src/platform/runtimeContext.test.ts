@@ -51,6 +51,14 @@ describe("RUNTIME_RULES", () => {
     );
   });
 
+  it("la última versión solo se exige en la app instalada (CHG-128)", () => {
+    expect(rulesForRuntime("native-app").requireLatestAppVersion).toBe(true);
+    expect(rulesForRuntime("mobile-web").requireLatestAppVersion).toBe(false);
+    expect(rulesForRuntime("desktop-web").requireLatestAppVersion).toBe(
+      false,
+    );
+  });
+
   it("cubre los tres contextos, ni uno más", () => {
     expect(Object.keys(RUNTIME_RULES).sort()).toEqual([
       "desktop-web",
