@@ -19,6 +19,10 @@ export const MAX_NOTIFICATION_RADIUS_KM = 100;
 export const DEFAULT_NOTIFICATION_RADIUS_KM = 5;
 export const MIN_DESCRIPTION_LENGTH = 10;
 export const MAX_DESCRIPTION_LENGTH = 1000;
+// CHG-146: la descripción de una solicitud de ayuda es breve por
+// naturaleza; pide 3 palabras distintas (el reporte de persona pide 5).
+// Mismo umbral que aplica el backend.
+export const HELP_REQUEST_MIN_DISTINCT_WORDS = 3;
 export const MIN_ADDRESS_LENGTH = 5;
 export const MAX_ADDRESS_LENGTH = 300;
 // DEC-125: una única fotografía opcional del lugar.

@@ -124,6 +124,29 @@ describe("collectHelpRequestIssues (CHG-125)", () => {
     });
     expect(issues.map((issue) => issue.field)).toContain("description");
   });
+
+  // CHG-146: la calidad de texto (CHG-107) se avisa en cliente. Una
+  // descripción de emergencia breve pero real se acepta; 1-2 palabras
+  // o basura se rechazan con mensaje claro antes de enviar.
+  it("acepta una descripción de emergencia breve pero real", () => {
+    expect(
+      collectHelpRequestIssues({
+        ...validDraft,
+        description: "Necesito ayuda urgente aquí",
+      }),
+    ).toEqual([]);
+  });
+
+  it("rechaza una descripción con muy pocas palabras distintas", () => {
+    const issues = collectHelpRequestIssues({
+      ...validDraft,
+      description: "ayuda ayuda ayuda",
+    });
+    const descriptionIssue = issues.find(
+      (issue) => issue.field === "description",
+    );
+    expect(descriptionIssue?.message).toMatch(/palabras distintas/);
+  });
 });
 
 describe("HelpRequestForm (CHG-125)", () => {

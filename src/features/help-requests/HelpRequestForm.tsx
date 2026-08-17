@@ -21,6 +21,7 @@ import {
   type SessionAccountSource,
 } from "../auth/useSessionAccount";
 import { parseDraftCoordinates } from "../missing-persons/geocoding";
+import { communityTextIssue } from "../humanitarian-directory/textQuality";
 import { LastSeenLocationPicker } from "../missing-persons/LastSeenLocationPicker";
 import {
   preparePhotosForUpload,
@@ -47,6 +48,7 @@ import {
   MAX_DURATION_DAYS,
   MAX_DURATION_HOURS,
   MAX_HELP_REQUEST_PHOTOS,
+  HELP_REQUEST_MIN_DISTINCT_WORDS,
   MAX_NOTIFICATION_RADIUS_KM,
   MIN_ADDRESS_LENGTH,
   MIN_DESCRIPTION_LENGTH,
@@ -103,6 +105,17 @@ export function collectHelpRequestIssues(
       "description",
       `La descripción no puede superar los ${MAX_DESCRIPTION_LENGTH} caracteres.`,
     );
+  } else {
+    // CHG-146: mismas reglas de calidad de texto que el backend
+    // (CHG-107), avisadas antes de enviar con un mensaje claro en vez
+    // del 422 opaco. La solicitud de ayuda pide 3 palabras distintas.
+    const textIssue = communityTextIssue(
+      description,
+      HELP_REQUEST_MIN_DISTINCT_WORDS,
+    );
+    if (textIssue) {
+      push("description", textIssue);
+    }
   }
 
   const address = draft.address.trim();

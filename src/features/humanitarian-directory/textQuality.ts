@@ -51,8 +51,17 @@ export function hasOverlongWord(value: string): boolean {
     .some((fragmento) => fragmento.length > MAX_WORD_LENGTH);
 }
 
-/** Devuelve el motivo del rechazo, o `null` si el texto sirve. */
-export function communityTextIssue(value: string): string | null {
+/**
+ * Devuelve el motivo del rechazo, o `null` si el texto sirve.
+ *
+ * CHG-146: `minDistinctWords` es parametrizable (por defecto 5, como el
+ * reporte de persona). La solicitud de ayuda, terse por naturaleza,
+ * pasa un mínimo menor; mismo valor que aplica el backend.
+ */
+export function communityTextIssue(
+  value: string,
+  minDistinctWords: number = MIN_DISTINCT_WORDS,
+): string | null {
   const texto = value.trim();
 
   if (hasExcessiveRepetition(texto)) {
@@ -63,8 +72,8 @@ export function communityTextIssue(value: string): string | null {
     return "El texto tiene una secuencia sin espacios demasiado larga; describe lo que observaste.";
   }
 
-  if (distinctWords(texto) < MIN_DISTINCT_WORDS) {
-    return `Describe lo que observaste con al menos ${MIN_DISTINCT_WORDS} palabras distintas.`;
+  if (distinctWords(texto) < minDistinctWords) {
+    return `Describe la situación con al menos ${minDistinctWords} palabras distintas.`;
   }
 
   return null;
