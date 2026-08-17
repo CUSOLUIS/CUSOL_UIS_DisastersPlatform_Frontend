@@ -577,3 +577,61 @@ describe("Feedback de la dirección (CHG-141)", () => {
     expect(screen.getByTestId("last-seen-marker")).toBeTruthy();
   });
 });
+
+// CHG-143 — Colocar el muñequito es una intención explícita: debe
+// resolver la dirección SIEMPRE, aunque las coordenadas coincidan con
+// las ya fijadas (recolocar en el mismo punto). Antes se necesitaban
+// dos intentos porque el efecto dependía solo del cambio de coordenadas.
+describe("Colocar muñequito resuelve siempre (CHG-143)", () => {
+  afterEach(() => jest.useRealTimers());
+
+  it("recolocar el GPS en el mismo punto vuelve a resolver la dirección", async () => {
+    jest.useFakeTimers();
+    const locateVisitor = jest
+      .fn()
+      .mockResolvedValue({ latitude: 7.1193, longitude: -73.1227 });
+    const resolveAddress = jest.fn().mockResolvedValue({
+      label: "Carrera 27 # 10-25, Bucaramanga",
+      municipality: null,
+      department: null,
+    });
+    const onAddressResolved = jest.fn();
+
+    render(
+      <ControlledPicker
+        addressQuery=""
+        locateMode="dot"
+        locateVisitor={locateVisitor}
+        onAddressResolved={onAddressResolved}
+        resolveAddress={resolveAddress}
+      />,
+    );
+
+    const locate = () =>
+      screen.getByRole("button", {
+        name: "Centrar el mapa en mi ubicación actual",
+      });
+    const place = () =>
+      screen.getByRole("button", {
+        name: "Colocar el muñequito en el centro del mapa",
+      });
+
+    // Primer intento: círculo + un solo colocar.
+    await act(async () => fireEvent.press(locate()));
+    await act(async () => fireEvent.press(place()));
+    await act(async () => {
+      jest.advanceTimersByTime(1200);
+      await Promise.resolve();
+    });
+    expect(onAddressResolved).toHaveBeenCalledTimes(1);
+
+    // Segundo intento sobre el MISMO punto: debe resolver de nuevo.
+    await act(async () => fireEvent.press(locate()));
+    await act(async () => fireEvent.press(place()));
+    await act(async () => {
+      jest.advanceTimersByTime(1200);
+      await Promise.resolve();
+    });
+    expect(onAddressResolved).toHaveBeenCalledTimes(2);
+  });
+});

@@ -122,6 +122,12 @@ export function LastSeenLocationPicker({
   // CHG-141: feedback sutil de la geocodificación inversa.
   const [resolvingAddress, setResolvingAddress] = useState(false);
   const [resolveError, setResolveError] = useState(false);
+  // CHG-143: colocar el muñequito es una intención explícita y debe
+  // resolver la dirección aunque las coordenadas redondeadas
+  // coincidan con las ya fijadas (recolocar en el mismo punto). Este
+  // contador dispara el efecto de resolución además del cambio de
+  // coordenadas.
+  const [placementSeq, setPlacementSeq] = useState(0);
   const locateAvailable =
     locateVisitor !== undefined || getBrowserGeolocation() !== null;
   // CHG-086: las candidatas ya traen su dirección; el resto de
@@ -165,7 +171,9 @@ export function LastSeenLocationPicker({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [value?.latitude, value?.longitude]);
+    // CHG-143: `placementSeq` fuerza la resolución en cada colocación
+    // explícita, incluso si las coordenadas redondeadas no cambian.
+  }, [value?.latitude, value?.longitude, placementSeq]);
 
   const trimmedQuery = addressQuery.trim();
   const tiles = useMemo(
@@ -244,6 +252,9 @@ export function LastSeenLocationPicker({
         setCurrentLocation(point);
       } else {
         onChange(point);
+        // CHG-143: el GPS es una colocación explícita; resolver aunque
+        // caiga sobre las mismas coordenadas ya fijadas.
+        setPlacementSeq((seq) => seq + 1);
       }
       setCenter(point);
       setZoom(CANDIDATE_ZOOM);
@@ -351,6 +362,8 @@ export function LastSeenLocationPicker({
             onChange(target);
             setCenter(target);
             setCurrentLocation(null);
+            // CHG-143: recolocar sobre el mismo punto también resuelve.
+            setPlacementSeq((seq) => seq + 1);
           }}
           style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
         >
