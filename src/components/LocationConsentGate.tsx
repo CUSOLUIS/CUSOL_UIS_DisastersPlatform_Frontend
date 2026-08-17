@@ -31,9 +31,14 @@ export interface LocationWatchSubscription {
 }
 
 export interface LocationWatcher {
-  // CHG-110: estado actual del permiso, sin pedirlo. Es lo que permite
-  // saber si el aviso ya se aceptó en una sesión anterior.
-  getPermissionStatus?(): Promise<boolean>;
+  // CHG-110/CHG-129: estado actual del permiso, sin pedirlo.
+  // `undetermined` distingue "nunca se ha pedido" (el aviso propio se
+  // muestra una única vez) de "se pidió y fue retirado" (se re-pide
+  // directo al sistema, sin repetir el aviso).
+  getPermissionState?(): Promise<{
+    granted: boolean;
+    undetermined: boolean;
+  }>;
   requestPermission(): Promise<boolean>;
   watch(
     onSample: (sample: {
@@ -47,10 +52,13 @@ export interface LocationWatcher {
 async function loadExpoLocationWatcher(): Promise<LocationWatcher> {
   const location = await import("expo-location");
   return {
-    async getPermissionStatus() {
+    async getPermissionState() {
       // Consulta sin abrir el diálogo del sistema.
       const response = await location.getForegroundPermissionsAsync();
-      return response.granted;
+      return {
+        granted: response.granted,
+        undetermined: response.status === "undetermined",
+      };
     },
     async requestPermission() {
       const response = await location.requestForegroundPermissionsAsync();
@@ -144,10 +152,24 @@ export function LocationConsentGate({
     const resolveInitialStatus = async () => {
       try {
         const active = await loadWatcher();
-        const alreadyGranted = await active.getPermissionStatus?.();
+        const state = await active.getPermissionState?.();
         if (cancelled || !mountedRef.current) return;
-        if (alreadyGranted) {
+        if (state?.granted) {
           await startWatching(active);
+          return;
+        }
+        // CHG-129: si el permiso ya se pidió alguna vez y fue retirado
+        // (revocado en ajustes o concedido "solo esta vez"), el aviso
+        // propio NO se repite: se re-pide directo al sistema. El aviso
+        // solo se muestra la primera vez (permiso nunca pedido).
+        if (state && !state.undetermined) {
+          const granted = await active.requestPermission();
+          if (cancelled || !mountedRef.current) return;
+          if (granted) {
+            await startWatching(active);
+            return;
+          }
+          setStatus("denied");
           return;
         }
         setStatus("consent");
