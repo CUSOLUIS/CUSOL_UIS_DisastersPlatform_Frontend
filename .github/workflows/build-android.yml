@@ -93,3 +93,19 @@ jobs:
             /home/cusol01/downloads/cusol-disasters.version.json
           rm -f /home/cusol01/downloads/cusol-disasters.version.json.tmp
           ls -la /home/cusol01/downloads/
+
+      # El nginx de borde del VPS solo sirve exactamente el .apk; el
+      # resto de /descargas/ lo atiende el nginx del contenedor
+      # frontend. El manifiesto se copia dentro del contenedor para que
+      # su try_files lo sirva como JSON; la copia en ~/downloads queda
+      # como fuente persistente (el deploy web la re-copia tras cada
+      # rebuild del contenedor).
+      - name: Servir el manifiesto por el frontend
+        run: |
+          cd /home/cusol01
+          container=$(docker compose ps -q frontend)
+          test -n "$container"
+          docker exec "$container" mkdir -p /usr/share/nginx/html/descargas
+          docker cp /home/cusol01/downloads/cusol-disasters.version.json \
+            "$container":/usr/share/nginx/html/descargas/cusol-disasters.version.json
+          curl --fail --silent https://cusoldisasterplatform.com/descargas/cusol-disasters.version.json | grep -F "$GITHUB_SHA"

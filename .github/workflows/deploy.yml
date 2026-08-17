@@ -99,6 +99,21 @@ jobs:
           docker compose build frontend
           docker compose up -d --wait frontend
 
+      # CHG-128: el rebuild deja el contenedor sin el manifiesto de
+      # versión del APK; se re-copia el vigente (describe el APK que
+      # realmente está publicado en ~/downloads). Si aún no existe, no
+      # hay nada que restaurar y el portón de la app falla abierto.
+      - name: Restaurar el manifiesto de versión del APK
+        run: |
+          cd "$COMPOSE_DIR"
+          if [ -f /home/cusol01/downloads/cusol-disasters.version.json ]; then
+            container=$(docker compose ps -q frontend)
+            test -n "$container"
+            docker exec "$container" mkdir -p /usr/share/nginx/html/descargas
+            docker cp /home/cusol01/downloads/cusol-disasters.version.json \
+              "$container":/usr/share/nginx/html/descargas/cusol-disasters.version.json
+          fi
+
       - name: Verificación por el dominio de producción
         run: |
           curl --fail --silent --show-error https://cusoldisasterplatform.com/ >/dev/null
