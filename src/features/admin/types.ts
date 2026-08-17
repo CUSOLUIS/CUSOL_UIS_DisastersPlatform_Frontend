@@ -248,6 +248,8 @@ export interface AdminVisitorPresencePage {
 export interface SystemMetricsSample {
   sampledAt: string;
   cpuPercent: number;
+  // CHG-140: null cuando el host no expone sensores térmicos.
+  cpuTemperatureCelsius: number | null;
   load1m: number;
   load5m: number;
   load15m: number;

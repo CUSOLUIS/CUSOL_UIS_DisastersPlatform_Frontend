@@ -740,6 +740,7 @@ export const demoAdminDataSource: AdminDataSource = {
         return {
           sampledAt: new Date(at).toISOString(),
           cpuPercent: Math.round((12 + 55 * wave(0)) * 100) / 100,
+          cpuTemperatureCelsius: Math.round((46 + 12 * wave(0.9)) * 10) / 10,
           load1m: Math.round((0.4 + 1.8 * wave(0.3)) * 100) / 100,
           load5m: 0.9,
           load15m: 0.7,

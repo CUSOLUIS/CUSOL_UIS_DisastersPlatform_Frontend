@@ -15,6 +15,7 @@ import {
   SystemMetricsSection,
   formatBytes,
   formatRate,
+  formatTemperature,
   formatUptime,
 } from "./SystemMetricsSection";
 import { demoAdminDataSource } from "./dataSource";
@@ -28,6 +29,7 @@ function sample(overrides: Partial<SystemMetricsSample> = {}): SystemMetricsSamp
   return {
     sampledAt: "2026-08-16T14:00:00Z",
     cpuPercent: 37.5,
+    cpuTemperatureCelsius: 44.6,
     load1m: 1.25,
     load5m: 0.9,
     load15m: 0.7,
@@ -89,12 +91,42 @@ describe("SystemMetricsSection", () => {
     expect(screen.getByText("80.0 GiB")).toBeTruthy();
     expect(screen.getByText("↓ 244 KiB/s")).toBeTruthy();
     expect(screen.getByText("12 d 4 h")).toBeTruthy();
+    // CHG-140: temperatura del host con sensor presente.
+    expect(screen.getByText("44.6 °C")).toBeTruthy();
     expect(screen.getByTestId("system-chart-cpu")).toBeTruthy();
+    expect(screen.getByTestId("system-chart-temperature")).toBeTruthy();
     expect(screen.getByTestId("system-chart-memory")).toBeTruthy();
     expect(screen.getByTestId("system-chart-network")).toBeTruthy();
     // Dos series en la gráfica de red exigen leyenda visible.
     expect(screen.getByText("Recibido")).toBeTruthy();
     expect(screen.getByText("Enviado")).toBeTruthy();
+  });
+
+  // CHG-140: sin sensores térmicos (VPS virtualizada) la tarjeta marca
+  // N/D y la gráfica de temperatura no se dibuja; nada más se degrada.
+  it("degrada la temperatura a N/D cuando el host no expone sensores", async () => {
+    const withoutSensor = metrics();
+    withoutSensor.series = withoutSensor.series.map((entry) => ({
+      ...entry,
+      cpuTemperatureCelsius: null,
+    }));
+    withoutSensor.latest =
+      withoutSensor.series[withoutSensor.series.length - 1];
+    const getSystemMetrics = jest.fn().mockResolvedValue(withoutSensor);
+
+    render(
+      <SystemMetricsSection
+        dataSource={dataSourceWith(getSystemMetrics)}
+        refreshKey={0}
+      />,
+    );
+
+    expect(await screen.findByText("N/D")).toBeTruthy();
+    expect(
+      screen.getByText("Este host no expone sensores térmicos"),
+    ).toBeTruthy();
+    expect(screen.queryByTestId("system-chart-temperature")).toBeNull();
+    expect(screen.getByTestId("system-chart-cpu")).toBeTruthy();
   });
 
   it("al arrastrar sobre la gráfica revela el valor y la hora de la muestra", async () => {
@@ -181,6 +213,7 @@ describe("SystemMetricsSection", () => {
     );
     expect(demo.latest.cpuPercent).toBeGreaterThanOrEqual(0);
     expect(demo.latest.cpuPercent).toBeLessThanOrEqual(100);
+    expect(demo.latest.cpuTemperatureCelsius).toBeGreaterThan(0);
   });
 });
 
@@ -190,6 +223,7 @@ describe("formato de unidades", () => {
     expect(formatBytes(4 * 1024 ** 3)).toBe("4.0 GiB");
     expect(formatBytes(200 * 1024 ** 3)).toBe("200 GiB");
     expect(formatRate(250_000)).toBe("244 KiB/s");
+    expect(formatTemperature(44.65)).toBe("44.6 °C");
     expect(formatUptime(86_400 * 12 + 3_600 * 4)).toBe("12 d 4 h");
     expect(formatUptime(3_600 * 2 + 60 * 5)).toBe("2 h 5 min");
   });

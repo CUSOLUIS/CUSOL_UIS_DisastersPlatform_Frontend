@@ -204,6 +204,7 @@ function systemMetricsSample(sampledAt: string) {
   return {
     sampledAt,
     cpuPercent: 21.5,
+    cpuTemperatureCelsius: 48.2,
     load1m: 0.8,
     load5m: 0.6,
     load15m: 0.5,

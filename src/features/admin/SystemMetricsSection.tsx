@@ -27,6 +27,7 @@ const CHART_SURFACE = "#0d1320";
 // deutan) y el contraste ≥3:1 sobre la superficie oscura.
 const SERIES_COLORS = {
   cpu: colors.cyan,
+  temperature: colors.reported,
   memory: colors.deceased,
   networkRx: colors.cyan,
   networkTx: colors.building,
@@ -83,6 +84,28 @@ export function SystemMetricsSection({
         label: "CPU",
         color: SERIES_COLORS.cpu,
         values: (data?.series ?? []).map((sample) => sample.cpuPercent),
+      },
+    ],
+    [data],
+  );
+  // CHG-140: solo hay serie de temperatura si el host expone sensores;
+  // en una VPS sin ellos la gráfica se omite y la tarjeta marca N/D.
+  const hasTemperature = useMemo(
+    () =>
+      (data?.series ?? []).some(
+        (entry) => entry.cpuTemperatureCelsius !== null,
+      ),
+    [data],
+  );
+  const temperatureSeries = useMemo<ChartSeries[]>(
+    () => [
+      {
+        key: "temperature",
+        label: "Temperatura",
+        color: SERIES_COLORS.temperature,
+        values: (data?.series ?? []).map(
+          (sample) => sample.cpuTemperatureCelsius ?? 0,
+        ),
       },
     ],
     [data],
@@ -188,6 +211,20 @@ export function SystemMetricsSection({
           detail={`Carga ${latest.load1m.toFixed(2)} · ${latest.load5m.toFixed(2)} · ${latest.load15m.toFixed(2)}`}
         />
         <StatTile
+          accent={SERIES_COLORS.temperature}
+          label="Temperatura del CPU"
+          value={
+            latest.cpuTemperatureCelsius !== null
+              ? formatTemperature(latest.cpuTemperatureCelsius)
+              : "N/D"
+          }
+          detail={
+            latest.cpuTemperatureCelsius !== null
+              ? "Sensor térmico del host"
+              : "Este host no expone sensores térmicos"
+          }
+        />
+        <StatTile
           accent={SERIES_COLORS.memory}
           label="Memoria usada"
           value={formatBytes(latest.memoryUsedBytes)}
@@ -222,6 +259,15 @@ export function SystemMetricsSection({
         title="USO DE CPU"
         yMax={100}
       />
+      {hasTemperature && (
+        <MetricTimeChart
+          formatValue={formatTemperature}
+          series={temperatureSeries}
+          testID="system-chart-temperature"
+          timestamps={timestamps}
+          title="TEMPERATURA DEL HOST"
+        />
+      )}
       <MetricTimeChart
         formatValue={formatBytes}
         series={memorySeries}
@@ -551,6 +597,10 @@ export function formatBytes(value: number): string {
 
 export function formatRate(value: number): string {
   return `${formatBytes(value)}/s`;
+}
+
+export function formatTemperature(celsius: number): string {
+  return `${celsius.toFixed(1)} °C`;
 }
 
 export function formatUptime(seconds: number): string {
