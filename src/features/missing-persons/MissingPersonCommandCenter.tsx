@@ -39,6 +39,8 @@ interface ReportActionsProps {
   onRegisterDonationPoint: () => void;
   onOfferCommunityMeals: () => void;
   onOfferTemporaryShelter: () => void;
+  // CHG-125: solicitud pública de ayuda de emergencia.
+  onRequestHelp: () => void;
   compact: boolean;
 }
 
@@ -151,6 +153,7 @@ export function ReportActions({
   onRegisterDonationPoint,
   onOfferCommunityMeals,
   onOfferTemporaryShelter,
+  onRequestHelp,
 }: ReportActionsProps) {
   const { width } = useWindowDimensions();
   const columns = getReportActionColumns(width);
@@ -208,6 +211,15 @@ export function ReportActions({
         compact={compact}
         columns={columns}
         onPress={onOfferTemporaryShelter}
+      />
+      {/* CHG-125: solicitud pública de ayuda de emergencia. */}
+      <ReportAction
+        testID="request-help-action"
+        action={reportActionCatalog["help-request"]}
+        icon={<HelpRequestIcon />}
+        compact={compact}
+        columns={columns}
+        onPress={onRequestHelp}
       />
     </View>
   );
@@ -496,6 +508,28 @@ function TemporaryShelterIcon() {
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+// CHG-125 — Megáfono con ondas: pedir ayuda en voz alta.
+function HelpRequestIcon() {
+  return (
+    <Svg width={36} height={36} viewBox="0 0 36 36">
+      <Path
+        d="M4 15v6h5l9 7V8l-9 7H4Z"
+        fill="none"
+        stroke={reportActionIconColor}
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M23 12c1.8 1.6 2.7 3.6 2.7 6s-.9 4.4-2.7 6M27.5 8.5c2.8 2.5 4.2 5.7 4.2 9.5s-1.4 7-4.2 9.5"
+        fill="none"
+        stroke={reportActionIconColor}
+        strokeWidth={2}
+        strokeLinecap="round"
       />
     </Svg>
   );

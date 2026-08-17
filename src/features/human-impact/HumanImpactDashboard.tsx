@@ -32,6 +32,9 @@ import type {
   CommunityContributionDataSource,
   HumanitarianDirectoryDataSource,
 } from "../humanitarian-directory/types";
+import { HelpRequestsSection } from "../help-requests/HelpRequestsSection";
+import { useActiveHelpRequests } from "../help-requests/useActiveHelpRequests";
+import type { HelpRequestsDataSource } from "../help-requests/types";
 import { ReportActions } from "../missing-persons/MissingPersonCommandCenter";
 import { OperationalMapPanel } from "../operational-map/OperationalMapPanel";
 import type {
@@ -55,12 +58,15 @@ interface HumanImpactDashboardProps {
   peopleRecordsDataSource: PeopleRecordsDataSource;
   humanitarianDirectoryDataSource: HumanitarianDirectoryDataSource;
   communityContributionDataSource: CommunityContributionDataSource;
+  // CHG-125: solicitudes «Necesitamos ayuda» vigentes.
+  helpRequestsDataSource: HelpRequestsDataSource;
   onReportMissingPerson: () => void;
   onReportUnverifiedBuilding: () => void;
   onRegisterCollectionCenter: () => void;
   onRegisterDonationPoint: () => void;
   onOfferCommunityMeals: () => void;
   onOfferTemporaryShelter: () => void;
+  onRequestHelp: () => void;
   onLogin: () => void;
   onRegister: () => void;
   onAbout: () => void;
@@ -176,6 +182,7 @@ export function HumanImpactDashboard({
   peopleRecordsDataSource,
   humanitarianDirectoryDataSource,
   communityContributionDataSource,
+  helpRequestsDataSource,
   initialDirectorySearch,
   onReportMissingPerson,
   onReportUnverifiedBuilding,
@@ -183,6 +190,7 @@ export function HumanImpactDashboard({
   onRegisterDonationPoint,
   onOfferCommunityMeals,
   onOfferTemporaryShelter,
+  onRequestHelp,
   onLogin,
   onRegister,
   onAbout,
@@ -258,6 +266,12 @@ export function HumanImpactDashboard({
   const showHome = () => {
     scrollRef.current?.scrollTo({ y: 0, animated: !reducedMotion });
   };
+
+  // CHG-125: una sola consulta de solicitudes vigentes alimenta el
+  // mapa, la sección bajo el mapa y el bloque de la transmisión.
+  const { state: helpRequestsState, refresh: refreshHelpRequests } =
+    useActiveHelpRequests(helpRequestsDataSource);
+  const attendHelpRequest = (id: string) => helpRequestsDataSource.attend(id);
 
   return (
     <LinearGradient
@@ -366,6 +380,7 @@ export function HumanImpactDashboard({
                 onRegisterDonationPoint={onRegisterDonationPoint}
                 onOfferCommunityMeals={onOfferCommunityMeals}
                 onOfferTemporaryShelter={onOfferTemporaryShelter}
+                onRequestHelp={onRequestHelp}
               />
 
               <ScrollContinuationCue onPress={showMap} />
@@ -381,6 +396,22 @@ export function HumanImpactDashboard({
                 dataSource={mapDataSource}
                 humanDataSource={humanMapDataSource}
                 compact={compact}
+                helpRequests={helpRequestsState.items}
+              />
+            </View>
+
+            {/* CHG-125: solicitudes vigentes bajo el mapa, con conteo
+                de personas atendiendo y la acción de atender. */}
+            <View testID="dashboard-help-requests" style={styles.fullWidth}>
+              <HelpRequestsSection
+                items={helpRequestsState.items}
+                loading={helpRequestsState.status === "loading"}
+                errorMessage={helpRequestsState.errorMessage}
+                isAuthenticated={account !== null}
+                attend={attendHelpRequest}
+                onAttended={refreshHelpRequests}
+                onLogin={onLogin}
+                onRegister={onRegister}
               />
             </View>
 
@@ -435,6 +466,24 @@ export function HumanImpactDashboard({
                 },
               ]}
             >
+              {/* CHG-125 / DEC-125-06: las solicitudes también se ven
+                  en la transmisión en vivo, como bloque propio encima
+                  de la tabla de personas (que conserva su contrato). */}
+              {helpRequestsState.items.length > 0 && (
+                <HelpRequestsSection
+                  items={helpRequestsState.items}
+                  loading={false}
+                  errorMessage={null}
+                  isAuthenticated={account !== null}
+                  attend={attendHelpRequest}
+                  onAttended={refreshHelpRequests}
+                  onLogin={onLogin}
+                  onRegister={onRegister}
+                  embedded
+                  maxItems={3}
+                  title="Solicitudes de ayuda en curso"
+                />
+              )}
               <RecentPeopleTable
                 dataSource={peopleRecordsDataSource}
                 viewportMinHeight={liveRecordsMinHeight}

@@ -6,7 +6,7 @@ interface CategoryMeta {
   shortLabel: string;
   glyph: string;
   color: string;
-  markerKind: "person" | "building";
+  markerKind: "person" | "building" | "help";
   summaryKey:
     | "missingPerson"
     | "collectionCenter"
@@ -16,7 +16,8 @@ interface CategoryMeta {
     | "buildingPending"
     | "communityMeal"
     | "temporaryShelter"
-    | "volunteersNeeded";
+    | "volunteersNeeded"
+    | "helpRequests";
 }
 
 export const categoryMeta: Record<OperationalMapCategory, CategoryMeta> = {
@@ -94,5 +95,14 @@ export const categoryMeta: Record<OperationalMapCategory, CategoryMeta> = {
     color: "#ffd166",
     markerKind: "person",
     summaryKey: "volunteersNeeded",
+  },
+  // CHG-125: solicitud de emergencia vigente — marcador rojo animado.
+  help_request: {
+    label: "Necesitamos ayuda",
+    shortLabel: "Solicitud de ayuda activa",
+    glyph: "!",
+    color: colors.emergency,
+    markerKind: "help",
+    summaryKey: "helpRequests",
   },
 };

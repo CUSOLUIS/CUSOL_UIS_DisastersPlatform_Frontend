@@ -283,7 +283,7 @@ describe("App universal", () => {
     expect(onAbout).toHaveBeenCalledTimes(1);
   });
 
-  it("prioriza situación, muestra la búsqueda y debajo las seis acciones", async () => {
+  it("prioriza situación, muestra la búsqueda y debajo las siete acciones", async () => {
     const onReportPerson = jest.fn();
     const onReportBuilding = jest.fn();
     const onRegisterCenter = jest.fn();
@@ -395,6 +395,7 @@ describe("App universal", () => {
       "register-donation-point-action",
       "offer-community-meals-action",
       "offer-temporary-shelter-action",
+      "request-help-action",
     ]);
 
     const reportButton = await screen.findByRole("button", {
@@ -1004,8 +1005,10 @@ describe("App universal", () => {
   it("mantiene filtros y mapa sobre el mismo subconjunto sin listado inferior", async () => {
     render(<App dataSource={demoDataSource} mapDataSource={demoMapDataSource} />);
 
+    // CHG-125: a los 8 puntos operativos demo se suman los 2 marcadores
+    // de solicitudes «Necesitamos ayuda» (categoría propia del mapa).
     await waitFor(() =>
-      expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(8),
+      expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(10),
     );
     // CHG-049: el bloque "UBICACIONES OPERATIVAS" y el detalle inferior
     // se retiraron; el mapa y sus filtros son la única superficie.
@@ -1018,7 +1021,9 @@ describe("App universal", () => {
       screen.getByRole("button", { name: "Filtrar mapa por Centros de acopio" }),
     );
 
-    expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(6);
+    // Quedan 6 puntos operativos + 2 solicitudes de ayuda (CHG-125),
+    // que no se apagan con los filtros de otras categorías.
+    expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(8);
   });
 
   it("expone las categorías comunitarias nuevas como filtros del mapa", async () => {
@@ -1046,7 +1051,8 @@ describe("App universal", () => {
       name: "Filtrar mapa por Edificios sin revisar",
     });
     fireEvent.press(buildingFilter);
-    expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(6);
+    // 6 puntos operativos visibles + 2 solicitudes de ayuda (CHG-125).
+    expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(8);
 
     fireEvent.press(buildingFilter);
     const buildingMarker = screen.getByRole("button", {
@@ -1108,7 +1114,8 @@ describe("App universal", () => {
 
     render(<App dataSource={demoDataSource} mapDataSource={updatingMapSource} />);
     await act(async () => Promise.resolve());
-    expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(8);
+    // 8 puntos operativos demo + 2 solicitudes de ayuda (CHG-125).
+    expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(10);
 
     await act(async () => {
       jest.advanceTimersByTime(30_000);
@@ -1116,7 +1123,7 @@ describe("App universal", () => {
     });
 
     expect(screen.getByText("DESACTUALIZADO")).toBeTruthy();
-    expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(8);
+    expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(10);
   });
 
   it("no inventa puntos operativos aunque la capa humana sí tenga clusters", async () => {
@@ -1133,6 +1140,7 @@ describe("App universal", () => {
           communityMeal: 0,
           temporaryShelter: 0,
           volunteersNeeded: 0,
+          helpRequests: 0,
         },
         items: [],
         generatedAt: "2026-08-12T18:30:00.000Z",
@@ -1145,7 +1153,13 @@ describe("App universal", () => {
     await waitFor(() =>
       expect(screen.getAllByTestId(/^human-map-feature-/)).toHaveLength(14),
     );
-    expect(screen.queryAllByTestId(/^map-marker-/)).toHaveLength(0);
+    // Sin puntos operativos no se inventa ninguno; los únicos marcadores
+    // admisibles son las solicitudes de ayuda demo (CHG-125), que tienen
+    // su propio origen de datos.
+    expect(
+      screen.queryAllByTestId(/^map-marker-(?!help_request:)/),
+    ).toHaveLength(0);
+    expect(screen.queryAllByTestId(/^map-marker-help_request:/)).toHaveLength(2);
     expect(screen.queryByText("SIN PUNTOS VISIBLES")).toBeNull();
   });
 

@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { AdminApiError, adminDataSource } from "./dataSource";
+import { SystemMetricsSection } from "./SystemMetricsSection";
 import type {
   AdminAccountDetail,
   AdminVisitorPresencePage,
@@ -49,6 +50,8 @@ const SECTION_OPTIONS: Array<{
   { value: "accounts", label: "Cuentas", code: "03" },
   { value: "audit", label: "Auditoría", code: "04" },
   { value: "presence", label: "Ubicaciones", code: "05" },
+  // CHG-126: métricas del sistema operativo del servidor.
+  { value: "system", label: "Sistema", code: "06" },
 ];
 
 const KIND_LABELS: Record<AdminSubmissionKind, string> = {
@@ -132,6 +135,8 @@ function guardAdminDataSource(
       guarded(source.listAudit(filters, signal)),
     listVisitorPresence: (signal) =>
       guarded(source.listVisitorPresence(signal)),
+    getSystemMetrics: (signal) =>
+      guarded(source.getSystemMetrics(signal)),
   };
 }
 
@@ -314,6 +319,12 @@ export function AdminDashboard({
             )}
             {section === "presence" && (
               <PresenceSection dataSource={protectedDataSource} refreshKey={refreshKey} />
+            )}
+            {section === "system" && (
+              <SystemMetricsSection
+                dataSource={protectedDataSource}
+                refreshKey={refreshKey}
+              />
             )}
           </ScrollView>
         </View>

@@ -59,12 +59,16 @@ type LegacyOperationalMapOverview = Omit<OperationalMapOverview, "summary"> & {
     | "communityMeal"
     | "temporaryShelter"
     | "volunteersNeeded"
+    | "helpRequests"
   > & {
     buildingPending?: number;
     collectionPoint?: number;
     communityMeal?: number;
     temporaryShelter?: number;
     volunteersNeeded?: number;
+    // CHG-125: el backend no envía esta cuenta; la fusión en cliente
+    // la sobreescribe con las solicitudes vigentes.
+    helpRequests?: number;
   };
 };
 
@@ -83,6 +87,7 @@ export function normalizeOperationalMapOverview(
     communityMeal: 0,
     temporaryShelter: 0,
     volunteersNeeded: 0,
+    helpRequests: 0,
   };
 
   items.forEach((point) => {
@@ -113,6 +118,9 @@ export function normalizeOperationalMapOverview(
         break;
       case "volunteers_needed":
         summary.volunteersNeeded += 1;
+        break;
+      case "help_request":
+        summary.helpRequests += 1;
         break;
     }
   });

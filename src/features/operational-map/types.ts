@@ -11,6 +11,9 @@ export const operationalMapCategories = [
   "temporary_shelter",
   // CHG-069: alertas ciudadanas de voluntariado.
   "volunteers_needed",
+  // CHG-125: solicitudes «Necesitamos ayuda» vigentes (fusionadas en
+  // cliente, DEC-125-10; nunca vienen del overview del backend).
+  "help_request",
 ] as const;
 
 export type OperationalMapCategory = (typeof operationalMapCategories)[number];
@@ -27,6 +30,7 @@ export const operationalResponseCategories = [
   "community_meal",
   "temporary_shelter",
   "volunteers_needed",
+  "help_request",
 ] as const satisfies readonly OperationalMapCategory[];
 
 export type CoordinatePrecision = "exact" | "approximate" | "municipality";
@@ -65,6 +69,9 @@ export interface OperationalMapSummary {
   communityMeal: number;
   temporaryShelter: number;
   volunteersNeeded: number;
+  // CHG-125: cuenta de solicitudes de ayuda vigentes fusionadas en
+  // cliente; el backend no la envía y se normaliza a 0.
+  helpRequests: number;
 }
 
 export interface OperationalMapOverview {

@@ -170,7 +170,9 @@ export class ReportRejectedError extends Error {
   }
 }
 
-async function extractProblem(
+// CHG-125: exportado — el envío de solicitudes de ayuda parsea el
+// mismo problem+json con `fields` en vez de duplicar el parser.
+export async function extractProblem(
   response: Response,
 ): Promise<{ detail: string | null; fields: string[] }> {
   try {
@@ -194,7 +196,9 @@ async function extractProblem(
   }
 }
 
-async function appendPhoto(body: FormData, photo: SelectedPhoto) {
+// CHG-125: exportado — mismas ramas web/nativo para adjuntar la foto
+// del multipart en cualquier envío de reporte.
+export async function appendPhoto(body: FormData, photo: SelectedPhoto) {
   const type = photo.mimeType ?? "image/jpeg";
   if (Platform.OS === "web") {
     const blob = await (await fetch(photo.uri)).blob();

@@ -22,6 +22,12 @@ import {
   type AddressCandidate,
 } from "../missing-persons/geocoding";
 import { requestVisitorLocation } from "../operational-map/visitorLocation";
+import { helpRequestsDataSource } from "../help-requests/dataSource";
+import { HelpRequestsSection } from "../help-requests/HelpRequestsSection";
+import type {
+  HelpRequestPage,
+  HelpRequestsDataSource,
+} from "../help-requests/types";
 import { mySpaceDataSource } from "./dataSource";
 import type {
   MySpaceDataSource,
@@ -75,18 +81,25 @@ export function MySpacePanel({
   visible,
   onClose,
   dataSource = mySpaceDataSource,
+  helpRequests = helpRequestsDataSource,
   geocode = searchAddressCandidates,
   locate = requestVisitorLocation,
 }: {
   visible: boolean;
   onClose: () => void;
   dataSource?: MySpaceDataSource;
+  // CHG-125 / DEC-125-09 y DEC-125-11: las solicitudes activas se
+  // notifican dentro del espacio personal con su acción de atender.
+  helpRequests?: HelpRequestsDataSource;
   geocode?: (query: string) => Promise<AddressCandidate[]>;
   locate?: () => Promise<{ latitude: number; longitude: number }>;
 }) {
-  const [section, setSection] = useState<"reports" | "volunteers">("reports");
+  const [section, setSection] = useState<"reports" | "volunteers" | "help">(
+    "reports",
+  );
   const [reports, setReports] = useState<MyReportsPage | null>(null);
   const [alerts, setAlerts] = useState<VolunteerAlertPage | null>(null);
+  const [helpPage, setHelpPage] = useState<HelpRequestPage | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -94,18 +107,20 @@ export function MySpacePanel({
     setLoading(true);
     setError(null);
     try {
-      const [reportsPage, alertsPage] = await Promise.all([
+      const [reportsPage, alertsPage, helpRequestsPage] = await Promise.all([
         dataSource.getMyReports(),
         dataSource.listVolunteerAlerts(),
+        helpRequests.listActive(),
       ]);
       setReports(reportsPage);
       setAlerts(alertsPage);
+      setHelpPage(helpRequestsPage);
     } catch (caught: unknown) {
       setError(messageOf(caught));
     } finally {
       setLoading(false);
     }
-  }, [dataSource]);
+  }, [dataSource, helpRequests]);
 
   useEffect(() => {
     if (visible) void load();
@@ -167,6 +182,22 @@ export function MySpacePanel({
                 VOLUNTARIOS
               </Text>
             </Pressable>
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityState={{ selected: section === "help" }}
+              accessibilityLabel="Solicitudes de ayuda"
+              onPress={() => setSection("help")}
+              style={[styles.tab, section === "help" && styles.tabActive]}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  section === "help" && styles.tabTextActive,
+                ]}
+              >
+                AYUDA
+              </Text>
+            </Pressable>
           </View>
 
           <ScrollView
@@ -203,6 +234,21 @@ export function MySpacePanel({
                 geocode={geocode}
                 locate={locate}
                 onChanged={() => void load()}
+              />
+            )}
+            {/* CHG-125: solicitudes «Necesitamos ayuda» vigentes; el
+                panel solo se abre con sesión, así que la acción de
+                atender siempre está disponible. */}
+            {section === "help" && (
+              <HelpRequestsSection
+                items={helpPage?.items ?? []}
+                loading={loading && helpPage === null}
+                errorMessage={null}
+                isAuthenticated
+                attend={(id) => helpRequests.attend(id)}
+                onAttended={() => void load()}
+                embedded
+                title="Solicitudes de ayuda vigentes"
               />
             )}
           </ScrollView>

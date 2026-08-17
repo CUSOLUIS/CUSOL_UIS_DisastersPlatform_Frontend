@@ -5,7 +5,8 @@ export type AdminSection =
   | "submissions"
   | "accounts"
   | "audit"
-  | "presence";
+  | "presence"
+  | "system";
 export type AdminSubmissionKind =
   | "missing_person_report"
   | "unverified_building_report"
@@ -238,6 +239,33 @@ export interface AdminVisitorPresencePage {
   generatedAt: string;
 }
 
+// CHG-126: una muestra del sistema operativo del host del gateway.
+export interface SystemMetricsSample {
+  sampledAt: string;
+  cpuPercent: number;
+  load1m: number;
+  load5m: number;
+  load15m: number;
+  memoryTotalBytes: number;
+  memoryUsedBytes: number;
+  memoryAvailableBytes: number;
+  swapTotalBytes: number;
+  swapUsedBytes: number;
+  diskTotalBytes: number;
+  diskUsedBytes: number;
+  diskFreeBytes: number;
+  networkRxBytesPerSecond: number;
+  networkTxBytesPerSecond: number;
+  uptimeSeconds: number;
+}
+
+export interface AdminSystemMetrics {
+  intervalSeconds: number;
+  latest: SystemMetricsSample;
+  series: SystemMetricsSample[];
+  generatedAt: string;
+}
+
 export interface AdminDataSource {
   transport: "api" | "demo";
   getCurrentAccount(signal?: AbortSignal): Promise<AuthenticatedAccount>;
@@ -287,5 +315,7 @@ export interface AdminDataSource {
   listVisitorPresence(
     signal?: AbortSignal,
   ): Promise<AdminVisitorPresencePage>;
+  // CHG-126: métricas del sistema donde corre el gateway.
+  getSystemMetrics(signal?: AbortSignal): Promise<AdminSystemMetrics>;
   logout(): Promise<void>;
 }

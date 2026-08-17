@@ -6,12 +6,14 @@ import type {
   AdminAuditEvent,
   AdminAuditPage,
   AdminDataSource,
+  AdminSystemMetrics,
   AdminVisitorPresencePage,
   AdminEvidenceAccessGrant,
   AdminMutationReceipt,
   AdminOverview,
   AdminSubmissionDetail,
   AdminSubmissionPage,
+  SystemMetricsSample,
 } from "./types";
 
 const configuredApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.replace(
@@ -151,6 +153,11 @@ const apiAdminDataSource: AdminDataSource = {
       "/api/v1/admin/visitor-presence",
       { signal },
     ),
+  // CHG-126: métricas del sistema del host del gateway (el VPS).
+  getSystemMetrics: (signal) =>
+    apiRequest<AdminSystemMetrics>("/api/v1/admin/system-metrics", {
+      signal,
+    }),
   logout: authDataSource.logout,
 };
 
@@ -646,6 +653,52 @@ export const demoAdminDataSource: AdminDataSource = {
       ],
       total: 2,
       windowMinutes: 30,
+      generatedAt: nowIso(),
+    });
+  },
+  // CHG-126: serie sintética con ondas suaves para trabajar sin
+  // backend; cada llamada mueve la ventana como lo haría el gateway.
+  async getSystemMetrics() {
+    const intervalSeconds = 5;
+    const points = 180;
+    const memoryTotal = 8 * 1024 ** 3;
+    const diskTotal = 160 * 1024 ** 3;
+    const now = Date.now();
+    const series: SystemMetricsSample[] = Array.from(
+      { length: points },
+      (_, index) => {
+        const at = now - (points - 1 - index) * intervalSeconds * 1000;
+        const phase = at / 60_000;
+        const wave = (offset: number) =>
+          (Math.sin(phase + offset) + 1) / 2;
+        const memoryUsed = Math.round(
+          memoryTotal * (0.42 + 0.18 * wave(0.7)),
+        );
+        const diskUsed = Math.round(diskTotal * 0.63);
+        return {
+          sampledAt: new Date(at).toISOString(),
+          cpuPercent: Math.round((12 + 55 * wave(0)) * 100) / 100,
+          load1m: Math.round((0.4 + 1.8 * wave(0.3)) * 100) / 100,
+          load5m: 0.9,
+          load15m: 0.7,
+          memoryTotalBytes: memoryTotal,
+          memoryUsedBytes: memoryUsed,
+          memoryAvailableBytes: memoryTotal - memoryUsed,
+          swapTotalBytes: 2 * 1024 ** 3,
+          swapUsedBytes: Math.round(0.2 * 1024 ** 3),
+          diskTotalBytes: diskTotal,
+          diskUsedBytes: diskUsed,
+          diskFreeBytes: diskTotal - diskUsed,
+          networkRxBytesPerSecond: Math.round(30_000 + 220_000 * wave(1.6)),
+          networkTxBytesPerSecond: Math.round(12_000 + 80_000 * wave(2.4)),
+          uptimeSeconds: 86_400 * 12 + Math.floor(at / 1000) % 86_400,
+        };
+      },
+    );
+    return clone({
+      intervalSeconds,
+      latest: series[series.length - 1],
+      series,
       generatedAt: nowIso(),
     });
   },

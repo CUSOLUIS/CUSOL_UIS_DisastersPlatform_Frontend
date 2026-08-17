@@ -54,6 +54,13 @@ export interface LastSeenLocationPickerProps {
   // para autocompletar el campo Dirección (siempre editable).
   onAddressResolved?: (address: ResolvedAddress) => void;
   resolveAddress?: (point: GeographicCenter) => Promise<ResolvedAddress>;
+  // CHG-125: rótulo y ayuda propios (la solicitud de ayuda exige el
+  // punto, así que "OPCIONAL" dejaría de ser cierto allí).
+  title?: string;
+  helper?: string;
+  // CHG-125: botón visible de GPS junto a las acciones («¿Dónde
+  // estoy?»); el control ◎ del lienzo sigue disponible igual.
+  locateActionLabel?: string;
 }
 
 export function LastSeenLocationPicker({
@@ -64,6 +71,9 @@ export function LastSeenLocationPicker({
   locateVisitor,
   onAddressResolved,
   resolveAddress = reverseGeocode,
+  title = "UBICACIÓN EN EL MAPA · OPCIONAL",
+  helper = "Cruza la dirección escrita arriba con el mapa, fija tu ubicación con el botón ◎ del GPS, o arrastra el muñequito hasta el lugar exacto.",
+  locateActionLabel,
 }: LastSeenLocationPickerProps) {
   const [zoom, setZoom] = useState(MIN_ZOOM);
   const [center, setCenter] = useState<GeographicCenter>(COLOMBIA_CENTER);
@@ -222,11 +232,8 @@ export function LastSeenLocationPicker({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>UBICACIÓN EN EL MAPA · OPCIONAL</Text>
-      <Text style={styles.helper}>
-        Cruza la dirección escrita arriba con el mapa, fija tu ubicación con el
-        botón ◎ del GPS, o arrastra el muñequito hasta el lugar exacto.
-      </Text>
+      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.helper}>{helper}</Text>
 
       <View style={styles.actionsRow}>
         <Pressable
@@ -255,6 +262,31 @@ export function LastSeenLocationPicker({
         >
           <Text style={styles.actionText}>COLOCAR MUÑEQUITO</Text>
         </Pressable>
+        {/* CHG-125: acceso de GPS con nombre visible; pide el permiso
+            de geolocalización y aplica el fallback de precisión
+            (CHG-085) igual que el control ◎. */}
+        {locateActionLabel && locateAvailable && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={locateActionLabel}
+            accessibilityState={{ disabled: locating }}
+            disabled={locating}
+            onPress={() => void locateMe()}
+            style={({ pressed }) => [
+              styles.actionButton,
+              pressed && styles.pressed,
+              locating && styles.actionDisabled,
+            ]}
+          >
+            {locating ? (
+              <ActivityIndicator color={colors.cyan} />
+            ) : (
+              <Text style={styles.actionText}>
+                {locateActionLabel.toLocaleUpperCase("es-CO")}
+              </Text>
+            )}
+          </Pressable>
+        )}
       </View>
 
       {trimmedQuery.length === 0 && (

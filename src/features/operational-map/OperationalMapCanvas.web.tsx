@@ -304,8 +304,13 @@ function createMarkerElement(
   color: string,
   glyph: string,
   selected: boolean,
-  markerKind: "person" | "building",
+  markerKind: "person" | "building" | "help",
 ): HTMLDivElement {
+  // CHG-125: la solicitud de ayuda es un núcleo rojo que titila con
+  // ondas expansivas; con movimiento reducido queda estática.
+  if (markerKind === "help") {
+    return createHelpRequestMarkerElement(color, glyph, selected);
+  }
   const element = document.createElement("div");
   const width = selected ? 39 : 32;
   const height = selected ? 45 : 38;
@@ -343,6 +348,71 @@ function createMarkerElement(
     element.animate(
       [{ transform: "translateY(0)" }, { transform: "translateY(-3px)" }, { transform: "translateY(0)" }],
       { duration: 1560, iterations: Infinity, easing: "ease-in-out" },
+    );
+  }
+
+  return element;
+}
+
+// CHG-125 — Marcador «Necesitamos ayuda» del lienzo de Google Maps.
+function createHelpRequestMarkerElement(
+  color: string,
+  glyph: string,
+  selected: boolean,
+): HTMLDivElement {
+  const element = document.createElement("div");
+  const size = selected ? 44 : 38;
+  const coreSize = selected ? 30 : 24;
+  element.setAttribute("aria-hidden", "true");
+  element.style.cssText = [
+    `width:${size}px`,
+    `height:${size}px`,
+    "position:relative",
+    "display:flex",
+    "align-items:center",
+    "justify-content:center",
+    "cursor:pointer",
+  ].join(";");
+
+  const buildLayer = (styleText: string) => {
+    const layer = document.createElement("span");
+    layer.style.cssText = styleText;
+    return layer;
+  };
+
+  const waveStyle =
+    `position:absolute;width:${coreSize + 2}px;height:${coreSize + 2}px;` +
+    `border:2px solid ${color};border-radius:999px;opacity:0`;
+  const waveOne = buildLayer(waveStyle);
+  const waveTwo = buildLayer(waveStyle);
+  const core = buildLayer(
+    `position:relative;width:${coreSize}px;height:${coreSize}px;display:flex;` +
+      `align-items:center;justify-content:center;border-radius:999px;` +
+      `background:${color};border:2px solid ${color};` +
+      `box-shadow:0 3px 10px ${color}66;color:#07101b;font:900 13px monospace`,
+  );
+  core.textContent = glyph;
+  element.append(waveOne, waveTwo, core);
+
+  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const waveFrames = [
+      { transform: "scale(.6)", opacity: 0.55 },
+      { transform: "scale(2.1)", opacity: 0 },
+    ];
+    waveOne.animate(waveFrames, {
+      duration: 1500,
+      iterations: Infinity,
+      easing: "ease-out",
+    });
+    waveTwo.animate(waveFrames, {
+      duration: 1500,
+      iterations: Infinity,
+      easing: "ease-out",
+      delay: 750,
+    });
+    core.animate(
+      [{ opacity: 1 }, { opacity: 0.55 }, { opacity: 1 }],
+      { duration: 1240, iterations: Infinity, easing: "ease-in-out" },
     );
   }
 

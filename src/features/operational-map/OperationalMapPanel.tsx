@@ -10,6 +10,12 @@ import {
 import { colors, fontFamilies } from "../../theme";
 import { font } from "../../typography";
 import { useDataRefreshTick } from "../../platform/dataRefresh";
+import { CountdownLabel } from "../help-requests/CountdownLabel";
+import {
+  helpRequestIdFromPointId,
+  helpRequestsToMapPoints,
+} from "../help-requests/mapPoints";
+import type { ActiveHelpRequest } from "../help-requests/types";
 import type { HumanStatus } from "../human-impact/types";
 import { categoryMeta } from "./categoryMeta";
 import { CategoryMarkerIcon } from "./CategoryMarkerIcon";
@@ -63,6 +69,9 @@ interface OperationalMapPanelProps {
   dataSource: OperationalMapDataSource;
   humanDataSource: HumanMapDataSource;
   compact: boolean;
+  // CHG-125 / DEC-125-10: solicitudes de ayuda vigentes fusionadas en
+  // cliente como marcadores `help_request`; nunca vienen del overview.
+  helpRequests?: ActiveHelpRequest[];
 }
 
 const INITIAL_HUMAN_VIEWPORT: HumanMapViewport = {
@@ -91,6 +100,7 @@ export function OperationalMapPanel({
   dataSource,
   humanDataSource,
   compact,
+  helpRequests = [],
 }: OperationalMapPanelProps) {
   const [loadState, setLoadState] = useState<MapLoadState>(() =>
     dataSource.initialOverview
@@ -215,6 +225,7 @@ export function OperationalMapPanel({
       data={loadState.data}
       stale={loadState.stale}
       compact={compact}
+      helpRequests={helpRequests}
       activeCategories={activeCategories}
       setActiveCategories={setActiveCategories}
       selectedId={selectedId}
@@ -236,6 +247,7 @@ function MapContent({
   data,
   stale,
   compact,
+  helpRequests,
   activeCategories,
   setActiveCategories,
   selectedId,
@@ -253,6 +265,7 @@ function MapContent({
   data: OperationalMapOverview;
   stale: boolean;
   compact: boolean;
+  helpRequests: ActiveHelpRequest[];
   activeCategories: OperationalMapCategory[];
   setActiveCategories: React.Dispatch<React.SetStateAction<OperationalMapCategory[]>>;
   selectedId: string | null;
@@ -267,14 +280,33 @@ function MapContent({
   retryHumanMap: () => void;
   onViewportChange: (viewport: HumanMapViewport) => void;
 }) {
+  // CHG-125 / DEC-125-10: los marcadores de ayuda se fusionan aquí; al
+  // expirar, el backend deja de devolver la solicitud y el marcador
+  // desaparece en el siguiente refresco sin lógica adicional.
+  const mergedItems = useMemo(
+    () => [...data.items, ...helpRequestsToMapPoints(helpRequests)],
+    [data.items, helpRequests],
+  );
+  const displaySummary = useMemo(
+    () => ({ ...data.summary, helpRequests: helpRequests.length }),
+    [data.summary, helpRequests.length],
+  );
   const visiblePoints = useMemo(
-    () => data.items.filter((point) => activeCategories.includes(point.category)),
-    [activeCategories, data.items],
+    () => mergedItems.filter((point) => activeCategories.includes(point.category)),
+    [activeCategories, mergedItems],
   );
   const selectedPoint =
     visiblePoints.find((point) => point.id === selectedId) ??
     visiblePoints[0] ??
     null;
+  const selectedHelpRequest = useMemo(() => {
+    const rawId = selectedPoint
+      ? helpRequestIdFromPointId(selectedPoint.id)
+      : null;
+    return rawId
+      ? (helpRequests.find((request) => request.id === rawId) ?? null)
+      : null;
+  }, [helpRequests, selectedPoint]);
   const handleSelect = useCallback(
     (pointId: string) => setSelectedId(pointId),
     [setSelectedId],
@@ -341,6 +373,36 @@ function MapContent({
         selectedFeature={selectedHumanFeature}
       />
 
+      {/* CHG-125: los datos de la solicitud elegida en el mapa —
+          descripción, dirección, vigencia y cuánta gente atiende. */}
+      {selectedHelpRequest && (
+        <View style={styles.detail} testID="help-request-map-detail">
+          <View
+            style={[styles.detailAccent, { backgroundColor: colors.emergency }]}
+          />
+          <View style={styles.detailMain}>
+            <Text style={[styles.detailCategory, { color: colors.emergency }]}>
+              NECESITAMOS AYUDA · SOLICITUD VIGENTE
+            </Text>
+            <Text style={styles.detailTitle}>{selectedHelpRequest.address}</Text>
+            <Text style={styles.detailDescription}>
+              {selectedHelpRequest.description}
+            </Text>
+          </View>
+          <View style={styles.detailMeta}>
+            <CountdownLabel
+              expiresAt={selectedHelpRequest.expiresAt}
+              style={[styles.detailMetaText, { color: colors.emergency }]}
+            />
+            <Text style={styles.detailMetaText}>
+              {selectedHelpRequest.attendersCount === 1
+                ? "1 PERSONA ATENDIENDO"
+                : `${mapNumberFormatter.format(selectedHelpRequest.attendersCount)} PERSONAS ATENDIENDO`}
+            </Text>
+          </View>
+        </View>
+      )}
+
       <View
         style={styles.legend}
         accessibilityLabel="Leyenda de respuesta e infraestructura"
@@ -373,7 +435,7 @@ function MapContent({
               <CategoryMarkerIcon category={category} animated={false} />
               <View style={styles.filterCopy}>
                 <Text style={[styles.filterCount, { color: active ? meta.color : colors.inkDim }]}>
-                  {data.summary[meta.summaryKey]}
+                  {displaySummary[meta.summaryKey]}
                 </Text>
                 <Text style={[styles.filterLabel, !active && styles.filterLabelInactive]}>
                   {meta.label}

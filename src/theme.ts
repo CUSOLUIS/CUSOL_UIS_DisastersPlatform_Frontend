@@ -14,6 +14,9 @@ export const colors = {
   alive: "#43e7ad",
   deceased: "#8796ff",
   building: "#ff9f43",
+  // CHG-125: rojo de emergencia para las solicitudes «Necesitamos
+  // ayuda»; ningún color previo del tema es un rojo pleno.
+  emergency: "#ff4d5e",
 } as const;
 
 export const fontFamilies = {

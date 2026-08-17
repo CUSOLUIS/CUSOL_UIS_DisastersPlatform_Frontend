@@ -173,7 +173,38 @@ function createDataSource(
       windowMinutes: 30,
       generatedAt: "2026-08-14T14:00:00Z",
     }),
+    // CHG-126: métricas del sistema para la sección 06.
+    getSystemMetrics: jest.fn().mockResolvedValue({
+      intervalSeconds: 5,
+      latest: systemMetricsSample("2026-08-14T14:00:00Z"),
+      series: [
+        systemMetricsSample("2026-08-14T13:59:55Z"),
+        systemMetricsSample("2026-08-14T14:00:00Z"),
+      ],
+      generatedAt: "2026-08-14T14:00:00Z",
+    }),
     logout: jest.fn().mockResolvedValue(undefined),
+  };
+}
+
+function systemMetricsSample(sampledAt: string) {
+  return {
+    sampledAt,
+    cpuPercent: 21.5,
+    load1m: 0.8,
+    load5m: 0.6,
+    load15m: 0.5,
+    memoryTotalBytes: 8 * 1024 ** 3,
+    memoryUsedBytes: 3 * 1024 ** 3,
+    memoryAvailableBytes: 5 * 1024 ** 3,
+    swapTotalBytes: 2 * 1024 ** 3,
+    swapUsedBytes: 256 * 1024 ** 2,
+    diskTotalBytes: 160 * 1024 ** 3,
+    diskUsedBytes: 100 * 1024 ** 3,
+    diskFreeBytes: 60 * 1024 ** 3,
+    networkRxBytesPerSecond: 120_000,
+    networkTxBytesPerSecond: 45_000,
+    uptimeSeconds: 86_400 * 3 + 3_600 * 5,
   };
 }
 

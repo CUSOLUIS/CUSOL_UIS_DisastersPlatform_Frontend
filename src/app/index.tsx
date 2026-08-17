@@ -16,6 +16,7 @@ export default function HomeRoute() {
       onReportUnverifiedBuilding={() =>
         router.push("/reportar-edificio-sin-verificar")
       }
+      onRequestHelp={() => router.push("/necesitamos-ayuda")}
       initialDirectorySearch={typeof buscar === "string" ? buscar : undefined}
     />
   );

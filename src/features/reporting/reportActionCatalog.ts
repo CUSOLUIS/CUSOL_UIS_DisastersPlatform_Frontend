@@ -12,7 +12,9 @@ export type ReportActionId =
   | "collection-center"
   | "donation-point"
   | "community-meals"
-  | "temporary-shelter";
+  | "temporary-shelter"
+  // CHG-125: solicitud pública de ayuda de emergencia.
+  | "help-request";
 
 export interface ReportActionCopy {
   id: ReportActionId;
@@ -74,5 +76,14 @@ export const reportActionCatalog: Record<ReportActionId, ReportActionCopy> = {
     purpose:
       "Informa que tienes un espacio disponible para que personas afectadas puedan dormir temporalmente.",
     hint: "Informa que tienes un espacio disponible para que personas afectadas puedan dormir temporalmente",
+  },
+  // CHG-125: la solicitud es pública, admite anónimos y expira sola.
+  "help-request": {
+    id: "help-request",
+    category: "AYUDA · EMERGENCIA ACTIVA",
+    title: "Necesitamos ayuda",
+    purpose:
+      "Publica una solicitud urgente de ayuda con tu ubicación para que la comunidad acuda mientras esté vigente.",
+    hint: "Publica una solicitud urgente de ayuda con tu ubicación para que la comunidad acuda mientras esté vigente",
   },
 };

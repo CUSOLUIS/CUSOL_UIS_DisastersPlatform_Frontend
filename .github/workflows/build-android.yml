@@ -24,6 +24,8 @@ env:
   EXPO_PUBLIC_MISSING_PERSON_DATA_MODE: api
   EXPO_PUBLIC_ADMIN_DATA_MODE: demo
   EXPO_PUBLIC_MY_SPACE_DATA_MODE: api
+  # CHG-125: solicitudes «Necesitamos ayuda» contra la API real.
+  EXPO_PUBLIC_HELP_REQUESTS_DATA_MODE: api
 
 jobs:
   build:

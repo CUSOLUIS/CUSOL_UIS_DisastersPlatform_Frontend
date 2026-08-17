@@ -25,6 +25,8 @@ import type {
   CommunityContributionDataSource,
   HumanitarianDirectoryDataSource,
 } from "./features/humanitarian-directory/types";
+import { helpRequestsDataSource } from "./features/help-requests/dataSource";
+import type { HelpRequestsDataSource } from "./features/help-requests/types";
 import { operationalMapDataSource } from "./features/operational-map/dataSource";
 import { humanMapDataSource } from "./features/operational-map/humanMapDataSource";
 import type {
@@ -54,12 +56,15 @@ interface AppProps {
   peopleRecordsDataSource?: PeopleRecordsDataSource;
   humanitarianDirectoryDataSource?: HumanitarianDirectoryDataSource;
   communityContributionDataSource?: CommunityContributionDataSource;
+  // CHG-125: solicitudes «Necesitamos ayuda» (inyectable en pruebas).
+  helpRequestsDataSource?: HelpRequestsDataSource;
   onReportMissingPerson?: () => void;
   onReportUnverifiedBuilding?: () => void;
   onRegisterCollectionCenter?: () => void;
   onRegisterDonationPoint?: () => void;
   onOfferCommunityMeals?: () => void;
   onOfferTemporaryShelter?: () => void;
+  onRequestHelp?: () => void;
   onLogin?: () => void;
   onRegister?: () => void;
   onAbout?: () => void;
@@ -78,12 +83,14 @@ export function App({
   peopleRecordsDataSource: recordsDataSource = peopleRecordsDataSource,
   humanitarianDirectoryDataSource: directoryDataSource = humanitarianDirectoryDataSource,
   communityContributionDataSource: contributionDataSource = communityContributionDataSource,
+  helpRequestsDataSource: helpRequestsSource = helpRequestsDataSource,
   onReportMissingPerson = () => undefined,
   onReportUnverifiedBuilding = () => undefined,
   onRegisterCollectionCenter = () => undefined,
   onRegisterDonationPoint = () => undefined,
   onOfferCommunityMeals = () => undefined,
   onOfferTemporaryShelter = () => undefined,
+  onRequestHelp = () => undefined,
   onLogin = () => undefined,
   onRegister = () => undefined,
   onAbout = () => undefined,
@@ -160,12 +167,14 @@ export function App({
         peopleRecordsDataSource={recordsDataSource}
         humanitarianDirectoryDataSource={directoryDataSource}
         communityContributionDataSource={contributionDataSource}
+        helpRequestsDataSource={helpRequestsSource}
         onReportMissingPerson={onReportMissingPerson}
         onReportUnverifiedBuilding={onReportUnverifiedBuilding}
         onRegisterCollectionCenter={onRegisterCollectionCenter}
         onRegisterDonationPoint={onRegisterDonationPoint}
         onOfferCommunityMeals={onOfferCommunityMeals}
         onOfferTemporaryShelter={onOfferTemporaryShelter}
+        onRequestHelp={onRequestHelp}
         onLogin={onLogin}
         onRegister={onRegister}
         onAbout={onAbout}
@@ -187,12 +196,14 @@ function DashboardLoader({
   peopleRecordsDataSource,
   humanitarianDirectoryDataSource,
   communityContributionDataSource,
+  helpRequestsDataSource: helpRequestsSource,
   onReportMissingPerson,
   onReportUnverifiedBuilding,
   onRegisterCollectionCenter,
   onRegisterDonationPoint,
   onOfferCommunityMeals,
   onOfferTemporaryShelter,
+  onRequestHelp,
   onLogin,
   onRegister,
   onAbout,
@@ -206,12 +217,14 @@ function DashboardLoader({
   peopleRecordsDataSource: PeopleRecordsDataSource;
   humanitarianDirectoryDataSource: HumanitarianDirectoryDataSource;
   communityContributionDataSource: CommunityContributionDataSource;
+  helpRequestsDataSource: HelpRequestsDataSource;
   onReportMissingPerson: () => void;
   onReportUnverifiedBuilding: () => void;
   onRegisterCollectionCenter: () => void;
   onRegisterDonationPoint: () => void;
   onOfferCommunityMeals: () => void;
   onOfferTemporaryShelter: () => void;
+  onRequestHelp: () => void;
   onLogin: () => void;
   onRegister: () => void;
   onAbout: () => void;
@@ -320,6 +333,7 @@ function DashboardLoader({
       peopleRecordsDataSource={peopleRecordsDataSource}
       humanitarianDirectoryDataSource={humanitarianDirectoryDataSource}
       communityContributionDataSource={communityContributionDataSource}
+      helpRequestsDataSource={helpRequestsSource}
       initialDirectorySearch={initialDirectorySearch}
       onReportMissingPerson={onReportMissingPerson}
       onReportUnverifiedBuilding={onReportUnverifiedBuilding}
@@ -327,6 +341,7 @@ function DashboardLoader({
       onRegisterDonationPoint={onRegisterDonationPoint}
       onOfferCommunityMeals={onOfferCommunityMeals}
       onOfferTemporaryShelter={onOfferTemporaryShelter}
+      onRequestHelp={onRequestHelp}
       onLogin={onLogin}
       onRegister={onRegister}
       onAbout={onAbout}
