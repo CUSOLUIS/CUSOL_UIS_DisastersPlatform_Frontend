@@ -33,7 +33,6 @@ import type {
   HumanitarianDirectoryDataSource,
 } from "../humanitarian-directory/types";
 import { HelpRequestProximityAlert } from "../help-requests/HelpRequestProximityAlert";
-import { HelpRequestsSection } from "../help-requests/HelpRequestsSection";
 import { useActiveHelpRequests } from "../help-requests/useActiveHelpRequests";
 import type { HelpRequestsDataSource } from "../help-requests/types";
 import { ReportActions } from "../missing-persons/MissingPersonCommandCenter";
@@ -271,11 +270,13 @@ export function HumanImpactDashboard({
     scrollRef.current?.scrollTo({ y: 0, animated: !reducedMotion });
   };
 
-  // CHG-125: una sola consulta de solicitudes vigentes alimenta el
-  // mapa, la sección bajo el mapa y el bloque de la transmisión.
-  const { state: helpRequestsState, refresh: refreshHelpRequests } =
+  // CHG-125 / CHG-148: una sola consulta de solicitudes vigentes
+  // alimenta el mapa (marcadores + contador del legend) y la alerta de
+  // proximidad. La LISTA y la acción de atender ya no viven en el
+  // inicio: la lista está en el espacio personal y la acción de
+  // voluntario se abre desde el detalle del mapa (CHG-148 fase B).
+  const { state: helpRequestsState } =
     useActiveHelpRequests(helpRequestsDataSource);
-  const attendHelpRequest = (id: string) => helpRequestsDataSource.attend(id);
 
   return (
     <LinearGradient
@@ -415,20 +416,12 @@ export function HumanImpactDashboard({
               />
             </View>
 
-            {/* CHG-125: solicitudes vigentes bajo el mapa, con conteo
-                de personas atendiendo y la acción de atender. */}
-            <View testID="dashboard-help-requests" style={styles.fullWidth}>
-              <HelpRequestsSection
-                items={helpRequestsState.items}
-                loading={helpRequestsState.status === "loading"}
-                errorMessage={helpRequestsState.errorMessage}
-                isAuthenticated={account !== null}
-                attend={attendHelpRequest}
-                onAttended={refreshHelpRequests}
-                onLogin={onLogin}
-                onRegister={onRegister}
-              />
-            </View>
+            {/* CHG-148: la LISTA de solicitudes ya no vive en el
+                inicio; se ve en el espacio personal (solo con cuenta).
+                En el dashboard quedan la alerta de proximidad y el
+                contador «Necesitamos ayuda» del legend del mapa. Tocar
+                una solicitud en el mapa abre su detalle con la acción
+                de voluntario. */}
 
             {stale && (
               <View style={[styles.notice, styles.staleNotice]} accessibilityRole="alert">
@@ -481,24 +474,9 @@ export function HumanImpactDashboard({
                 },
               ]}
             >
-              {/* CHG-125 / DEC-125-06: las solicitudes también se ven
-                  en la transmisión en vivo, como bloque propio encima
-                  de la tabla de personas (que conserva su contrato). */}
-              {helpRequestsState.items.length > 0 && (
-                <HelpRequestsSection
-                  items={helpRequestsState.items}
-                  loading={false}
-                  errorMessage={null}
-                  isAuthenticated={account !== null}
-                  attend={attendHelpRequest}
-                  onAttended={refreshHelpRequests}
-                  onLogin={onLogin}
-                  onRegister={onRegister}
-                  embedded
-                  maxItems={3}
-                  title="Solicitudes de ayuda en curso"
-                />
-              )}
+              {/* CHG-148: la lista «Solicitudes de ayuda en curso» se
+                  retiró de la transmisión en vivo; vive en el espacio
+                  personal (solo con cuenta). */}
               <RecentPeopleTable
                 dataSource={peopleRecordsDataSource}
                 viewportMinHeight={liveRecordsMinHeight}
