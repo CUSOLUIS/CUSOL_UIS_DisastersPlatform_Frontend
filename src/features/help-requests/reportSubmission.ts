@@ -12,6 +12,7 @@ import {
   type SubmitReportOptions,
 } from "../missing-persons/reportSubmission";
 import type { SelectedPhoto } from "../missing-persons/reportTypes";
+import { searchAddressCandidates } from "../missing-persons/geocoding";
 import { getLastKnownVisitorLocation } from "../operational-map/visitorPresence";
 import type { HelpRequestDraft, HelpRequestReceipt } from "./types";
 
@@ -75,10 +76,43 @@ const ERROR_MESSAGES_BY_STATUS: Record<number, string> = {
   503: "El servicio de solicitudes no está disponible en este momento. Intenta más tarde.",
 };
 
+// CHG-132: si la persona escribió solo la dirección (sin fijar punto),
+// las coordenadas se resuelven aquí solas a partir de ese texto — a
+// nadie se le piden latitudes. Mejor esfuerzo: si el geocodificador no
+// responde o no encuentra nada, la solicitud viaja igual solo con la
+// dirección (CHG-127).
+export async function resolveDraftCoordinates(
+  draft: HelpRequestDraft,
+  geocodeAddress: typeof searchAddressCandidates,
+): Promise<HelpRequestDraft> {
+  const hasCoordinates =
+    Number.isFinite(Number.parseFloat(draft.latitude.trim())) &&
+    Number.isFinite(Number.parseFloat(draft.longitude.trim()));
+  const address = draft.address.trim();
+  if (hasCoordinates || !address) {
+    return draft;
+  }
+  try {
+    const [candidate] = await geocodeAddress(`${address}, Colombia`);
+    if (!candidate) {
+      return draft;
+    }
+    return {
+      ...draft,
+      latitude: candidate.latitude.toFixed(5),
+      longitude: candidate.longitude.toFixed(5),
+    };
+  } catch {
+    return draft;
+  }
+}
+
 export async function submitHelpRequest(
   draft: HelpRequestDraft,
   photos: SelectedPhoto[],
-  options: SubmitReportOptions = {},
+  options: SubmitReportOptions & {
+    geocodeAddress?: typeof searchAddressCandidates;
+  } = {},
 ): Promise<HelpRequestReceipt> {
   const requestBaseUrl = options.requestBaseUrl ?? apiBaseUrl;
   if (requestBaseUrl === undefined) {
@@ -87,7 +121,13 @@ export async function submitHelpRequest(
     );
   }
 
-  const serializedPayload = JSON.stringify(buildHelpRequestPayload(draft));
+  const resolvedDraft = await resolveDraftCoordinates(
+    draft,
+    options.geocodeAddress ?? searchAddressCandidates,
+  );
+  const serializedPayload = JSON.stringify(
+    buildHelpRequestPayload(resolvedDraft),
+  );
   // La misma llave en todos los intentos: reintentar es seguro porque
   // el backend devuelve la constancia ya creada en vez de duplicarla.
   const idempotencyKey = options.idempotencyKey ?? createIdempotencyKey();

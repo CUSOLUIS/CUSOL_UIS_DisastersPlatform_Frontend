@@ -476,7 +476,7 @@ export function HelpRequestForm({
               <FieldGrid>
                 <FormField
                   label="Radio de aviso (km)"
-                  hint={`A cuántos kilómetros a la redonda se avisa en la app (${MIN_NOTIFICATION_RADIUS_KM}-${MAX_NOTIFICATION_RADIUS_KM}); requiere el punto en el mapa. Vacío = sin aviso`}
+                  hint={`A cuántos kilómetros a la redonda se avisa en la app (${MIN_NOTIFICATION_RADIUS_KM}-${MAX_NOTIFICATION_RADIUS_KM}); el lugar sale del punto del mapa o de la dirección escrita. Vacío = sin aviso`}
                   invalid={invalidFields.has("notificationRadiusKm")}
                   value={draft.notificationRadiusKm}
                   onChangeText={(value) =>
