@@ -78,12 +78,14 @@ export const reportActionCatalog: Record<ReportActionId, ReportActionCopy> = {
     hint: "Informa que tienes un espacio disponible para que personas afectadas puedan dormir temporalmente",
   },
   // CHG-125: la solicitud es pública, admite anónimos y expira sola.
+  // CHG-133: la leyenda dice para qué sirve el módulo — remoción de
+  // escombros y búsqueda de personas.
   "help-request": {
     id: "help-request",
     category: "AYUDA · EMERGENCIA ACTIVA",
     title: "Necesitamos ayuda",
     purpose:
-      "Publica una solicitud urgente de ayuda con tu ubicación para que la comunidad acuda mientras esté vigente.",
-    hint: "Publica una solicitud urgente de ayuda con tu ubicación para que la comunidad acuda mientras esté vigente",
+      "Publica una solicitud urgente para que la comunidad acuda a remover escombros y ayudar a buscar personas mientras esté vigente.",
+    hint: "Publica una solicitud urgente para que la comunidad acuda a remover escombros y ayudar a buscar personas mientras esté vigente",
   },
 };

@@ -397,6 +397,10 @@ export function HelpRequestForm({
             <ReportConsiderations
               purpose={reportActionCatalog["help-request"].purpose}
               considerations={[
+                "Este módulo sirve para pedir ayuda en la remoción de escombros y en la búsqueda de personas.",
+                // CHG-133: guía para quien acude al llamado.
+                "Si vas a ayudar, lleva tus propios implementos (guantes, pala, casco, agua) en lo posible: en el sitio quizás entreguen algunos, pero no está garantizado.",
+                "Al llegar al lugar sé respetuoso: preséntate y di de primero que vienes a ayudar.",
                 "La descripción, la dirección y el punto del mapa son públicos: así la comunidad sabe dónde hace falta ayuda.",
                 "No incluyas datos personales sensibles en la descripción; esta solicitud no reemplaza la línea de emergencias 123.",
                 "Define una vigencia realista en horas o días: al vencer, la solicitud desaparece automáticamente de todos los espacios.",
