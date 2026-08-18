@@ -321,57 +321,29 @@ it("muestra el total de coincidencias en la pista y renombra el botón", async (
 });
 
 /**
- * CHG-091 — Sugerencias bajo el buscador de personas: aparecen al
- * escribir 3+ caracteres y sus acciones abren la ventana en la ficha o
- * en el aporte de novedad.
+ * CHG-150 — «Buscar y verificar»: al escribir solo se muestra el número
+ * de coincidencias; la lista desplegable ya no aparece bajo el input.
+ * Las coincidencias se ven en la ventana de RESULTADOS (con ver ficha /
+ * reportar novedad, cubierto por las pruebas de arriba).
  */
-describe("Sugerencias del buscador (CHG-091)", () => {
-  const SUGGESTION = {
-    kind: "missing_person" as const,
-    id: "persona-demo-1",
-    publicCaseCode: "MP-2026-DEMO01",
-    displayName: "Camila Rueda (caso demo)",
-    status: "missing" as const,
-    approximateAge: 34,
-    lastSeenAt: "2026-08-10T18:30:00Z",
-    lastSeenArea: "Sector Café Madrid",
-    municipality: "Bucaramanga",
-    department: "Santander",
-    publicPhotoUrl: null,
-    source: { name: "Demo", sourceType: "citizen" as const, url: null },
-    updatedAt: "2026-08-12T10:00:00Z",
-    dataClassification: "demonstrative" as const,
-    similarity: 0.62,
-  };
-
-  const suggestionsDataSource = {
-    transport: "fixture" as const,
-    autocomplete: jest.fn().mockResolvedValue({
-      items: [SUGGESTION],
-      query: "Kamila",
-      generatedAt: "2026-08-15T12:00:00Z",
-    }),
-    checkDuplicates: jest.fn().mockResolvedValue({
+describe("Coincidencias sin desplegable (CHG-150)", () => {
+  it("al escribir NO despliega la lista de coincidencias, solo el contador", async () => {
+    jest.useFakeTimers();
+    const search = jest.fn(async () => ({
       items: [],
-      firstName: "",
-      lastName: "",
-      generatedAt: "2026-08-15T12:00:00Z",
-    }),
-  };
+      total: 3,
+      limit: 20,
+      offset: 0,
+      query: "Kamila",
+      kind: "missing_person" as const,
+      generatedAt: "2026-08-18T12:00:00.000Z",
+    }));
 
-  it("muestra coincidencias al escribir y abre la ficha desde la sugerencia", async () => {
     render(
       <HumanitarianSearchPanel
         compact={false}
-        dataSource={humanitarianDirectoryDataSource}
+        dataSource={{ transport: "fixture", search }}
         contributionDataSource={contributionDataSource}
-        suggestionsDataSource={suggestionsDataSource}
-        fetchNovelties={async (personId) => ({
-          personId,
-          publicStatus: "missing" as const,
-          items: [],
-          total: 0,
-        })}
       />,
     );
 
@@ -381,24 +353,17 @@ describe("Sugerencias del buscador (CHG-091)", () => {
       ),
       "Kamila",
     );
+    await act(async () => {
+      jest.advanceTimersByTime(500);
+      await Promise.resolve();
+    });
 
-    expect(await screen.findByText("COINCIDENCIAS REGISTRADAS")).toBeTruthy();
-    expect(screen.getByText("Camila Rueda (caso demo)")).toBeTruthy();
-    expect(suggestionsDataSource.autocomplete).toHaveBeenCalledWith(
-      "Kamila",
-      expect.anything(),
-    );
-
-    fireEvent.press(
-      screen.getByRole("button", {
-        name: "Ver ficha completa de Camila Rueda (caso demo)",
-      }),
-    );
-
-    // La ventana de resultados se abre directamente en el detalle.
+    // CHG-150: nada de desplegable bajo el input; solo el número.
+    expect(screen.queryByText("COINCIDENCIAS REGISTRADAS")).toBeNull();
     expect(
-      await screen.findByText("Novedades de la persona"),
+      screen.getByText(/3 coincidencias — se abrirán en una ventana/),
     ).toBeTruthy();
+    jest.useRealTimers();
   });
 
   it("el deep link ?buscar= precarga el texto y abre los resultados", async () => {
@@ -407,7 +372,6 @@ describe("Sugerencias del buscador (CHG-091)", () => {
         compact={false}
         dataSource={humanitarianDirectoryDataSource}
         contributionDataSource={contributionDataSource}
-        suggestionsDataSource={suggestionsDataSource}
         initialQuery="MP-2026-DEMO01"
       />,
     );

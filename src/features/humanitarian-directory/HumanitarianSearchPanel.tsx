@@ -20,10 +20,6 @@ import {
   type PickContributionPhotos,
 } from "./CommunityContributionForm";
 import { PersonNoveltyPanel } from "./PersonNoveltyPanel";
-import { personSuggestionsDataSource } from "../person-suggestions/dataSource";
-import { PersonSuggestionsPanel } from "../person-suggestions/PersonSuggestionsPanel";
-import { usePersonSuggestions } from "../person-suggestions/usePersonSuggestions";
-import type { PersonSuggestionsDataSource } from "../person-suggestions/types";
 import type {
   AidLocationDirectoryCard,
   CommunityContributionDataSource,
@@ -118,7 +114,6 @@ export function HumanitarianSearchPanel({
   dataSource,
   pickPhotos,
   fetchNovelties,
-  suggestionsDataSource = personSuggestionsDataSource,
   initialQuery,
 }: {
   compact: boolean;
@@ -127,8 +122,6 @@ export function HumanitarianSearchPanel({
   pickPhotos?: PickContributionPhotos;
   // CHG-077: inyectable en pruebas; por defecto usa la API real.
   fetchNovelties?: FetchPersonNovelties;
-  // CHG-091: sugerencias difusas mientras se escribe.
-  suggestionsDataSource?: PersonSuggestionsDataSource;
   // CHG-091: deep link ?buscar= — precarga y ejecuta la búsqueda.
   initialQuery?: string;
 }) {
@@ -208,14 +201,6 @@ export function HumanitarianSearchPanel({
   };
 
   const search = async () => runSearch(query);
-
-  // CHG-091: sugerencias bajo el input (solo personas, 3+ caracteres,
-  // y nunca mientras la ventana de resultados está abierta).
-  const suggestions = usePersonSuggestions({
-    dataSource: suggestionsDataSource,
-    query,
-    enabled: kind === "missing_person" && !windowVisible,
-  });
 
   // CHG-091: el deep link ?buscar= aterriza directo en la búsqueda.
   useEffect(() => {
@@ -317,24 +302,9 @@ export function HumanitarianSearchPanel({
         </Pressable>
       </View>
 
-      {suggestions.status === "ready" && (
-        <PersonSuggestionsPanel
-          items={suggestions.items}
-          actions={{
-            mode: "search",
-            onOpenDetail: (item) => {
-              setDetailTarget(item);
-              setWindowVisible(true);
-              void runSearch(query, true);
-            },
-            onContribute: (item) => {
-              setContributionTarget(item);
-              setWindowVisible(true);
-              void runSearch(query, true);
-            },
-          }}
-        />
-      )}
+      {/* CHG-150: al escribir NO se despliega la lista de coincidencias;
+          solo el contador de abajo. Las coincidencias se ven en la
+          ventana de RESULTADOS, con «ver ficha» y «reportar novedad». */}
 
       <View style={styles.filterLine}>
         <Text style={styles.filterLabel}>FILTROS</Text>
