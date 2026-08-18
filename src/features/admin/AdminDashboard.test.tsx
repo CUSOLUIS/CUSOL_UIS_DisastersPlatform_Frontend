@@ -196,6 +196,11 @@ function createDataSource(
     }),
     deleteHelpRequest: jest.fn().mockResolvedValue({ deleted: 1 }),
     purgeHelpRequests: jest.fn().mockResolvedValue({ deleted: 0 }),
+    // CHG-154: registros de personas.
+    listPeople: jest.fn().mockResolvedValue({ items: [], total: 0 }),
+    updatePerson: jest.fn(),
+    hidePerson: jest.fn(),
+    restorePerson: jest.fn(),
     resetPlatform: jest.fn().mockResolvedValue({
       tablesCleared: 21,
       accountsDeleted: 6,

@@ -9,6 +9,8 @@ export type AdminSection =
   | "system"
   // CHG-138: gestión de solicitudes «Necesitamos ayuda».
   | "helpRequests"
+  // CHG-154: gestión de registros de personas (ocultar/editar).
+  | "peopleRecords"
   // CHG-139: reinicio absoluto de la plataforma.
   | "reset";
 export type AdminSubmissionKind =
@@ -327,6 +329,55 @@ export interface AdminPlatformResetReceipt {
   generatedAt: string;
 }
 
+// CHG-154 — Registro de persona visto desde la consola: ocultamiento
+// reversible (nada se borra; el borrado definitivo será otro apartado)
+// y edición acotada por las reglas de integridad de estado.
+export type AdminPersonStatus =
+  | "missing"
+  | "reported_deceased"
+  | "confirmed_alive"
+  | "confirmed_deceased";
+
+export type AdminPeopleVisibility = "visible" | "hidden" | "all";
+
+export interface AdminPersonRecord {
+  id: string;
+  displayName: string;
+  status: AdminPersonStatus;
+  location: string;
+  relatedEvent: string;
+  latitude: number | null;
+  longitude: number | null;
+  // Con caso ciudadano vinculado el estado lo derivan las novedades y
+  // no se edita a mano.
+  hasLinkedCase: boolean;
+  source: { name: string; sourceType: string; url: string | null };
+  createdAt: string;
+  updatedAt: string;
+  hiddenAt: string | null;
+  hiddenBy: string | null;
+}
+
+export interface AdminPeoplePage {
+  items: AdminPersonRecord[];
+  total: number;
+}
+
+export interface AdminPeopleFilters {
+  statuses?: AdminPersonStatus[];
+  q?: string;
+  visibility: AdminPeopleVisibility;
+  limit: number;
+  offset: number;
+}
+
+export interface AdminPersonUpdateInput {
+  displayName?: string;
+  location?: string;
+  relatedEvent?: string;
+  status?: AdminPersonStatus;
+}
+
 export interface AdminDataSource {
   transport: "api" | "demo";
   getCurrentAccount(signal?: AbortSignal): Promise<AuthenticatedAccount>;
@@ -388,6 +439,18 @@ export interface AdminDataSource {
   ): Promise<AdminHelpRequestVolunteerPage>;
   deleteHelpRequest(id: string): Promise<AdminHelpRequestDeleteReceipt>;
   purgeHelpRequests(): Promise<AdminHelpRequestDeleteReceipt>;
+  // CHG-154: registros de personas — listar (con ocultos), ocultar
+  // (reversible), restaurar y editar.
+  listPeople(
+    filters: AdminPeopleFilters,
+    signal?: AbortSignal,
+  ): Promise<AdminPeoplePage>;
+  updatePerson(
+    id: string,
+    input: AdminPersonUpdateInput,
+  ): Promise<AdminPersonRecord>;
+  hidePerson(id: string): Promise<AdminPersonRecord>;
+  restorePerson(id: string): Promise<AdminPersonRecord>;
   // CHG-139: reinicio absoluto (frase de confirmación obligatoria).
   resetPlatform(confirm: string): Promise<AdminPlatformResetReceipt>;
   logout(): Promise<void>;

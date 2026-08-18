@@ -12,6 +12,8 @@ import type {
   AdminHelpRequestPage,
   AdminHelpRequestVolunteer,
   AdminHelpRequestVolunteerPage,
+  AdminPeoplePage,
+  AdminPersonRecord,
   AdminPlatformResetReceipt,
   AdminSystemMetrics,
   AdminVisitorPresencePage,
@@ -187,6 +189,35 @@ const apiAdminDataSource: AdminDataSource = {
       "/api/v1/admin/help-requests",
       { method: "DELETE" },
     ),
+  // CHG-154: registros de personas — el filtro de estados viaja como
+  // parámetros repetidos (statuses=a&statuses=b).
+  listPeople: (filters, signal) => {
+    const params = new URLSearchParams();
+    for (const status of filters.statuses ?? []) {
+      params.append("statuses", status);
+    }
+    if (filters.q) params.set("q", filters.q);
+    params.set("visibility", filters.visibility);
+    params.set("limit", String(filters.limit));
+    params.set("offset", String(filters.offset));
+    return apiRequest<AdminPeoplePage>(
+      `/api/v1/admin/people?${params.toString()}`,
+      { signal },
+    );
+  },
+  updatePerson: (id, input) =>
+    apiRequest<AdminPersonRecord>(`/api/v1/admin/people/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
+  hidePerson: (id) =>
+    apiRequest<AdminPersonRecord>(`/api/v1/admin/people/${id}/hide`, {
+      method: "POST",
+    }),
+  restorePerson: (id) =>
+    apiRequest<AdminPersonRecord>(`/api/v1/admin/people/${id}/restore`, {
+      method: "POST",
+    }),
   // CHG-139: reinicio absoluto de la plataforma.
   resetPlatform: (confirm) =>
     apiRequest<AdminPlatformResetReceipt>(
@@ -510,6 +541,41 @@ function assertVersion(actual: number, expected: number) {
   }
 }
 
+// CHG-154 — Registros de personas demo (uno sembrado y uno con caso
+// ciudadano vinculado) mutables para ensayar ocultar/editar/restaurar.
+const demoPeople: AdminPersonRecord[] = [
+  {
+    id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1",
+    displayName: "Marina Rueda",
+    status: "missing",
+    location: "Bucaramanga, Santander",
+    relatedEvent: "Deslizamiento Mesa de los Santos",
+    latitude: 7.1,
+    longitude: -73.1,
+    hasLinkedCase: true,
+    source: { name: "Reporte ciudadano", sourceType: "citizen", url: null },
+    createdAt: "2026-08-10T10:00:00Z",
+    updatedAt: "2026-08-10T10:00:00Z",
+    hiddenAt: null,
+    hiddenBy: null,
+  },
+  {
+    id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2",
+    displayName: "Aurelio Prada",
+    status: "confirmed_alive",
+    location: "Girón, Santander",
+    relatedEvent: "Inundación río de Oro",
+    latitude: 7.07,
+    longitude: -73.17,
+    hasLinkedCase: false,
+    source: { name: "Registro oficial", sourceType: "official", url: null },
+    createdAt: "2026-08-09T08:00:00Z",
+    updatedAt: "2026-08-09T08:00:00Z",
+    hiddenAt: null,
+    hiddenBy: null,
+  },
+];
+
 export const demoAdminDataSource: AdminDataSource = {
   transport: "demo",
   getCurrentAccount: authDataSource.getCurrentAccount,
@@ -818,6 +884,65 @@ export const demoAdminDataSource: AdminDataSource = {
     const deleted = demoHelpRequests.length;
     demoHelpRequests.length = 0;
     return { deleted };
+  },
+  // CHG-154: registros de personas demo con ocultamiento en memoria.
+  async listPeople(filters) {
+    const query = filters.q?.trim().toLocaleLowerCase("es-CO");
+    const filtered = demoPeople.filter((person) => {
+      if (filters.visibility === "visible" && person.hiddenAt) return false;
+      if (filters.visibility === "hidden" && !person.hiddenAt) return false;
+      if (
+        filters.statuses?.length &&
+        !filters.statuses.includes(person.status)
+      ) {
+        return false;
+      }
+      if (
+        query &&
+        !`${person.displayName} ${person.location} ${person.relatedEvent}`
+          .toLocaleLowerCase("es-CO")
+          .includes(query)
+      ) {
+        return false;
+      }
+      return true;
+    });
+    return clone({
+      items: filtered.slice(filters.offset, filters.offset + filters.limit),
+      total: filtered.length,
+    });
+  },
+  async updatePerson(id, input) {
+    const person = demoPeople.find((item) => item.id === id);
+    if (!person) throw new Error("El registro de persona no existe.");
+    if (input.status !== undefined && person.hasLinkedCase) {
+      throw new Error(
+        "Este registro tiene caso vinculado: su estado lo derivan las novedades.",
+      );
+    }
+    if (input.displayName !== undefined) person.displayName = input.displayName;
+    if (input.location !== undefined) person.location = input.location;
+    if (input.relatedEvent !== undefined)
+      person.relatedEvent = input.relatedEvent;
+    if (input.status !== undefined) person.status = input.status;
+    person.updatedAt = nowIso();
+    return clone(person);
+  },
+  async hidePerson(id) {
+    const person = demoPeople.find((item) => item.id === id);
+    if (!person) throw new Error("El registro de persona no existe.");
+    person.hiddenAt = nowIso();
+    person.hiddenBy = "Admin demostración";
+    person.updatedAt = person.hiddenAt;
+    return clone(person);
+  },
+  async restorePerson(id) {
+    const person = demoPeople.find((item) => item.id === id);
+    if (!person) throw new Error("El registro de persona no existe.");
+    person.hiddenAt = null;
+    person.hiddenBy = null;
+    person.updatedAt = nowIso();
+    return clone(person);
   },
   // CHG-139: en demo el reinicio vacía las colecciones sintéticas.
   async resetPlatform(confirm) {

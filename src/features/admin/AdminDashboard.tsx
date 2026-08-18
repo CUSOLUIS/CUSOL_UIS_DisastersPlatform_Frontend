@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { AdminApiError, adminDataSource } from "./dataSource";
 import { HelpRequestsAdminSection } from "./HelpRequestsAdminSection";
+import { PeopleRecordsAdminSection } from "./PeopleRecordsAdminSection";
 import { PlatformResetSection } from "./PlatformResetSection";
 import { SystemMetricsSection } from "./SystemMetricsSection";
 import type {
@@ -56,8 +57,10 @@ const SECTION_OPTIONS: Array<{
   { value: "system", label: "Sistema", code: "06" },
   // CHG-138: gestión de solicitudes «Necesitamos ayuda».
   { value: "helpRequests", label: "Solicitudes", code: "07" },
+  // CHG-154: gestión de registros de personas (ocultar/editar).
+  { value: "peopleRecords", label: "Personas", code: "08" },
   // CHG-139: reinicio absoluto de la plataforma.
-  { value: "reset", label: "Reinicio", code: "08" },
+  { value: "reset", label: "Reinicio", code: "09" },
 ];
 
 const KIND_LABELS: Record<AdminSubmissionKind, string> = {
@@ -143,6 +146,12 @@ function guardAdminDataSource(
       guarded(source.listVisitorPresence(signal)),
     getSystemMetrics: (signal) =>
       guarded(source.getSystemMetrics(signal)),
+    // CHG-154: registros de personas.
+    listPeople: (filters, signal) =>
+      guarded(source.listPeople(filters, signal)),
+    updatePerson: (id, input) => guarded(source.updatePerson(id, input)),
+    hidePerson: (id) => guarded(source.hidePerson(id)),
+    restorePerson: (id) => guarded(source.restorePerson(id)),
   };
 }
 
@@ -336,6 +345,14 @@ export function AdminDashboard({
                 eliminarlo una a una o vaciar la base. */}
             {section === "helpRequests" && (
               <HelpRequestsAdminSection dataSource={protectedDataSource} />
+            )}
+            {/* CHG-154: registros de personas — buscar, editar y
+                ocultar/restaurar uno a uno (nada se borra). */}
+            {section === "peopleRecords" && (
+              <PeopleRecordsAdminSection
+                dataSource={protectedDataSource}
+                onMutated={refreshAll}
+              />
             )}
             {/* CHG-139: reinicio absoluto — zona de peligro con frase
                 de confirmación escrita. */}
