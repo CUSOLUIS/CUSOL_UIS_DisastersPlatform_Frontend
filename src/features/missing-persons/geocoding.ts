@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import type { GeographicCenter } from "../operational-map/webMercator";
 
 export interface AddressCandidate {
@@ -10,11 +11,28 @@ export interface AddressCandidate {
 export type FetchLike = (
   url: string,
   init?: { headers?: Record<string, string> },
-) => Promise<{ ok: boolean; json(): Promise<unknown> }>;
+) => Promise<{ ok: boolean; status?: number; json(): Promise<unknown> }>;
 
-// Geocodificador de OpenStreetMap: sin credenciales, misma familia que las teselas.
-// Política de uso moderado (desarrollo/demostración), igual que CHG-008.
-const NOMINATIM_SEARCH_URL = "https://nominatim.openstreetmap.org/search";
+// CHG-147: la geocodificación ya no llama a nominatim.org desde el
+// navegador (bloqueada por CORS/política de uso en producción); pasa
+// por el proxy del gateway, que consulta server-side con caché y
+// límite por origen. En web es el mismo origen (el proxy nginx enruta
+// /api); en la app nativa manda EXPO_PUBLIC_API_BASE_URL, como en el
+// resto de dataSources.
+function geocodeUrl(path: string): string {
+  const configuredApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.replace(
+    /\/$/,
+    "",
+  );
+  const apiBaseUrl =
+    configuredApiBaseUrl ?? (Platform.OS === "web" ? "" : undefined);
+  if (apiBaseUrl === undefined) {
+    throw new Error(
+      "Configura EXPO_PUBLIC_API_BASE_URL para resolver direcciones desde un dispositivo móvil.",
+    );
+  }
+  return `${apiBaseUrl}${path}`;
+}
 
 export function buildLastSeenQuery(parts: {
   department: string;
@@ -36,9 +54,9 @@ export async function searchAddressCandidates(
     return [];
   }
 
-  const url =
-    `${NOMINATIM_SEARCH_URL}?format=jsonv2&countrycodes=co&limit=5&addressdetails=0` +
-    `&q=${encodeURIComponent(trimmed)}`;
+  const url = geocodeUrl(
+    `/api/v1/geocode/search?q=${encodeURIComponent(trimmed)}`,
+  );
 
   let response: Awaited<ReturnType<FetchLike>>;
   try {
@@ -51,21 +69,23 @@ export async function searchAddressCandidates(
     throw new Error("El servicio de direcciones no respondió. Intenta de nuevo.");
   }
 
-  const payload = (await response.json()) as Array<{
-    display_name?: unknown;
-    lat?: unknown;
-    lon?: unknown;
-  }>;
+  const payload = (await response.json()) as {
+    candidates?: Array<{
+      label?: unknown;
+      latitude?: unknown;
+      longitude?: unknown;
+    }>;
+  };
 
-  if (!Array.isArray(payload)) {
+  if (!Array.isArray(payload.candidates)) {
     return [];
   }
 
-  return payload
+  return payload.candidates
     .map((item) => ({
-      label: typeof item.display_name === "string" ? item.display_name : "",
-      latitude: Number(item.lat),
-      longitude: Number(item.lon),
+      label: typeof item.label === "string" ? item.label : "",
+      latitude: Number(item.latitude),
+      longitude: Number(item.longitude),
     }))
     .filter(
       (candidate) =>
@@ -96,8 +116,6 @@ export function parseDraftCoordinates(
 // CHG-086 — Geocodificación inversa: al fijar el muñequito en el mapa
 // (GPS, botón o arrastre) se resuelve la dirección del sitio para
 // autocompletar el campo Dirección (siempre editable).
-const NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse";
-
 export interface ResolvedAddress {
   label: string;
   municipality: string | null;
@@ -108,10 +126,10 @@ export async function reverseGeocode(
   point: GeographicCenter,
   fetchFn: FetchLike = fetch,
 ): Promise<ResolvedAddress> {
-  const url =
-    `${NOMINATIM_REVERSE_URL}?format=jsonv2&addressdetails=1&zoom=17` +
-    `&lat=${encodeURIComponent(String(point.latitude))}` +
-    `&lon=${encodeURIComponent(String(point.longitude))}`;
+  const url = geocodeUrl(
+    `/api/v1/geocode/reverse?lat=${encodeURIComponent(String(point.latitude))}` +
+      `&lon=${encodeURIComponent(String(point.longitude))}`,
+  );
 
   let response: Awaited<ReturnType<FetchLike>>;
   try {
@@ -119,32 +137,31 @@ export async function reverseGeocode(
   } catch {
     throw new Error("No fue posible resolver la dirección del punto.");
   }
+  if (response.status === 404) {
+    throw new Error("El punto no corresponde a una dirección conocida.");
+  }
   if (!response.ok) {
     throw new Error("El servicio de direcciones no respondió. Intenta de nuevo.");
   }
 
   const payload = (await response.json()) as {
-    display_name?: unknown;
-    address?: Record<string, unknown>;
+    label?: unknown;
+    municipality?: unknown;
+    department?: unknown;
   };
-  const label =
-    typeof payload.display_name === "string" ? payload.display_name : "";
+  const label = typeof payload.label === "string" ? payload.label : "";
   if (!label) {
     throw new Error("El punto no corresponde a una dirección conocida.");
   }
-  const address = payload.address ?? {};
-  const firstString = (...keys: string[]): string | null => {
-    for (const key of keys) {
-      const value = address[key];
-      if (typeof value === "string" && value.trim()) {
-        return value.trim();
-      }
-    }
-    return null;
-  };
   return {
     label,
-    municipality: firstString("city", "town", "municipality", "village"),
-    department: firstString("state", "region"),
+    municipality:
+      typeof payload.municipality === "string" && payload.municipality.trim()
+        ? payload.municipality.trim()
+        : null,
+    department:
+      typeof payload.department === "string" && payload.department.trim()
+        ? payload.department.trim()
+        : null,
   };
 }

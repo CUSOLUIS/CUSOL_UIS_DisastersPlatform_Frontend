@@ -4,7 +4,18 @@ import {
   searchAddressCandidates,
   type FetchLike, reverseGeocode } from "./geocoding";
 
-describe("Cruce de dirección con Nominatim", () => {
+// CHG-147: la geocodificación pasa por el proxy del gateway; en las
+// pruebas (plataforma nativa) la base sale de esta variable, como en
+// un dispositivo real.
+beforeAll(() => {
+  process.env.EXPO_PUBLIC_API_BASE_URL = "http://gateway.test";
+});
+
+afterAll(() => {
+  delete process.env.EXPO_PUBLIC_API_BASE_URL;
+});
+
+describe("Cruce de dirección por el proxy del gateway", () => {
   it("arma la consulta con zona, municipio, departamento y país, omitiendo vacíos", () => {
     expect(
       buildLastSeenQuery({
@@ -19,17 +30,24 @@ describe("Cruce de dirección con Nominatim", () => {
     ).toBe("Soacha, Colombia");
   });
 
-  it("consulta Nominatim restringido a Colombia y convierte las coincidencias", async () => {
+  it("consulta el proxy del gateway y convierte las candidatas", async () => {
     const fetchFn: FetchLike = jest.fn(async (url: string) => {
-      expect(url).toContain("nominatim.openstreetmap.org/search");
-      expect(url).toContain("countrycodes=co");
-      expect(url).toContain(encodeURIComponent("Parque García Rovira, Bucaramanga"));
+      expect(url).toContain("http://gateway.test/api/v1/geocode/search");
+      expect(url).toContain(
+        `q=${encodeURIComponent("Parque García Rovira, Bucaramanga")}`,
+      );
       return {
         ok: true,
-        json: async () => [
-          { display_name: "Parque García Rovira, Bucaramanga, Santander", lat: "7.1148", lon: "-73.1268" },
-          { display_name: "Sin coordenadas", lat: "no-numérico", lon: "-73.0" },
-        ],
+        json: async () => ({
+          candidates: [
+            {
+              label: "Parque García Rovira, Bucaramanga, Santander",
+              latitude: 7.1148,
+              longitude: -73.1268,
+            },
+            { label: "Sin coordenadas", latitude: "no-numérico", longitude: -73.0 },
+          ],
+        }),
       };
     });
 
@@ -81,15 +99,15 @@ describe("Cruce de dirección con Nominatim", () => {
 describe("reverseGeocode", () => {
   it("resuelve dirección, municipio y departamento del punto", async () => {
     const fetchFn = jest.fn(async (url: string) => {
-      expect(url).toContain("nominatim.openstreetmap.org/reverse");
+      expect(url).toContain("http://gateway.test/api/v1/geocode/reverse");
       expect(url).toContain("lat=7.1193");
       expect(url).toContain("lon=-73.1227");
       return {
         ok: true,
         json: async () => ({
-          display_name:
-            "Parque García Rovira, Bucaramanga, Santander, Colombia",
-          address: { city: "Bucaramanga", state: "Santander" },
+          label: "Parque García Rovira, Bucaramanga, Santander, Colombia",
+          municipality: "Bucaramanga",
+          department: "Santander",
         }),
       };
     });
@@ -103,13 +121,44 @@ describe("reverseGeocode", () => {
     });
   });
 
-  it("rechaza cuando el punto no tiene dirección conocida", async () => {
+  it("tolera municipio y departamento nulos en zonas rurales", async () => {
     const fetchFn = jest.fn(async () => ({
       ok: true,
+      json: async () => ({
+        label: "Vereda El Roble, Colombia",
+        municipality: null,
+        department: null,
+      }),
+    }));
+
+    await expect(
+      reverseGeocode({ latitude: 7.2, longitude: -73.2 }, fetchFn),
+    ).resolves.toEqual({
+      label: "Vereda El Roble, Colombia",
+      municipality: null,
+      department: null,
+    });
+  });
+
+  it("rechaza cuando el punto no tiene dirección conocida (404 del proxy)", async () => {
+    const fetchFn = jest.fn(async () => ({
+      ok: false,
+      status: 404,
       json: async () => ({}),
     }));
     await expect(
       reverseGeocode({ latitude: 0, longitude: 0 }, fetchFn),
     ).rejects.toThrow(/no corresponde a una dirección conocida/);
+  });
+
+  it("sin EXPO_PUBLIC_API_BASE_URL en nativo pide configurarla", async () => {
+    delete process.env.EXPO_PUBLIC_API_BASE_URL;
+    try {
+      await expect(
+        reverseGeocode({ latitude: 1, longitude: 1 }, jest.fn()),
+      ).rejects.toThrow(/EXPO_PUBLIC_API_BASE_URL/);
+    } finally {
+      process.env.EXPO_PUBLIC_API_BASE_URL = "http://gateway.test";
+    }
   });
 });
