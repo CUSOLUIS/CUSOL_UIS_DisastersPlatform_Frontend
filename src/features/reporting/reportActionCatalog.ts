@@ -11,6 +11,10 @@ export type ReportActionId =
   | "unverified-building"
   | "collection-center"
   | "donation-point"
+  // CHG-153: los dos tipos logísticos nuevos (acopio receptor y
+  // punto de distribución).
+  | "receiver-center"
+  | "distribution-point"
   | "community-meals"
   | "temporary-shelter"
   // CHG-125: solicitud pública de ayuda de emergencia.
@@ -45,21 +49,40 @@ export const reportActionCatalog: Record<ReportActionId, ReportActionCopy> = {
       "Informa un edificio cuya búsqueda no ha terminado y donde aún no se puede descartar presencia humana.",
     hint: "Informa un edificio cuya búsqueda no ha terminado y donde aún no se puede descartar presencia humana",
   },
+  // CHG-153: la logística son 4 tipos; los textos siguen las leyendas
+  // del contrato («aquí puedes entregar» / «recibe y clasifica» /
+  // «recibe cargamentos» / «aquí puedes recibir»).
   "collection-center": {
     id: "collection-center",
-    category: "AYUDA · RECEPCIÓN Y ALMACENAMIENTO",
-    title: "Inscribir centro de acopio",
+    category: "LOGÍSTICA · CLASIFICACIÓN Y DESPACHO",
+    title: "Inscribir centro de acopio local",
     purpose:
-      "Registra un lugar que recibe, clasifica y almacena ayudas, y que será revisado antes de publicarse.",
-    hint: "Registra un lugar que recibe, clasifica y almacena ayudas y que deberá ser revisado antes de publicarse",
+      "Registra un centro que recibe, clasifica, almacena y prepara ayudas para su envío a otros puntos.",
+    hint: "Registra un centro que recibe, clasifica, almacena y prepara ayudas para su envío a otros puntos",
   },
   "donation-point": {
     id: "donation-point",
-    category: "AYUDA · ENTREGA COMUNITARIA",
+    category: "LOGÍSTICA · ENTREGA DE DONACIONES",
     title: "Registrar punto de recolección",
     purpose:
-      "Registra un punto comunitario de entrega que reúne ayudas para trasladarlas posteriormente.",
-    hint: "Registra un punto comunitario de entrega que reúne ayudas para trasladarlas posteriormente",
+      "Registra un punto donde la comunidad puede entregar donaciones que luego viajan a un centro de acopio local.",
+    hint: "Registra un punto donde la comunidad puede entregar donaciones que luego viajan a un centro de acopio local",
+  },
+  "receiver-center": {
+    id: "receiver-center",
+    category: "LOGÍSTICA · CARGAMENTOS Y REDISTRIBUCIÓN",
+    title: "Inscribir centro de acopio receptor",
+    purpose:
+      "Registra un centro que recibe grandes cargamentos de ayuda y los redistribuye hacia las zonas afectadas.",
+    hint: "Registra un centro que recibe grandes cargamentos de ayuda y los redistribuye hacia las zonas afectadas",
+  },
+  "distribution-point": {
+    id: "distribution-point",
+    category: "LOGÍSTICA · ENTREGA A AFECTADOS",
+    title: "Registrar punto de distribución",
+    purpose:
+      "Registra un punto donde las personas afectadas pueden recibir alimentos, agua y elementos de primera necesidad.",
+    hint: "Registra un punto donde las personas afectadas pueden recibir alimentos, agua y elementos de primera necesidad",
   },
   "community-meals": {
     id: "community-meals",

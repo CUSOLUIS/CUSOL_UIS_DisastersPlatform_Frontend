@@ -283,7 +283,7 @@ describe("App universal", () => {
     expect(onAbout).toHaveBeenCalledTimes(1);
   });
 
-  it("prioriza situación, muestra la búsqueda y debajo las siete acciones", async () => {
+  it("prioriza situación, muestra la búsqueda y debajo las nueve acciones", async () => {
     const onReportPerson = jest.fn();
     const onReportBuilding = jest.fn();
     const onRegisterCenter = jest.fn();
@@ -398,6 +398,9 @@ describe("App universal", () => {
       "report-unverified-building-action",
       "register-collection-center-action",
       "register-donation-point-action",
+      // CHG-153: acopio receptor y punto de distribución.
+      "register-receiver-center-action",
+      "register-distribution-point-action",
       "offer-community-meals-action",
       "offer-temporary-shelter-action",
       "request-help-action",
@@ -410,10 +413,17 @@ describe("App universal", () => {
       name: "Reportar edificio sin verificar",
     });
     const centerButton = screen.getByRole("button", {
-      name: "Inscribir centro de acopio",
+      name: "Inscribir centro de acopio local",
     });
     const donationPointButton = screen.getByRole("button", {
       name: "Registrar punto de recolección",
+    });
+    // CHG-153: los dos tipos logísticos nuevos.
+    const receiverCenterButton = screen.getByRole("button", {
+      name: "Inscribir centro de acopio receptor",
+    });
+    const distributionPointButton = screen.getByRole("button", {
+      name: "Registrar punto de distribución",
     });
     const communityMealsButton = screen.getByRole("button", {
       name: "Ofrecer comida comunitaria",
@@ -426,6 +436,8 @@ describe("App universal", () => {
       "report-unverified-building-action",
       "register-collection-center-action",
       "register-donation-point-action",
+      "register-receiver-center-action",
+      "register-distribution-point-action",
       "offer-community-meals-action",
       "offer-temporary-shelter-action",
     ];
@@ -436,6 +448,8 @@ describe("App universal", () => {
     expect(reportSurfaceStyle.minHeight).toBeGreaterThanOrEqual(160);
     expect(reportSurfaceStyle.minHeight).toBeLessThan(196);
     expect(reportSurfaceStyles.map(({ backgroundColor }) => backgroundColor)).toEqual([
+      "#e3e9e8",
+      "#e3e9e8",
       "#e3e9e8",
       "#e3e9e8",
       "#e3e9e8",
@@ -460,8 +474,10 @@ describe("App universal", () => {
       screen.getByLabelText("Buscar persona desaparecida por cualquier dato público"),
     ).toBeTruthy();
     expect(buildingButton.props.accessibilityHint).toMatch(/no se puede descartar presencia humana/i);
-    expect(centerButton.props.accessibilityHint).toMatch(/recibe, clasifica y almacena ayudas/i);
-    expect(donationPointButton.props.accessibilityHint).toMatch(/entrega que reúne ayudas/i);
+    expect(centerButton.props.accessibilityHint).toMatch(/recibe, clasifica, almacena y prepara ayudas/i);
+    expect(donationPointButton.props.accessibilityHint).toMatch(/entregar donaciones/i);
+    expect(receiverCenterButton.props.accessibilityHint).toMatch(/grandes cargamentos/i);
+    expect(distributionPointButton.props.accessibilityHint).toMatch(/personas afectadas pueden recibir/i);
     expect(communityMealsButton.props.accessibilityHint).toMatch(/preparas alimentos/i);
     expect(temporaryShelterButton.props.accessibilityHint).toMatch(/espacio disponible/i);
     // CHG-090 (QA): la tarjeta conserva categoría y título, pero ya no
@@ -470,14 +486,19 @@ describe("App universal", () => {
     expect(
       screen.queryByText(/clasifica y almacena ayudas/i),
     ).toBeNull();
-    expect(screen.getByText("AYUDA · RECEPCIÓN Y ALMACENAMIENTO")).toBeTruthy();
-    expect(screen.getByText("AYUDA · ENTREGA COMUNITARIA")).toBeTruthy();
+    // CHG-153: las categorías logísticas reflejan los cuatro tipos.
+    expect(screen.getByText("LOGÍSTICA · CLASIFICACIÓN Y DESPACHO")).toBeTruthy();
+    expect(screen.getByText("LOGÍSTICA · ENTREGA DE DONACIONES")).toBeTruthy();
+    expect(screen.getByText("LOGÍSTICA · CARGAMENTOS Y REDISTRIBUCIÓN")).toBeTruthy();
+    expect(screen.getByText("LOGÍSTICA · ENTREGA A AFECTADOS")).toBeTruthy();
     expect(screen.getByText("AYUDA · ALIMENTACIÓN SOLIDARIA")).toBeTruthy();
     expect(screen.getByText("AYUDA · ALOJAMIENTO SOLIDARIO")).toBeTruthy();
     expect(screen.getByText("PERSONA · REPORTE CIUDADANO")).toBeTruthy();
     expect(screen.getByText("EDIFICIO · BÚSQUEDA PENDIENTE")).toBeTruthy();
-    expect(screen.getByText("Inscribir centro de acopio")).toBeTruthy();
+    expect(screen.getByText("Inscribir centro de acopio local")).toBeTruthy();
     expect(screen.getByText("Registrar punto de recolección")).toBeTruthy();
+    expect(screen.getByText("Inscribir centro de acopio receptor")).toBeTruthy();
+    expect(screen.getByText("Registrar punto de distribución")).toBeTruthy();
     expect(screen.getByText("Ofrecer comida comunitaria")).toBeTruthy();
     expect(screen.getByText("Ofrecer alojamiento temporal")).toBeTruthy();
     const showMoreButton = screen.getByRole("button", {

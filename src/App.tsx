@@ -62,6 +62,9 @@ interface AppProps {
   onReportUnverifiedBuilding?: () => void;
   onRegisterCollectionCenter?: () => void;
   onRegisterDonationPoint?: () => void;
+  // CHG-153: acopio receptor y punto de distribución.
+  onRegisterReceiverCenter?: () => void;
+  onRegisterDistributionPoint?: () => void;
   onOfferCommunityMeals?: () => void;
   onOfferTemporaryShelter?: () => void;
   onRequestHelp?: () => void;
@@ -90,6 +93,8 @@ export function App({
   onReportUnverifiedBuilding = () => undefined,
   onRegisterCollectionCenter = () => undefined,
   onRegisterDonationPoint = () => undefined,
+  onRegisterReceiverCenter = () => undefined,
+  onRegisterDistributionPoint = () => undefined,
   onOfferCommunityMeals = () => undefined,
   onOfferTemporaryShelter = () => undefined,
   onRequestHelp = () => undefined,
@@ -175,6 +180,8 @@ export function App({
         onReportUnverifiedBuilding={onReportUnverifiedBuilding}
         onRegisterCollectionCenter={onRegisterCollectionCenter}
         onRegisterDonationPoint={onRegisterDonationPoint}
+        onRegisterReceiverCenter={onRegisterReceiverCenter}
+        onRegisterDistributionPoint={onRegisterDistributionPoint}
         onOfferCommunityMeals={onOfferCommunityMeals}
         onOfferTemporaryShelter={onOfferTemporaryShelter}
         onRequestHelp={onRequestHelp}
@@ -205,6 +212,8 @@ function DashboardLoader({
   onReportUnverifiedBuilding,
   onRegisterCollectionCenter,
   onRegisterDonationPoint,
+  onRegisterReceiverCenter,
+  onRegisterDistributionPoint,
   onOfferCommunityMeals,
   onOfferTemporaryShelter,
   onRequestHelp,
@@ -227,6 +236,8 @@ function DashboardLoader({
   onReportUnverifiedBuilding: () => void;
   onRegisterCollectionCenter: () => void;
   onRegisterDonationPoint: () => void;
+  onRegisterReceiverCenter: () => void;
+  onRegisterDistributionPoint: () => void;
   onOfferCommunityMeals: () => void;
   onOfferTemporaryShelter: () => void;
   onRequestHelp: () => void;
@@ -346,6 +357,8 @@ function DashboardLoader({
       onReportUnverifiedBuilding={onReportUnverifiedBuilding}
       onRegisterCollectionCenter={onRegisterCollectionCenter}
       onRegisterDonationPoint={onRegisterDonationPoint}
+      onRegisterReceiverCenter={onRegisterReceiverCenter}
+      onRegisterDistributionPoint={onRegisterDistributionPoint}
       onOfferCommunityMeals={onOfferCommunityMeals}
       onOfferTemporaryShelter={onOfferTemporaryShelter}
       onRequestHelp={onRequestHelp}

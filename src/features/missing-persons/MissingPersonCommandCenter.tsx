@@ -37,6 +37,9 @@ interface ReportActionsProps {
   onReportUnverifiedBuilding: () => void;
   onRegisterCollectionCenter: () => void;
   onRegisterDonationPoint: () => void;
+  // CHG-153: los dos tipos logísticos nuevos.
+  onRegisterReceiverCenter: () => void;
+  onRegisterDistributionPoint: () => void;
   onOfferCommunityMeals: () => void;
   onOfferTemporaryShelter: () => void;
   // CHG-125: solicitud pública de ayuda de emergencia.
@@ -151,6 +154,8 @@ export function ReportActions({
   onReportUnverifiedBuilding,
   onRegisterCollectionCenter,
   onRegisterDonationPoint,
+  onRegisterReceiverCenter,
+  onRegisterDistributionPoint,
   onOfferCommunityMeals,
   onOfferTemporaryShelter,
   onRequestHelp,
@@ -195,6 +200,23 @@ export function ReportActions({
         compact={compact}
         columns={columns}
         onPress={onRegisterDonationPoint}
+      />
+      {/* CHG-153: acopio receptor y punto de distribución. */}
+      <ReportAction
+        testID="register-receiver-center-action"
+        action={reportActionCatalog["receiver-center"]}
+        icon={<ReceiverCenterIcon />}
+        compact={compact}
+        columns={columns}
+        onPress={onRegisterReceiverCenter}
+      />
+      <ReportAction
+        testID="register-distribution-point-action"
+        action={reportActionCatalog["distribution-point"]}
+        icon={<DistributionPointIcon />}
+        compact={compact}
+        columns={columns}
+        onPress={onRegisterDistributionPoint}
       />
       <ReportAction
         testID="offer-community-meals-action"
@@ -469,6 +491,63 @@ function DonationPointIcon() {
         fill="none"
         stroke={reportActionIconColor}
         strokeWidth={1.7}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+// CHG-153 — Bodega con camión: recibe cargamentos y redistribuye.
+function ReceiverCenterIcon() {
+  return (
+    <Svg width={36} height={36} viewBox="0 0 36 36">
+      <Path
+        d="M2.5 13.5 13 7l10.5 6.5M4.5 13V25h17V13"
+        fill="none"
+        stroke={reportActionIconColor}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M8.5 25v-7h9v7"
+        fill="none"
+        stroke={reportActionIconColor}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M24 20h5.2l3.3 3.6V29H24v-9Z"
+        fill="none"
+        stroke={reportActionIconColor}
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+      <Circle cx="26.8" cy="30" r="2.1" fill="none" stroke={reportActionIconColor} strokeWidth={1.8} />
+      <Circle cx="30.6" cy="30" r="2.1" fill="none" stroke={reportActionIconColor} strokeWidth={1.8} />
+    </Svg>
+  );
+}
+
+// CHG-153 — Caja sobre manos abiertas: entrega directa a afectados.
+function DistributionPointIcon() {
+  return (
+    <Svg width={36} height={36} viewBox="0 0 36 36">
+      <Path
+        d="m12.5 8.5 5.5-3 5.5 3-5.5 3-5.5-3ZM12.5 8.5v6.2l5.5 3 5.5-3V8.5M18 11.5v6.2"
+        fill="none"
+        stroke={reportActionIconColor}
+        strokeWidth={1.7}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M4 24.5c3-2.6 6-2.6 8.5-.8l4 2.8h6.2c1.4 0 1.4 2.6 0 2.6h-6M25 25.5l3.6-2.4c2.6-1.6 4.6.9 2.4 2.7L25.4 30c-1.2 1-2.7 1.2-4.2.7l-4.7-1.5"
+        fill="none"
+        stroke={reportActionIconColor}
+        strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
       />

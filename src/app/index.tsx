@@ -17,6 +17,18 @@ export default function HomeRoute() {
       onReportUnverifiedBuilding={() =>
         router.push("/reportar-edificio-sin-verificar")
       }
+      onRegisterCollectionCenter={() =>
+        router.push("/registrar-centro-acopio-local")
+      }
+      onRegisterDonationPoint={() =>
+        router.push("/registrar-punto-recoleccion")
+      }
+      onRegisterReceiverCenter={() =>
+        router.push("/registrar-centro-acopio-receptor")
+      }
+      onRegisterDistributionPoint={() =>
+        router.push("/registrar-punto-distribucion")
+      }
       onRequestHelp={() => router.push("/necesitamos-ayuda")}
       initialDirectorySearch={typeof buscar === "string" ? buscar : undefined}
     />
