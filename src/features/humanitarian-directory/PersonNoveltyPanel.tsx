@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -64,6 +66,9 @@ export function PersonNoveltyPanel({
   fetchNovelties?: FetchPersonNovelties;
 }) {
   const [state, setState] = useState<PanelState>({ status: "loading" });
+  // CHG-152: vista ampliada de la foto al tocarla (web, web móvil, APK).
+  const [photoZoomed, setPhotoZoomed] = useState(false);
+  const photoUri = resolvePublicMediaUrl(person.publicPhotoUrl);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,17 +114,23 @@ export function PersonNoveltyPanel({
           sensibles nunca salen en esta proyección). */}
       <View style={styles.header}>
         <View style={styles.identity}>
-          {resolvePublicMediaUrl(person.publicPhotoUrl) ? (
-            <LazyImage
-              containerStyle={styles.avatar}
-              placeholder={<AvatarFallback name={person.displayName} />}
-              accessibilityLabel={`Fotografía pública autorizada de ${person.displayName}`}
-              source={{
-                uri: resolvePublicMediaUrl(person.publicPhotoUrl)!,
-              }}
-              resizeMode="cover"
-              style={styles.avatarPhoto}
-            />
+          {photoUri ? (
+            // CHG-152: tocar la foto la amplía.
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Ampliar la fotografía de ${person.displayName}`}
+              onPress={() => setPhotoZoomed(true)}
+              style={styles.avatar}
+            >
+              <LazyImage
+                containerStyle={styles.avatarPhoto}
+                placeholder={<AvatarFallback name={person.displayName} />}
+                accessibilityLabel={`Fotografía pública autorizada de ${person.displayName}`}
+                source={{ uri: photoUri }}
+                resizeMode="cover"
+                style={styles.avatarPhoto}
+              />
+            </Pressable>
           ) : (
             <View style={styles.avatar}>
               <AvatarFallback name={person.displayName} />
@@ -203,6 +214,31 @@ export function PersonNoveltyPanel({
           REPORTAR ENCONTRADA O FALLECIDA →
         </Text>
       </Pressable>
+
+      {/* CHG-152: foto ampliada (lightbox). Cross-plataforma: web, web
+          móvil y APK desde el mismo Modal. Se monta solo al ampliar. */}
+      {photoUri && photoZoomed && (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setPhotoZoomed(false)}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Cerrar la fotografía ampliada"
+            onPress={() => setPhotoZoomed(false)}
+            style={styles.zoomBackdrop}
+          >
+            <Image
+              accessibilityLabel={`Fotografía ampliada de ${person.displayName}`}
+              source={{ uri: photoUri }}
+              resizeMode="contain"
+              style={styles.zoomImage}
+            />
+          </Pressable>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -299,6 +335,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarPhoto: { width: "100%", height: "100%" },
+  // CHG-152: fondo y lienzo de la foto ampliada.
+  zoomBackdrop: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+    backgroundColor: "rgba(3,6,12,0.92)",
+  },
+  zoomImage: { width: "100%", height: "100%", maxWidth: 720, maxHeight: 720 },
   avatarFallback: {
     width: "100%",
     height: "100%",
