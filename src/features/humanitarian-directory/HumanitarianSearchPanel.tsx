@@ -536,15 +536,15 @@ function PersonCard({
           FUENTE · {item.source.name} · VIGENCIA · {dateFormatter.format(new Date(item.updatedAt))}
         </Text>
       </View>
-      {/* CHG-077: al abrir la tarjeta se ven las novedades que otras
-          personas reportaron (qué dicen quienes la encontraron). */}
+      {/* CHG-151: abre la FICHA de la persona — foto e información
+          pública (no sensible) más las novedades de terceros. */}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Ver novedades de ${item.displayName}`}
+        accessibilityLabel={`Ver ficha de ${item.displayName}`}
         onPress={onOpenDetail}
         style={[styles.cardAction, styles.cardActionSecondary]}
       >
-        <Text style={styles.cardActionText}>VER NOVEDADES E INFORMACIÓN</Text>
+        <Text style={styles.cardActionText}>VER FICHA</Text>
         <Text style={styles.cardActionArrow}>→</Text>
       </Pressable>
       {item.status === "missing" && (

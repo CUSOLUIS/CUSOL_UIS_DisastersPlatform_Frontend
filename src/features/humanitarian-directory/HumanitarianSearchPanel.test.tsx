@@ -249,7 +249,7 @@ describe("Directorio humanitario", () => {
     fireEvent.press(screen.getByRole("button", { name: "Buscar personas" }));
     fireEvent.press(
       await screen.findByRole("button", {
-        name: "Ver novedades de Valentina Rojas",
+        name: "Ver ficha de Valentina Rojas",
       }),
     );
 
@@ -258,6 +258,10 @@ describe("Directorio humanitario", () => {
     ).toBeTruthy();
     expect(screen.getByText("SECTOR SALUD")).toBeTruthy();
     expect(screen.getByText("ESTADO ACTUAL · ENCONTRADA")).toBeTruthy();
+    // CHG-151: la ficha muestra la información pública (no sensible).
+    expect(screen.getByText("EDAD APROXIMADA")).toBeTruthy();
+    expect(screen.getByText("ÚLTIMA ZONA PÚBLICA")).toBeTruthy();
+    expect(screen.getByText("MUNICIPIO / DEPARTAMENTO")).toBeTruthy();
     expect(screen.getByText(/5 o más\s+personas reportan el mismo desenlace/)).toBeTruthy();
     expect(fetchNovelties).toHaveBeenCalledTimes(1);
 

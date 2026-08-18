@@ -7,6 +7,8 @@ import {
   View,
 } from "react-native";
 import { colors, fontFamilies } from "../../theme";
+import { LazyImage } from "../../components/LazyImage";
+import { resolvePublicMediaUrl } from "../media/publicMediaUrl";
 import { fetchPersonNovelties } from "./dataSource";
 import type {
   FetchPersonNovelties,
@@ -41,6 +43,9 @@ const dateFormatter = new Intl.DateTimeFormat("es-CO", {
   dateStyle: "medium",
   timeStyle: "short",
 });
+
+// CHG-151: la fecha de última visualización se muestra sin hora.
+const dayFormatter = new Intl.DateTimeFormat("es-CO", { dateStyle: "medium" });
 
 type PanelState =
   | { status: "loading" }
@@ -100,14 +105,58 @@ export function PersonNoveltyPanel({
         <Text style={styles.backText}>← VOLVER A RESULTADOS</Text>
       </Pressable>
 
+      {/* CHG-151: ficha pública — foto y datos NO sensibles (los datos
+          sensibles nunca salen en esta proyección). */}
       <View style={styles.header}>
-        <Text style={styles.overline}>{person.publicCaseCode}</Text>
-        <Text style={styles.title} accessibilityRole="header">
-          {person.displayName}
-        </Text>
-        <Text style={styles.statusBadge}>
-          ESTADO ACTUAL · {statusLabels[publicStatus]}
-        </Text>
+        <View style={styles.identity}>
+          {resolvePublicMediaUrl(person.publicPhotoUrl) ? (
+            <LazyImage
+              containerStyle={styles.avatar}
+              placeholder={<AvatarFallback name={person.displayName} />}
+              accessibilityLabel={`Fotografía pública autorizada de ${person.displayName}`}
+              source={{
+                uri: resolvePublicMediaUrl(person.publicPhotoUrl)!,
+              }}
+              resizeMode="cover"
+              style={styles.avatarPhoto}
+            />
+          ) : (
+            <View style={styles.avatar}>
+              <AvatarFallback name={person.displayName} />
+            </View>
+          )}
+          <View style={styles.identityCopy}>
+            <Text style={styles.overline}>{person.publicCaseCode}</Text>
+            <Text style={styles.title} accessibilityRole="header">
+              {person.displayName}
+            </Text>
+            <Text style={styles.statusBadge}>
+              ESTADO ACTUAL · {statusLabels[publicStatus]}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.fichaGrid}>
+          <FichaField
+            label="EDAD APROXIMADA"
+            value={
+              person.approximateAge === null
+                ? "Sin confirmar"
+                : `${person.approximateAge} años`
+            }
+          />
+          <FichaField label="ÚLTIMA ZONA PÚBLICA" value={person.lastSeenArea} />
+          <FichaField
+            label="MUNICIPIO / DEPARTAMENTO"
+            value={`${person.municipality}, ${person.department}`}
+          />
+          <FichaField
+            label="VISTA POR ÚLTIMA VEZ"
+            value={dayFormatter.format(new Date(person.lastSeenAt))}
+          />
+          <FichaField label="FUENTE" value={person.source.name} />
+        </View>
+
         <Text style={styles.rulesText}>
           El estado público cambia automáticamente cuando 5 o más
           personas reportan el mismo desenlace, de inmediato si reporta
@@ -154,6 +203,26 @@ export function PersonNoveltyPanel({
           REPORTAR ENCONTRADA O FALLECIDA →
         </Text>
       </Pressable>
+    </View>
+  );
+}
+
+// CHG-151: dato público etiquetado dentro de la ficha.
+function FichaField({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.fichaField}>
+      <Text style={styles.fichaLabel}>{label}</Text>
+      <Text style={styles.fichaValue}>{value}</Text>
+    </View>
+  );
+}
+
+// CHG-151: avatar de reemplazo cuando no hay foto pública autorizada.
+function AvatarFallback({ name }: { name: string }) {
+  const initial = name.trim().charAt(0).toLocaleUpperCase("es-CO") || "?";
+  return (
+    <View style={styles.avatarFallback}>
+      <Text style={styles.avatarInitial}>{initial}</Text>
     </View>
   );
 }
@@ -214,8 +283,42 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: 14,
     padding: 18,
-    gap: 8,
+    gap: 14,
   },
+  identity: { flexDirection: "row", alignItems: "center", gap: 14 },
+  identityCopy: { flex: 1, minWidth: 0, gap: 6 },
+  avatar: {
+    width: 68,
+    height: 68,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: colors.panelSoft,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarPhoto: { width: "100%", height: "100%" },
+  avatarFallback: {
+    width: "100%",
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarInitial: { color: colors.inkSoft, fontSize: 26, fontWeight: "800" },
+  fichaGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  fichaField: { minWidth: 130, flexGrow: 1, flexBasis: 130, gap: 2 },
+  fichaLabel: {
+    color: colors.inkDim,
+    fontFamily: fontFamilies.mono,
+    fontSize: 9,
+    letterSpacing: 1,
+  },
+  fichaValue: { color: colors.ink, fontSize: 13, lineHeight: 18 },
   overline: {
     color: colors.inkSoft,
     fontFamily: fontFamilies.mono,
