@@ -24,6 +24,10 @@ import { parseDraftCoordinates } from "../missing-persons/geocoding";
 import { communityTextIssue } from "../humanitarian-directory/textQuality";
 import { LastSeenLocationPicker } from "../missing-persons/LastSeenLocationPicker";
 import {
+  MapScrollLockProvider,
+  useMapScrollLockController,
+} from "../operational-map/mapScrollLock";
+import {
   preparePhotosForUpload,
   totalSizeNotice,
 } from "../missing-persons/photoProcessing";
@@ -271,6 +275,8 @@ export function HelpRequestForm({
   const idempotencyKeyRef = useRef<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Record<string, number>>({});
+  // CHG-155: el gesto que nace en el mapa no desplaza el formulario.
+  const { scrollEnabled, scrollLock } = useMapScrollLockController();
 
   const registerSection = (code: string, y: number) => {
     sectionOffsets.current[code] = y;
@@ -354,6 +360,7 @@ export function HelpRequestForm({
   }
 
   return (
+    <MapScrollLockProvider value={scrollLock}>
     <LinearGradient
       colors={["#0d070a", colors.canvas, "#0b070a"]}
       style={styles.root}
@@ -388,6 +395,7 @@ export function HelpRequestForm({
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={styles.scroll}
+          scrollEnabled={scrollEnabled}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -729,6 +737,7 @@ export function HelpRequestForm({
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
+    </MapScrollLockProvider>
   );
 }
 

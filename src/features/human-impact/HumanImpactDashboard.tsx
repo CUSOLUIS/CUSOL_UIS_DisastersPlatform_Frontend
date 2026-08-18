@@ -42,6 +42,10 @@ import {
 import type { HelpRequestsDataSource } from "../help-requests/types";
 import { ReportActions } from "../missing-persons/MissingPersonCommandCenter";
 import { OperationalMapPanel } from "../operational-map/OperationalMapPanel";
+import {
+  MapScrollLockProvider,
+  useMapScrollLockController,
+} from "../operational-map/mapScrollLock";
 import type {
   HumanMapDataSource,
   OperationalMapDataSource,
@@ -225,6 +229,9 @@ export function HumanImpactDashboard({
   const headerHeight = getDashboardHeaderHeight(compact, stackedNavigation);
   const liveRecordsMinHeight = getLiveRecordsMinHeight(height, headerHeight);
   const scrollRef = useRef<ScrollView>(null);
+  // CHG-155: mientras un gesto nace en el mapa, la página no se
+  // desplaza — el ScrollView vertical le robaba el paneo vertical.
+  const { scrollEnabled, scrollLock } = useMapScrollLockController();
   // CHG-069: menú desplegable de la cuenta y panel "Mi espacio".
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [mySpaceOpen, setMySpaceOpen] = useState(false);
@@ -307,6 +314,7 @@ export function HumanImpactDashboard({
   );
 
   return (
+    <MapScrollLockProvider value={scrollLock}>
     <LinearGradient
       colors={["#080b14", colors.canvas, "#080b14"]}
       locations={[0, 0.52, 1]}
@@ -371,6 +379,7 @@ export function HumanImpactDashboard({
             scrollPosition.current = event.nativeEvent.contentOffset.y;
             resolveActiveSection(scrollPosition.current);
           }}
+          scrollEnabled={scrollEnabled}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
         >
@@ -544,6 +553,7 @@ export function HumanImpactDashboard({
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
+    </MapScrollLockProvider>
   );
 }
 

@@ -22,6 +22,10 @@ import {
 import { parseDraftCoordinates } from "../missing-persons/geocoding";
 import { LastSeenLocationPicker } from "../missing-persons/LastSeenLocationPicker";
 import {
+  MapScrollLockProvider,
+  useMapScrollLockController,
+} from "../operational-map/mapScrollLock";
+import {
   ReportRejectedError,
   createIdempotencyKey,
   type SubmitReportOptions,
@@ -234,6 +238,8 @@ export function AidLocationForm({
   const idempotencyKeyRef = useRef<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Record<string, number>>({});
+  // CHG-155: el gesto que nace en el mapa no desplaza el formulario.
+  const { scrollEnabled, scrollLock } = useMapScrollLockController();
 
   const registerSection = (code: string, y: number) => {
     sectionOffsets.current[code] = y;
@@ -423,6 +429,7 @@ export function AidLocationForm({
   };
 
   return (
+    <MapScrollLockProvider value={scrollLock}>
     <LinearGradient
       colors={["#070c14", colors.canvas, "#080b12"]}
       style={styles.root}
@@ -457,6 +464,7 @@ export function AidLocationForm({
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={styles.scroll}
+          scrollEnabled={scrollEnabled}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -708,6 +716,7 @@ export function AidLocationForm({
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
+    </MapScrollLockProvider>
   );
 }
 

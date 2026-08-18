@@ -15,6 +15,7 @@ import {
   type GestureResponderEvent,
   type GestureResponderHandlers,
 } from "react-native";
+import { useMapScrollLock } from "./mapScrollLock";
 
 export interface MapTouchCallbacks {
   onPanBy: (deltaX: number, deltaY: number) => void;
@@ -145,20 +146,44 @@ export function createMapTouchController(callbacks: MapTouchCallbacks) {
   return { sync, move, reset: () => sync([]) };
 }
 
+// CHG-155 — El lienzo bloquea el scroll del ancestro mientras el toque
+// vive en el mapa (lock al primer dedo, unlock al soltar el último).
+export interface MapTouchLockHandlers {
+  onTouchStart: (event: GestureResponderEvent) => void;
+  onTouchEnd: (event: GestureResponderEvent) => void;
+  onTouchCancel: (event: GestureResponderEvent) => void;
+}
+
 /**
- * Manejadores de responder para el lienzo del mapa en Android/iOS. En
- * web devuelve un objeto vacío: allí gobiernan los manejadores DOM de
- * CHG-050 y duplicarlos produciría paneo doble.
+ * Manejadores táctiles del lienzo del mapa. En Android/iOS aporta el
+ * responder de paneo/pellizco (los manejadores DOM de CHG-050 son
+ * inertes ahí); en web solo aporta el bloqueo del scroll padre, porque
+ * el paneo lo gobiernan los manejadores DOM y duplicarlos produciría
+ * paneo doble. CHG-155: el reclamo del gesto también corre en fase de
+ * CAPTURA y bloquea el responder nativo (Android) — sin esto el
+ * ScrollView vertical interceptaba el arrastre hacia arriba/abajo y el
+ * mapa solo paneaba a los lados.
  */
 export function useNativeMapTouchInteractions(
   callbacks: MapTouchCallbacks,
-): GestureResponderHandlers | Record<string, never> {
+): MapTouchLockHandlers & Partial<GestureResponderHandlers> {
   const callbacksRef = useRef(callbacks);
   callbacksRef.current = callbacks;
+  const scrollLock = useMapScrollLock();
 
   return useMemo(() => {
+    const lockHandlers: MapTouchLockHandlers = {
+      onTouchStart: () => scrollLock.lock(),
+      onTouchEnd: (event) => {
+        if ((event.nativeEvent?.touches?.length ?? 0) === 0) {
+          scrollLock.unlock();
+        }
+      },
+      onTouchCancel: () => scrollLock.unlock(),
+    };
+
     if (Platform.OS === "web") {
-      return {};
+      return lockHandlers;
     }
 
     const controller = createMapTouchController({
@@ -170,20 +195,34 @@ export function useNativeMapTouchInteractions(
         x: touch.pageX,
         y: touch.pageY,
       }));
+    const shouldClaimMove = (
+      event: GestureResponderEvent,
+      gesture: { dx: number; dy: number },
+    ) =>
+      (event?.nativeEvent?.touches?.length ?? 0) >= 2 ||
+      Math.abs(gesture?.dx ?? 0) > DRAG_SLOP ||
+      Math.abs(gesture?.dy ?? 0) > DRAG_SLOP;
 
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (event, gesture) =>
-        event.nativeEvent.touches.length >= 2 ||
-        Math.abs(gesture.dx) > DRAG_SLOP ||
-        Math.abs(gesture.dy) > DRAG_SLOP,
-      // CHG-050: el gesto que nace en el mapa es del mapa; un ancestro
-      // desplazable no lo arrebata a mitad de arrastre.
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: (event) => controller.sync(readTouches(event)),
-      onPanResponderMove: (event) => controller.move(readTouches(event)),
-      onPanResponderRelease: (event) => controller.sync(readTouches(event)),
-      onPanResponderTerminate: () => controller.reset(),
-    }).panHandlers;
-  }, []);
+    return {
+      ...PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onStartShouldSetPanResponderCapture: () => false,
+        onMoveShouldSetPanResponder: shouldClaimMove,
+        // CHG-155: reclamo también en captura — el arrastre que nace en
+        // el mapa se decide aquí antes de que un ancestro lo tome.
+        onMoveShouldSetPanResponderCapture: shouldClaimMove,
+        // CHG-050: el gesto que nace en el mapa es del mapa; un ancestro
+        // desplazable no lo arrebata a mitad de arrastre.
+        onPanResponderTerminationRequest: () => false,
+        // CHG-155 (Android): con el responder activo, el padre nativo no
+        // intercepta el gesto.
+        onShouldBlockNativeResponder: () => true,
+        onPanResponderGrant: (event) => controller.sync(readTouches(event)),
+        onPanResponderMove: (event) => controller.move(readTouches(event)),
+        onPanResponderRelease: (event) => controller.sync(readTouches(event)),
+        onPanResponderTerminate: () => controller.reset(),
+      }).panHandlers,
+      ...lockHandlers,
+    };
+  }, [scrollLock]);
 }

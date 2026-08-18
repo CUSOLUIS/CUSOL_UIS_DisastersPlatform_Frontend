@@ -44,6 +44,10 @@ import { buildLastSeenQuery, parseDraftCoordinates } from "./geocoding";
 import { AddressAutocompleteField } from "./AddressAutocompleteField";
 import { LastSeenLocationPicker } from "./LastSeenLocationPicker";
 import {
+  MapScrollLockProvider,
+  useMapScrollLockController,
+} from "../operational-map/mapScrollLock";
+import {
   DOCUMENT_TYPE_OPTIONS,
   NATIONALITY_OPTIONS,
   SEX_OPTIONS,
@@ -196,6 +200,8 @@ export function MissingPersonReportForm({
   );
   const idempotencyKeyRef = useRef<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
+  // CHG-155: el gesto que nace en el mapa no desplaza el formulario.
+  const { scrollEnabled, scrollLock } = useMapScrollLockController();
   // CHG-091: aviso de posibles duplicados mientras se escribe el
   // nombre. Descartar el aviso lo silencia para ese par exacto de
   // nombres; si el nombre cambia, vuelve a evaluarse.
@@ -332,6 +338,7 @@ export function MissingPersonReportForm({
   }
 
   return (
+    <MapScrollLockProvider value={scrollLock}>
     <LinearGradient colors={["#070a13", colors.canvas, "#080b15"]} style={styles.root}>
       <SafeAreaView edges={["top"]} style={styles.safeArea}>
         {/* CHG-097: el mismo navbar de la portada — logos, nombre de
@@ -356,7 +363,7 @@ export function MissingPersonReportForm({
           </View>
         </View>
 
-        <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll} scrollEnabled={scrollEnabled} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={[styles.content, compact && styles.contentCompact]}>
             <View style={styles.intro}>
               <Text style={styles.overline}>MISSING PERSON / NEW REPORT</Text>
@@ -595,6 +602,7 @@ export function MissingPersonReportForm({
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
+    </MapScrollLockProvider>
   );
 }
 
