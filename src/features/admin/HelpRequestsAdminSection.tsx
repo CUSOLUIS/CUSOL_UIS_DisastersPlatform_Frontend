@@ -13,7 +13,11 @@ import {
   View,
 } from "react-native";
 import { colors, fontFamilies } from "../../theme";
-import type { AdminDataSource, AdminHelpRequest } from "./types";
+import type {
+  AdminDataSource,
+  AdminHelpRequest,
+  AdminHelpRequestVolunteer,
+} from "./types";
 
 type SectionStatus = "loading" | "error" | "ready";
 
@@ -43,6 +47,12 @@ export function HelpRequestsAdminSection({
   const [confirmingPurge, setConfirmingPurge] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // CHG-148: voluntarios anónimos por solicitud, cargados a demanda.
+  const [volunteers, setVolunteers] = useState<
+    Record<string, AdminHelpRequestVolunteer[]>
+  >({});
+  const [volunteersBusy, setVolunteersBusy] = useState<string | null>(null);
+  const [volunteersError, setVolunteersError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setStatus("loading");
@@ -82,6 +92,31 @@ export function HelpRequestsAdminSection({
       );
     } finally {
       setBusy(false);
+    }
+  };
+
+  const toggleVolunteers = async (id: string) => {
+    setVolunteersError(null);
+    if (volunteers[id]) {
+      setVolunteers((current) => {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+      return;
+    }
+    setVolunteersBusy(id);
+    try {
+      const page = await dataSource.listHelpRequestVolunteers(id);
+      setVolunteers((current) => ({ ...current, [id]: page.items }));
+    } catch (error: unknown) {
+      setVolunteersError(
+        error instanceof Error
+          ? error.message
+          : "No fue posible cargar los voluntarios.",
+      );
+    } finally {
+      setVolunteersBusy(null);
     }
   };
 
@@ -221,11 +256,45 @@ export function HelpRequestsAdminSection({
           <Text style={styles.meta}>{item.address}</Text>
           <Text style={styles.meta}>
             {`Creada ${formatStamp(item.createdAt)} · vence ${formatStamp(item.expiresAt)} · ${item.attendersCount} atendiendo` +
+              (item.volunteersCount > 0
+                ? ` · ${item.volunteersCount} voluntario${item.volunteersCount === 1 ? "" : "s"} anónimo${item.volunteersCount === 1 ? "" : "s"}`
+                : "") +
               (item.notificationRadiusKm
                 ? ` · avisa a ${item.notificationRadiusKm} km`
                 : "") +
               (item.hasPhoto ? " · con foto" : "")}
           </Text>
+
+          {/* CHG-148: la PII de los voluntarios anónimos, solo aquí. */}
+          {item.volunteersCount > 0 && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${volunteers[item.id] ? "Ocultar" : "Ver"} los voluntarios de ${item.publicCode}`}
+              disabled={volunteersBusy === item.id}
+              onPress={() => void toggleVolunteers(item.id)}
+              style={styles.volunteersToggle}
+            >
+              {volunteersBusy === item.id ? (
+                <ActivityIndicator color={colors.cyan} />
+              ) : (
+                <Text style={styles.volunteersToggleText}>
+                  {volunteers[item.id]
+                    ? "OCULTAR VOLUNTARIOS"
+                    : `VER ${item.volunteersCount} VOLUNTARIO${item.volunteersCount === 1 ? "" : "S"} (PRIVADO)`}
+                </Text>
+              )}
+            </Pressable>
+          )}
+          {volunteers[item.id] && (
+            <View style={styles.volunteersList}>
+              {volunteersError && (
+                <Text style={styles.volunteersError}>{volunteersError}</Text>
+              )}
+              {volunteers[item.id].map((volunteer) => (
+                <VolunteerRow key={volunteer.id} volunteer={volunteer} />
+              ))}
+            </View>
+          )}
 
           {confirmingId === item.id ? (
             <View style={styles.confirmActions}>
@@ -263,6 +332,29 @@ export function HelpRequestsAdminSection({
           )}
         </View>
       ))}
+    </View>
+  );
+}
+
+// CHG-148 — Una fila de voluntario anónimo con su PII descifrada. Este
+// dato solo se ve aquí, en la consola del super_admin.
+function VolunteerRow({
+  volunteer,
+}: {
+  volunteer: AdminHelpRequestVolunteer;
+}) {
+  const contact = [volunteer.phone, volunteer.email]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <View style={styles.volunteerRow} testID={`volunteer-${volunteer.id}`}>
+      <Text style={styles.volunteerName}>{volunteer.name}</Text>
+      {contact.length > 0 && (
+        <Text style={styles.volunteerContact}>{contact}</Text>
+      )}
+      {volunteer.hasPhoto && (
+        <Text style={styles.volunteerPhotoTag}>adjuntó foto</Text>
+      )}
     </View>
   );
 }
@@ -324,6 +416,31 @@ const styles = StyleSheet.create({
   },
   description: { color: colors.ink, fontSize: 12, lineHeight: 17 },
   meta: { color: colors.inkSoft, fontSize: 10, lineHeight: 15 },
+  // CHG-148: acceso y lista de voluntarios (PII, solo super_admin).
+  volunteersToggle: { alignSelf: "flex-start", paddingVertical: 4 },
+  volunteersToggleText: {
+    color: colors.cyan,
+    fontFamily: fontFamilies.mono,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+  },
+  volunteersList: {
+    gap: 6,
+    marginTop: 2,
+    paddingLeft: 10,
+    borderLeftWidth: 2,
+    borderLeftColor: "rgba(81,229,255,0.3)",
+  },
+  volunteersError: { color: colors.emergency, fontSize: 10 },
+  volunteerRow: { gap: 1 },
+  volunteerName: { color: colors.ink, fontSize: 12, fontWeight: "700" },
+  volunteerContact: {
+    color: colors.inkSoft,
+    fontFamily: fontFamilies.mono,
+    fontSize: 10,
+  },
+  volunteerPhotoTag: { color: colors.inkDim, fontSize: 9 },
   deleteLink: { alignSelf: "flex-start", paddingVertical: 4 },
   dangerButton: {
     minHeight: 34,

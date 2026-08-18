@@ -189,6 +189,11 @@ function createDataSource(
       total: 0,
       generatedAt: "2026-08-17T12:00:00Z",
     }),
+    listHelpRequestVolunteers: jest.fn().mockResolvedValue({
+      items: [],
+      total: 0,
+      generatedAt: "2026-08-17T12:00:00Z",
+    }),
     deleteHelpRequest: jest.fn().mockResolvedValue({ deleted: 1 }),
     purgeHelpRequests: jest.fn().mockResolvedValue({ deleted: 0 }),
     resetPlatform: jest.fn().mockResolvedValue({

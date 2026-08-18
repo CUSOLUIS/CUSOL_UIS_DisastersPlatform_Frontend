@@ -286,6 +286,8 @@ export interface AdminHelpRequest {
   expiresAt: string;
   expired: boolean;
   attendersCount: number;
+  // CHG-148: voluntarios anónimos con datos privados que ver.
+  volunteersCount: number;
   hasPhoto: boolean;
 }
 
@@ -297,6 +299,22 @@ export interface AdminHelpRequestPage {
 
 export interface AdminHelpRequestDeleteReceipt {
   deleted: number;
+}
+
+// CHG-148 — Voluntario anónimo visto por el super_admin (PII descifrada).
+export interface AdminHelpRequestVolunteer {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  hasPhoto: boolean;
+  createdAt: string;
+}
+
+export interface AdminHelpRequestVolunteerPage {
+  items: AdminHelpRequestVolunteer[];
+  total: number;
+  generatedAt: string;
 }
 
 // CHG-139 — Reinicio absoluto: la frase exacta que exige el gateway y
@@ -363,6 +381,11 @@ export interface AdminDataSource {
   // CHG-138: gestión de solicitudes de ayuda — ver TODO (activas y
   // expiradas), borrar una a una o vaciarlas por completo.
   listHelpRequests(signal?: AbortSignal): Promise<AdminHelpRequestPage>;
+  // CHG-148: voluntarios anónimos de una solicitud (PII descifrada).
+  listHelpRequestVolunteers(
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<AdminHelpRequestVolunteerPage>;
   deleteHelpRequest(id: string): Promise<AdminHelpRequestDeleteReceipt>;
   purgeHelpRequests(): Promise<AdminHelpRequestDeleteReceipt>;
   // CHG-139: reinicio absoluto (frase de confirmación obligatoria).

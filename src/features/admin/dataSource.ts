@@ -10,6 +10,8 @@ import type {
   AdminHelpRequest,
   AdminHelpRequestDeleteReceipt,
   AdminHelpRequestPage,
+  AdminHelpRequestVolunteer,
+  AdminHelpRequestVolunteerPage,
   AdminPlatformResetReceipt,
   AdminSystemMetrics,
   AdminVisitorPresencePage,
@@ -169,6 +171,12 @@ const apiAdminDataSource: AdminDataSource = {
       "/api/v1/admin/help-requests?limit=200",
       { signal },
     ),
+  // CHG-148: voluntarios anónimos de una solicitud (PII descifrada).
+  listHelpRequestVolunteers: (id, signal) =>
+    apiRequest<AdminHelpRequestVolunteerPage>(
+      `/api/v1/admin/help-requests/${id}/volunteers`,
+      { signal },
+    ),
   deleteHelpRequest: (id) =>
     apiRequest<AdminHelpRequestDeleteReceipt>(
       `/api/v1/admin/help-requests/${id}`,
@@ -204,6 +212,7 @@ const demoHelpRequests: AdminHelpRequest[] = [
     expiresAt: new Date(Date.now() + 6 * 3_600_000).toISOString(),
     expired: false,
     attendersCount: 2,
+    volunteersCount: 1,
     hasPhoto: false,
   },
   {
@@ -219,7 +228,21 @@ const demoHelpRequests: AdminHelpRequest[] = [
     expiresAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
     expired: true,
     attendersCount: 5,
+    volunteersCount: 0,
     hasPhoto: false,
+  },
+];
+
+// CHG-148: voluntarios de la solicitud demo (PII visible solo en la
+// consola super_admin).
+const demoVolunteers: AdminHelpRequestVolunteer[] = [
+  {
+    id: "5d3f9a10-2222-4c2d-9e3f-000000000001",
+    name: "María Restrepo",
+    phone: "+57 300 123 4567",
+    email: "maria@example.com",
+    hasPhoto: false,
+    createdAt: new Date(Date.now() - 1_800_000).toISOString(),
   },
 ];
 
@@ -770,6 +793,17 @@ export const demoAdminDataSource: AdminDataSource = {
     return clone({
       items: demoHelpRequests,
       total: demoHelpRequests.length,
+      generatedAt: nowIso(),
+    });
+  },
+  // CHG-148: la primera solicitud demo trae un voluntario; el resto,
+  // ninguno.
+  async listHelpRequestVolunteers(id) {
+    const items =
+      id === demoHelpRequests[0]?.id ? demoVolunteers : [];
+    return clone({
+      items,
+      total: items.length,
       generatedAt: nowIso(),
     });
   },

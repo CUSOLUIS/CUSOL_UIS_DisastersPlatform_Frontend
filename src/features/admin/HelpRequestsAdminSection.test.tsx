@@ -25,6 +25,7 @@ const activeRequest: AdminHelpRequest = {
   expiresAt: "2026-08-18T10:00:00Z",
   expired: false,
   attendersCount: 2,
+  volunteersCount: 1,
   hasPhoto: false,
 };
 
@@ -34,6 +35,7 @@ const expiredRequest: AdminHelpRequest = {
   publicCode: "HR-2026-BBBB2222",
   expired: true,
   attendersCount: 0,
+  volunteersCount: 0,
   notificationRadiusKm: null,
 };
 
@@ -55,12 +57,33 @@ function sectionDataSource(
     state.items = [];
     return { deleted };
   });
+  const listHelpRequestVolunteers = jest.fn(async () => ({
+    items: [
+      {
+        id: "v-1",
+        name: "María Restrepo",
+        phone: "+57 300 123 4567",
+        email: "maria@example.com",
+        hasPhoto: false,
+        createdAt: "2026-08-17T11:00:00Z",
+      },
+    ],
+    total: 1,
+    generatedAt: "2026-08-17T12:00:00Z",
+  }));
   const dataSource = {
     listHelpRequests,
+    listHelpRequestVolunteers,
     deleteHelpRequest,
     purgeHelpRequests,
   } as unknown as AdminDataSource;
-  return { dataSource, listHelpRequests, deleteHelpRequest, purgeHelpRequests };
+  return {
+    dataSource,
+    listHelpRequests,
+    listHelpRequestVolunteers,
+    deleteHelpRequest,
+    purgeHelpRequests,
+  };
 }
 
 describe("HelpRequestsAdminSection (CHG-138)", () => {
@@ -76,6 +99,25 @@ describe("HelpRequestsAdminSection (CHG-138)", () => {
     expect(screen.getByText("ACTIVA")).toBeTruthy();
     expect(screen.getByText("EXPIRADA")).toBeTruthy();
     expect(screen.getByText(/avisa a 10 km/)).toBeTruthy();
+  });
+
+  // CHG-148: el super_admin ve la PII de los voluntarios anónimos.
+  it("muestra los voluntarios anónimos con su contacto a demanda", async () => {
+    const { dataSource, listHelpRequestVolunteers } = sectionDataSource();
+    render(<HelpRequestsAdminSection dataSource={dataSource} />);
+
+    const toggle = await screen.findByRole("button", {
+      name: /Ver los voluntarios de HR-2026-AAAA1111/,
+    });
+    fireEvent.press(toggle);
+
+    expect(await screen.findByText("María Restrepo")).toBeTruthy();
+    expect(
+      screen.getByText("+57 300 123 4567 · maria@example.com"),
+    ).toBeTruthy();
+    expect(listHelpRequestVolunteers).toHaveBeenCalledWith(
+      activeRequest.id,
+    );
   });
 
   it("elimina una a una con confirmación y recarga", async () => {
