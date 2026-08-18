@@ -1280,6 +1280,51 @@ describe("Sesión en el encabezado", () => {
     );
   });
 
+  // CHG-149 — El super_admin ve el acceso al dashboard admin bajo Mi
+  // espacio.
+  it("muestra el dashboard admin en el menú solo para super_admin", async () => {
+    const superAdmin = { ...sessionAccount, assignedRole: "super_admin" as const };
+    const onOpenAdmin = jest.fn();
+    const authSource = {
+      register: jest.fn(),
+      login: jest.fn(),
+      verifyEmail: jest.fn(),
+      getCurrentAccount: jest.fn().mockResolvedValue(superAdmin),
+      logout: jest.fn(),
+    };
+    render(
+      <App
+        dataSource={demoDataSource}
+        authSource={authSource}
+        onOpenAdmin={onOpenAdmin}
+      />,
+    );
+
+    fireEvent.press(await screen.findByTestId("session-account-chip"));
+    const adminOption = screen.getByRole("button", {
+      name: "Abrir el dashboard de administración",
+    });
+    fireEvent.press(adminOption);
+    expect(onOpenAdmin).toHaveBeenCalled();
+  });
+
+  it("un usuario normal no ve el acceso al dashboard admin", async () => {
+    render(
+      <App
+        dataSource={demoDataSource}
+        authSource={authSourceWithSession()}
+        onOpenAdmin={jest.fn()}
+      />,
+    );
+
+    fireEvent.press(await screen.findByTestId("session-account-chip"));
+    expect(
+      screen.queryByRole("button", {
+        name: "Abrir el dashboard de administración",
+      }),
+    ).toBeNull();
+  });
+
   it("cierra la sesión y restaura iniciar sesión y registro", async () => {
     const logout = jest.fn().mockResolvedValue(undefined);
     render(

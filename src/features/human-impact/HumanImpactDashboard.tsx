@@ -35,6 +35,10 @@ import type {
 import { HelpRequestProximityAlert } from "../help-requests/HelpRequestProximityAlert";
 import { useActiveHelpRequests } from "../help-requests/useActiveHelpRequests";
 import { pickVolunteerPhoto } from "../help-requests/pickVolunteerPhoto";
+import {
+  useAccountNotifications,
+  type AccountNotifications,
+} from "../notifications/useAccountNotifications";
 import type { HelpRequestsDataSource } from "../help-requests/types";
 import { ReportActions } from "../missing-persons/MissingPersonCommandCenter";
 import { OperationalMapPanel } from "../operational-map/OperationalMapPanel";
@@ -219,6 +223,13 @@ export function HumanImpactDashboard({
   // CHG-069: menú desplegable de la cuenta y panel "Mi espacio".
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [mySpaceOpen, setMySpaceOpen] = useState(false);
+  // CHG-149: contador rojo de notificaciones no atendidas (novedades en
+  // los reportes propios + pendientes de la consola para super_admin).
+  const isSuperAdmin = account?.assignedRole === "super_admin";
+  const notifications = useAccountNotifications({
+    account,
+    isSuperAdmin: isSuperAdmin ?? false,
+  });
   const mapRef = useRef<View>(null);
   const dataRef = useRef<View>(null);
   const liveRef = useRef<View>(null);
@@ -317,12 +328,29 @@ export function HumanImpactDashboard({
           onLogout={onLogout}
           accountMenuOpen={accountMenuOpen}
           onToggleAccountMenu={() =>
-            setAccountMenuOpen((current) => !current)
+            setAccountMenuOpen((current) => {
+              // CHG-149: al abrir el menú se lee el mini-resumen; el
+              // contador rojo se limpia.
+              if (!current) {
+                notifications.markRead();
+              }
+              return !current;
+            })
           }
           onOpenMySpace={() => {
             setAccountMenuOpen(false);
             setMySpaceOpen(true);
           }}
+          isSuperAdmin={isSuperAdmin ?? false}
+          onOpenAdmin={
+            onOpenAdmin
+              ? () => {
+                  setAccountMenuOpen(false);
+                  onOpenAdmin();
+                }
+              : undefined
+          }
+          notifications={notifications}
         />
         <MySpacePanel
           visible={mySpaceOpen}
@@ -635,6 +663,9 @@ export function Header({
   accountMenuOpen,
   onToggleAccountMenu,
   onOpenMySpace,
+  isSuperAdmin = false,
+  onOpenAdmin,
+  notifications,
 }: {
   compact: boolean;
   narrow: boolean;
@@ -652,6 +683,10 @@ export function Header({
   accountMenuOpen: boolean;
   onToggleAccountMenu: () => void;
   onOpenMySpace: () => void;
+  // CHG-149: acceso al dashboard admin (super_admin) y contador rojo.
+  isSuperAdmin?: boolean;
+  onOpenAdmin?: () => void;
+  notifications?: AccountNotifications;
 }) {
   const reducedMotion = useReducedMotion();
   // CHG-090 (QA): en pantallas angostas la navegación vive en un menú
@@ -789,7 +824,11 @@ export function Header({
                   <Pressable
                     testID="session-account-chip"
                     accessibilityRole="button"
-                    accessibilityLabel={`Sesión activa de ${account.displayName}. Abrir menú de cuenta`}
+                    accessibilityLabel={
+                      notifications?.unread
+                        ? `Sesión activa de ${account.displayName}. ${notifications.count} notificaciones sin atender. Abrir menú de cuenta`
+                        : `Sesión activa de ${account.displayName}. Abrir menú de cuenta`
+                    }
                     onPress={onToggleAccountMenu}
                     style={[
                       styles.sessionChip,
@@ -810,11 +849,42 @@ export function Header({
                       {accountMenuOpen ? "▴" : "▾"}
                     </Text>
                   </Pressable>
+                  {/* CHG-149: contador rojo sobre el nombre cuando hay
+                      notificaciones nuevas sin atender. */}
+                  {notifications?.unread && notifications.count > 0 && (
+                    <View
+                      pointerEvents="none"
+                      testID="notifications-badge"
+                      style={styles.notificationsBadge}
+                    >
+                      <Text style={styles.notificationsBadgeText}>
+                        {notifications.count > 99 ? "99+" : notifications.count}
+                      </Text>
+                    </View>
+                  )}
                   {accountMenuOpen && (
                     <View
                       testID="session-account-menu"
                       style={styles.sessionMenu}
                     >
+                      {/* CHG-149: mini-resumen de lo que hay sin atender. */}
+                      {notifications && notifications.count > 0 && (
+                        <View style={styles.sessionMenuSummary}>
+                          {notifications.adminPending > 0 && (
+                            <Text style={styles.sessionMenuSummaryText}>
+                              {notifications.adminPending} por revisar en la
+                              consola
+                            </Text>
+                          )}
+                          {notifications.ownNovelties > 0 && (
+                            <Text style={styles.sessionMenuSummaryText}>
+                              {notifications.ownNovelties} novedad
+                              {notifications.ownNovelties === 1 ? "" : "es"} en
+                              tus reportes
+                            </Text>
+                          )}
+                        </View>
+                      )}
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel="Abrir Mi espacio"
@@ -828,6 +898,23 @@ export function Header({
                           MI ESPACIO
                         </Text>
                       </Pressable>
+                      {/* CHG-149: acceso al dashboard admin, bajo Mi
+                          espacio, solo para super_admin. */}
+                      {isSuperAdmin && onOpenAdmin && (
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Abrir el dashboard de administración"
+                          onPress={onOpenAdmin}
+                          style={({ pressed }) => [
+                            styles.sessionMenuItem,
+                            pressed && styles.authButtonPressed,
+                          ]}
+                        >
+                          <Text style={styles.sessionMenuItemText}>
+                            DASHBOARD ADMIN
+                          </Text>
+                        </Pressable>
+                      )}
                     </View>
                   )}
                 </View>
@@ -1483,6 +1570,42 @@ const styles = StyleSheet.create({
   sessionChipHolder: {
     position: "relative",
     zIndex: 30,
+  },
+  // CHG-149: contador rojo de notificaciones, sobre el nombre.
+  notificationsBadge: {
+    position: "absolute",
+    top: -8,
+    right: -6,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.emergency,
+    borderWidth: 1,
+    borderColor: colors.canvas,
+    zIndex: 40,
+  },
+  notificationsBadgeText: {
+    color: "#ffffff",
+    fontFamily: fontFamilies.mono,
+    // CHG-108: el piso legible se respeta con font().
+    fontSize: font(9),
+    fontWeight: "900",
+  },
+  sessionMenuSummary: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
+    backgroundColor: "rgba(255,77,94,0.06)",
+  },
+  sessionMenuSummaryText: {
+    color: colors.inkSoft,
+    fontSize: 11,
+    lineHeight: 16,
   },
   sessionMenu: {
     position: "absolute",
