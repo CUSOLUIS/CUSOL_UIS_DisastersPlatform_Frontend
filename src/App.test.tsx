@@ -378,9 +378,9 @@ describe("App universal", () => {
     ).toBe(0);
     expect(shouldStackReportActions(620)).toBe(false);
     expect(shouldStackReportActions(619)).toBe(true);
-    // CHG-090 (QA): máximo 3 columnas — grid 3x2 en escritorio.
-    expect(getReportActionColumns(1380)).toBe(3);
-    expect(getReportActionColumns(1280)).toBe(3);
+    // CHG-158: 4 columnas en escritorio ancho; 3 en el rango medio.
+    expect(getReportActionColumns(1380)).toBe(4);
+    expect(getReportActionColumns(1280)).toBe(4);
     expect(getReportActionColumns(1279)).toBe(3);
     expect(getReportActionColumns(1080)).toBe(3);
     expect(getReportActionColumns(1079)).toBe(2);

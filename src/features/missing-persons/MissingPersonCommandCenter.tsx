@@ -47,7 +47,7 @@ interface ReportActionsProps {
   compact: boolean;
 }
 
-type ReportActionColumns = 1 | 2 | 3 | 6;
+type ReportActionColumns = 1 | 2 | 3 | 4 | 6;
 
 const reportActionIconColor = "#174d59";
 
@@ -252,8 +252,9 @@ export function shouldStackReportActions(width: number): boolean {
 }
 
 export function getReportActionColumns(width: number): ReportActionColumns {
-  // CHG-090 (QA): máximo 3 columnas — grid 3x2 en escritorio para dar
-  // respiración y mayor área de clic; nunca 6 tarjetas comprimidas.
+  // CHG-090 (QA): nunca 6 tarjetas comprimidas en una fila.
+  // CHG-158: con 9 tarjetas, el escritorio ancho pasa a 4 por fila
+  // (tarjetas más angostas); el rango medio conserva las 3.
   if (width < 620) {
     return 1;
   }
@@ -262,7 +263,11 @@ export function getReportActionColumns(width: number): ReportActionColumns {
     return 2;
   }
 
-  return 3;
+  if (width < 1280) {
+    return 3;
+  }
+
+  return 4;
 }
 
 function ReportAction({
@@ -280,7 +285,7 @@ function ReportAction({
   onPress: () => void;
   testID: string;
 }) {
-  const dense = columns === 3 || columns === 6;
+  const dense = columns === 3 || columns === 4 || columns === 6;
 
   return (
     <Pressable
@@ -292,6 +297,7 @@ function ReportAction({
       style={({ pressed }) => [
         styles.reportAction,
         columns === 6 && styles.reportActionSixColumns,
+        columns === 4 && styles.reportActionFourColumns,
         columns === 3 && styles.reportActionThreeColumns,
         columns === 2 && styles.reportActionTwoColumns,
         columns === 1 && styles.reportActionSingleColumn,
@@ -681,6 +687,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   reportActionSixColumns: { flexBasis: "15%" },
+  // CHG-158: 4 por fila en escritorio ancho.
+  reportActionFourColumns: { flexBasis: "23%" },
   reportActionThreeColumns: { flexBasis: "31%" },
   reportActionTwoColumns: { flexBasis: "48%" },
   reportActionSingleColumn: { width: "100%", flexBasis: "100%" },
