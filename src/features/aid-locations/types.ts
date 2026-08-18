@@ -25,6 +25,25 @@ export const AID_LOCATION_PARENT_KIND: Partial<
   distribution_point: "receiver_center",
 };
 
+// CHG-161 — Tipos cuya alta exige sesión (portón en el formulario; el
+// refuerzo server-side queda en F2): el acopio local y el punto de
+// distribución, igual que los transportes.
+export const AID_LOCATION_REQUIRES_SESSION: Record<AidLocationKind, boolean> = {
+  collection_point: false,
+  collection_center: true,
+  receiver_center: false,
+  distribution_point: true,
+};
+
+export const aidLocationSessionExplanation: Partial<
+  Record<AidLocationKind, string>
+> = {
+  collection_center:
+    "Inscribir un centro de acopio local exige iniciar sesión: la logística humanitaria necesita una persona responsable con cuenta.",
+  distribution_point:
+    "Registrar un punto de distribución exige iniciar sesión: la logística humanitaria necesita una persona responsable con cuenta.",
+};
+
 // Espejo de `AidLocationInput` del contrato.
 export const MIN_NAME_LENGTH = 2;
 export const MAX_NAME_LENGTH = 180;

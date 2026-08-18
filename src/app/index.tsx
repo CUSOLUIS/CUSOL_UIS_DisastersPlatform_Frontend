@@ -29,6 +29,9 @@ export default function HomeRoute() {
       onRegisterDistributionPoint={() =>
         router.push("/registrar-punto-distribucion")
       }
+      onRegisterMuleTransport={() => router.push("/registrar-mulera")}
+      onRegisterBoatTransport={() => router.push("/registrar-lanchera")}
+      onReportDamagedHome={() => router.push("/reportar-casita-partida")}
       onRequestHelp={() => router.push("/necesitamos-ayuda")}
       initialDirectorySearch={typeof buscar === "string" ? buscar : undefined}
     />

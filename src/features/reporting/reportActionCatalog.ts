@@ -17,6 +17,11 @@ export type ReportActionId =
   | "distribution-point"
   | "community-meals"
   | "temporary-shelter"
+  // CHG-161: transporte de insumos con trazabilidad.
+  | "mule-transport"
+  | "boat-transport"
+  // CHG-162: informe de hogar en malas condiciones.
+  | "damaged-home"
   // CHG-125: solicitud pública de ayuda de emergencia.
   | "help-request";
 
@@ -83,6 +88,33 @@ export const reportActionCatalog: Record<ReportActionId, ReportActionCopy> = {
     purpose:
       "Registra un punto donde las personas afectadas pueden recibir alimentos, agua y elementos de primera necesidad.",
     hint: "Registra un punto donde las personas afectadas pueden recibir alimentos, agua y elementos de primera necesidad",
+  },
+  // CHG-161: transporte de insumos entre acopio local y receptor;
+  // exige sesión (trazabilidad con responsable).
+  "mule-transport": {
+    id: "mule-transport",
+    category: "LOGÍSTICA · TRANSPORTE POR TIERRA",
+    title: "La mulera",
+    purpose:
+      "Registra la mula que llevará insumos desde un centro de acopio local hasta un centro de acopio receptor, con trazabilidad de los suministros.",
+    hint: "Registra la mula que llevará insumos desde un centro de acopio local hasta un centro de acopio receptor, con trazabilidad de los suministros",
+  },
+  "boat-transport": {
+    id: "boat-transport",
+    category: "LOGÍSTICA · TRANSPORTE FLUVIAL",
+    title: "La lanchera",
+    purpose:
+      "Registra la lancha que llevará insumos desde un centro de acopio local hasta un centro de acopio receptor, con trazabilidad de los suministros.",
+    hint: "Registra la lancha que llevará insumos desde un centro de acopio local hasta un centro de acopio receptor, con trazabilidad de los suministros",
+  },
+  // CHG-162: el informe sale también en el mapa (categoría propia).
+  "damaged-home": {
+    id: "damaged-home",
+    category: "HOGAR · DAÑOS GRAVES",
+    title: "Mi casita partida",
+    purpose:
+      "Genera un informe sobre un hogar que quedó en muy malas condiciones; también aparecerá en el mapa.",
+    hint: "Genera un informe sobre un hogar que quedó en muy malas condiciones; también aparecerá en el mapa",
   },
   "community-meals": {
     id: "community-meals",

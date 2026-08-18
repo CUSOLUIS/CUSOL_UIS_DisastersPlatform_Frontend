@@ -76,6 +76,10 @@ interface HumanImpactDashboardProps {
   // CHG-153: acopio receptor y punto de distribución.
   onRegisterReceiverCenter: () => void;
   onRegisterDistributionPoint: () => void;
+  // CHG-161/162: transportes y hogar en malas condiciones.
+  onRegisterMuleTransport: () => void;
+  onRegisterBoatTransport: () => void;
+  onReportDamagedHome: () => void;
   onOfferCommunityMeals: () => void;
   onOfferTemporaryShelter: () => void;
   onRequestHelp: () => void;
@@ -204,6 +208,9 @@ export function HumanImpactDashboard({
   onRegisterDonationPoint,
   onRegisterReceiverCenter,
   onRegisterDistributionPoint,
+  onRegisterMuleTransport,
+  onRegisterBoatTransport,
+  onReportDamagedHome,
   onOfferCommunityMeals,
   onOfferTemporaryShelter,
   onRequestHelp,
@@ -441,6 +448,9 @@ export function HumanImpactDashboard({
                 onRegisterDonationPoint={onRegisterDonationPoint}
                 onRegisterReceiverCenter={onRegisterReceiverCenter}
                 onRegisterDistributionPoint={onRegisterDistributionPoint}
+                onRegisterMuleTransport={onRegisterMuleTransport}
+                onRegisterBoatTransport={onRegisterBoatTransport}
+                onReportDamagedHome={onReportDamagedHome}
                 onOfferCommunityMeals={onOfferCommunityMeals}
                 onOfferTemporaryShelter={onOfferTemporaryShelter}
                 onRequestHelp={onRequestHelp}

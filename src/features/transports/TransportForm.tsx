@@ -15,179 +15,128 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { fieldGridLayout } from "../../components/fieldGrid";
 import { InnerRouteHeader } from "../../components/InnerRouteHeader";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
+import type { AidLocationParentCandidate } from "../aid-locations/types";
+import { SessionGate } from "../auth/SessionGate";
 import {
   useSessionAccount,
   type SessionAccountSource,
 } from "../auth/useSessionAccount";
-import { parseDraftCoordinates } from "../missing-persons/geocoding";
-import { LastSeenLocationPicker } from "../missing-persons/LastSeenLocationPicker";
-import {
-  MapScrollLockProvider,
-  useMapScrollLockController,
-} from "../operational-map/mapScrollLock";
 import {
   ReportRejectedError,
   createIdempotencyKey,
   type SubmitReportOptions,
 } from "../missing-persons/reportSubmission";
-import { ReportConsiderations } from "../reporting/ReportConsiderations";
 import {
-  fetchParentCandidates,
-  submitAidLocation,
+  fetchTransportCenterCandidates,
+  submitTransport,
 } from "./reportSubmission";
-import { SessionGate } from "../auth/SessionGate";
 import {
-  AID_LOCATION_PARENT_KIND,
-  AID_LOCATION_REQUIRES_SESSION,
-  aidLocationSessionExplanation,
-  MAX_ADDRESS_LENGTH,
-  MAX_CITY_LENGTH,
-  MAX_CONTACT_LENGTH,
-  MAX_DESCRIPTION_LENGTH,
-  MAX_NAME_LENGTH,
-  MAX_SCHEDULE_LENGTH,
-  MIN_ADDRESS_LENGTH,
-  MIN_NAME_LENGTH,
-  aidLocationFormCopy,
-  aidLocationKindLabel,
-  type AidLocationDraft,
-  type AidLocationKind,
-  type AidLocationParentCandidate,
-  type AidLocationReceipt,
+  MAX_SUPPLIES_LENGTH,
+  MAX_TRANSPORT_CITY_LENGTH,
+  transportFormCopy,
+  transportKindLabel,
+  transportSideCopy,
+  transportStatusLabel,
+  type TransportDraft,
+  type TransportKind,
+  type TransportReceipt,
+  type TransportSide,
 } from "./types";
 
-// CHG-153 — Formulario único de alta de los cuatro tipos de puntos
-// logísticos, con la misma silueta de los reportes ciudadanos
-// (plantilla «Necesitamos ayuda»). Los tipos dependientes (recolección
-// y distribución) exigen elegir el centro asociado de su ciudad; los
-// candidatos los filtra el backend y el servicio revalida al crear.
+// CHG-161 — Formulario compartido de «La mulera» y «La lanchera»:
+// exige sesión (portón; el gateway refuerza con 401), pide ciudad y
+// centro de cada lado del viaje (candidatos de CHG-153, filtrados por
+// el backend y revalidados al crear) y publica con constancia.
 
-export const initialAidLocationDraft: AidLocationDraft = {
-  name: "",
-  address: "",
-  municipality: "",
-  department: "",
-  latitude: "",
-  longitude: "",
-  schedule: "",
-  contact: "",
-  description: "",
-  parentId: "",
+export const initialTransportDraft: TransportDraft = {
+  originMunicipality: "",
+  originLocationId: "",
+  destinationMunicipality: "",
+  destinationLocationId: "",
+  suppliesSummary: "",
   truthConfirmed: false,
 };
 
-export type AidLocationIssueField =
-  | keyof AidLocationDraft
-  | "location";
+export type TransportIssueField = keyof TransportDraft;
 
-export interface AidLocationIssue {
-  field: AidLocationIssueField;
+export interface TransportIssue {
+  field: TransportIssueField;
   message: string;
 }
 
-// Espejo del contrato (`AidLocationInput`): las mismas reglas que
-// aplicará el backend, avisadas antes del viaje.
-export function collectAidLocationIssues(
-  kind: AidLocationKind,
-  draft: AidLocationDraft,
-): AidLocationIssue[] {
-  const issues: AidLocationIssue[] = [];
-  const push = (field: AidLocationIssueField, message: string) =>
+// Espejo del contrato (`HumanitarianTransportInput`): las mismas
+// reglas que aplicará el backend, avisadas antes del viaje.
+export function collectTransportIssues(
+  draft: TransportDraft,
+): TransportIssue[] {
+  const issues: TransportIssue[] = [];
+  const push = (field: TransportIssueField, message: string) =>
     issues.push({ field, message });
 
-  const name = draft.name.trim();
-  if (name.length < MIN_NAME_LENGTH) {
-    push("name", `Escribe el nombre del punto (mínimo ${MIN_NAME_LENGTH} caracteres).`);
-  } else if (name.length > MAX_NAME_LENGTH) {
-    push("name", `El nombre no puede superar los ${MAX_NAME_LENGTH} caracteres.`);
+  if (!draft.originMunicipality.trim()) {
+    push("originMunicipality", "Indica la ciudad de la que salen los insumos.");
   }
-
-  if (!draft.municipality.trim()) {
-    push("municipality", "Indica el municipio donde funciona el punto.");
-  }
-  if (!draft.department.trim()) {
-    push("department", "Indica el departamento donde funciona el punto.");
-  }
-
-  const address = draft.address.trim();
-  if (address.length < MIN_ADDRESS_LENGTH) {
-    push("address", "Escribe la dirección del lugar o resuélvela desde el mapa.");
-  } else if (address.length > MAX_ADDRESS_LENGTH) {
-    push("address", `La dirección no puede superar los ${MAX_ADDRESS_LENGTH} caracteres.`);
-  }
-
-  const coordinates = parseDraftCoordinates(draft.latitude, draft.longitude);
-  if (
-    coordinates &&
-    (coordinates.latitude < -90 ||
-      coordinates.latitude > 90 ||
-      coordinates.longitude < -180 ||
-      coordinates.longitude > 180)
-  ) {
-    push("location", "Las coordenadas del punto están fuera de rango.");
-  }
-
-  // Dependencia obligatoria (§6): recolección exige acopio local;
-  // distribución exige acopio receptor.
-  if (AID_LOCATION_PARENT_KIND[kind] && !draft.parentId.trim()) {
+  if (!draft.originLocationId.trim()) {
     push(
-      "parentId",
-      `Elige el ${aidLocationFormCopy[kind].parentLabel?.toLocaleLowerCase("es-CO")}.`,
+      "originLocationId",
+      "Elige el centro de acopio local del que sale el transporte.",
     );
   }
-
-  if (draft.description.trim().length > MAX_DESCRIPTION_LENGTH) {
+  if (!draft.destinationMunicipality.trim()) {
     push(
-      "description",
-      `La descripción no puede superar los ${MAX_DESCRIPTION_LENGTH} caracteres.`,
+      "destinationMunicipality",
+      "Indica la ciudad a la que llegan los insumos.",
     );
   }
-
+  if (!draft.destinationLocationId.trim()) {
+    push(
+      "destinationLocationId",
+      "Elige el centro de acopio receptor al que llega el transporte.",
+    );
+  }
+  if (draft.suppliesSummary.trim().length > MAX_SUPPLIES_LENGTH) {
+    push(
+      "suppliesSummary",
+      `La descripción de los insumos no puede superar los ${MAX_SUPPLIES_LENGTH} caracteres.`,
+    );
+  }
   if (!draft.truthConfirmed) {
-    push("truthConfirmed", "Debes confirmar que la información es real.");
+    push("truthConfirmed", "Debes confirmar que el transporte es real.");
   }
 
   return issues;
 }
 
-// Sección (01..05) de cada campo, para el scroll al primer error.
+// Sección (01..04) de cada campo, para el scroll al primer error.
 const FIELD_SECTIONS: Record<string, string> = {
-  name: "01",
-  municipality: "02",
-  department: "02",
-  address: "02",
-  location: "02",
-  latitude: "02",
-  longitude: "02",
-  parentId: "03",
-  schedule: "04",
-  contact: "04",
-  description: "04",
-  truthConfirmed: "05",
+  originMunicipality: "01",
+  originLocationId: "01",
+  destinationMunicipality: "02",
+  destinationLocationId: "02",
+  suppliesSummary: "03",
+  truthConfirmed: "04",
 };
 
-type ParentCandidatesState =
+type CandidatesState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "success"; items: AidLocationParentCandidate[] }
   | { status: "error"; message: string };
 
-interface AidLocationFormProps {
-  kind: AidLocationKind;
+interface TransportFormProps {
+  kind: TransportKind;
   onBack: () => void;
   onHome?: () => void;
   onRegister?: () => void;
   onLogin?: () => void;
   sessionSource?: SessionAccountSource;
-  // CHG-080: obtención de la posición GPS, inyectable en pruebas.
-  locateVisitor?: () => Promise<{ latitude: number; longitude: number }>;
-  submitLocation?: (
-    kind: AidLocationKind,
-    draft: AidLocationDraft,
+  submitTransportReport?: (
+    kind: TransportKind,
+    draft: TransportDraft,
     options?: SubmitReportOptions,
-  ) => Promise<AidLocationReceipt>;
-  loadParentCandidates?: (
-    kind: AidLocationKind,
+  ) => Promise<TransportReceipt>;
+  loadCenterCandidates?: (
+    side: TransportSide,
     municipality: string,
     options?: { signal?: AbortSignal },
   ) => Promise<AidLocationParentCandidate[]>;
@@ -209,97 +158,115 @@ const candidateStatusLabel: Record<string, string> = {
   under_observation: "EN OBSERVACIÓN",
 };
 
-export function AidLocationForm({
+// Campos del borrador que guardan la ciudad y el centro de cada lado.
+const SIDE_FIELDS: Record<
+  TransportSide,
+  { municipality: "originMunicipality" | "destinationMunicipality";
+    locationId: "originLocationId" | "destinationLocationId" }
+> = {
+  origin: {
+    municipality: "originMunicipality",
+    locationId: "originLocationId",
+  },
+  destination: {
+    municipality: "destinationMunicipality",
+    locationId: "destinationLocationId",
+  },
+};
+
+export function TransportForm({
   kind,
   onBack,
   onHome,
   onRegister,
   onLogin,
   sessionSource,
-  locateVisitor,
-  submitLocation = submitAidLocation,
-  loadParentCandidates = (candidateKind, municipality, options) =>
-    fetchParentCandidates(candidateKind, municipality, options),
-}: AidLocationFormProps) {
-  const copy = aidLocationFormCopy[kind];
-  const requiresParent = AID_LOCATION_PARENT_KIND[kind] !== undefined;
+  submitTransportReport = submitTransport,
+  loadCenterCandidates = (side, municipality, options) =>
+    fetchTransportCenterCandidates(side, municipality, options),
+}: TransportFormProps) {
+  const copy = transportFormCopy[kind];
   const { width } = useWindowDimensions();
   const compact = width < 760;
   const session = useSessionAccount(sessionSource);
-  const [draft, setDraft] = useState<AidLocationDraft>(
-    initialAidLocationDraft,
-  );
+  const [draft, setDraft] = useState<TransportDraft>(initialTransportDraft);
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [receipt, setReceipt] = useState<AidLocationReceipt | null>(null);
+  const [receipt, setReceipt] = useState<TransportReceipt | null>(null);
   const [invalidFields, setInvalidFields] = useState<Set<string>>(
     () => new Set(),
   );
-  const [candidates, setCandidates] = useState<ParentCandidatesState>({
+  const [originCandidates, setOriginCandidates] = useState<CandidatesState>({
     status: "idle",
   });
+  const [destinationCandidates, setDestinationCandidates] =
+    useState<CandidatesState>({ status: "idle" });
   const idempotencyKeyRef = useRef<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Record<string, number>>({});
-  // CHG-155: el gesto que nace en el mapa no desplaza el formulario.
-  const { scrollEnabled, scrollLock } = useMapScrollLockController();
 
   const registerSection = (code: string, y: number) => {
     sectionOffsets.current[code] = y;
   };
 
-  const setField = <Key extends keyof AidLocationDraft>(
+  const setField = <Key extends keyof TransportDraft>(
     key: Key,
-    value: AidLocationDraft[Key],
+    value: TransportDraft[Key],
   ) => setDraft((current) => ({ ...current, [key]: value }));
 
-  // Los candidatos dependen de la ciudad escrita: al cambiarla se
+  // Los candidatos de cada lado dependen de su ciudad: al cambiarla se
   // consultan de nuevo (con un respiro para no disparar por tecla) y
   // se descarta la selección previa si ya no aplica.
-  const municipality = draft.municipality.trim();
-  useEffect(() => {
-    if (!requiresParent) {
-      return;
-    }
-    if (!municipality) {
-      setCandidates({ status: "idle" });
-      setField("parentId", "");
-      return;
-    }
-    const controller = new AbortController();
-    const timer = globalThis.setTimeout(() => {
-      setCandidates({ status: "loading" });
-      loadParentCandidates(kind, municipality, {
-        signal: controller.signal,
-      })
-        .then((items) => {
-          setCandidates({ status: "success", items });
-          setDraft((current) =>
-            current.parentId &&
-            !items.some((item) => item.id === current.parentId)
-              ? { ...current, parentId: "" }
-              : current,
-          );
+  const useSideCandidates = (
+    side: TransportSide,
+    setCandidates: (state: CandidatesState) => void,
+  ) => {
+    const fields = SIDE_FIELDS[side];
+    const municipality = draft[fields.municipality].trim();
+    useEffect(() => {
+      if (!municipality) {
+        setCandidates({ status: "idle" });
+        setField(fields.locationId, "");
+        return;
+      }
+      const controller = new AbortController();
+      const timer = globalThis.setTimeout(() => {
+        setCandidates({ status: "loading" });
+        loadCenterCandidates(side, municipality, {
+          signal: controller.signal,
         })
-        .catch((error: unknown) => {
-          if (error instanceof Error && error.name === "AbortError") {
-            return;
-          }
-          setCandidates({
-            status: "error",
-            message:
-              "No fue posible consultar los centros de esta ciudad. Intenta de nuevo.",
+          .then((items) => {
+            setCandidates({ status: "success", items });
+            setDraft((current) =>
+              current[fields.locationId] &&
+              !items.some((item) => item.id === current[fields.locationId])
+                ? { ...current, [fields.locationId]: "" }
+                : current,
+            );
+          })
+          .catch((error: unknown) => {
+            if (error instanceof Error && error.name === "AbortError") {
+              return;
+            }
+            setCandidates({
+              status: "error",
+              message:
+                "No fue posible consultar los centros de esta ciudad. Intenta de nuevo.",
+            });
           });
-        });
-    }, 600);
-    return () => {
-      controller.abort();
-      globalThis.clearTimeout(timer);
-    };
-    // `loadParentCandidates` queda fuera de las dependencias adrede:
-    // el valor por defecto se recrea en cada render y relanzaría la
-    // consulta en bucle.
-  }, [kind, municipality, requiresParent]);
+      }, 600);
+      return () => {
+        controller.abort();
+        globalThis.clearTimeout(timer);
+      };
+      // `loadCenterCandidates` queda fuera de las dependencias adrede:
+      // el valor por defecto se recrea en cada render y relanzaría la
+      // consulta en bucle.
+    }, [side, municipality]);
+  };
+
+  useSideCandidates("origin", setOriginCandidates);
+  useSideCandidates("destination", setDestinationCandidates);
 
   const scrollToField = (field: string) => {
     const section = FIELD_SECTIONS[field];
@@ -313,7 +280,7 @@ export function AidLocationForm({
   };
 
   const submit = async () => {
-    const issues = collectAidLocationIssues(kind, draft);
+    const issues = collectTransportIssues(draft);
     setFormErrors(issues.map((issue) => issue.message));
     setInvalidFields(new Set(issues.map((issue) => issue.field)));
     if (issues.length > 0) {
@@ -325,7 +292,7 @@ export function AidLocationForm({
     idempotencyKeyRef.current ??= createIdempotencyKey();
     try {
       setReceipt(
-        await submitLocation(kind, draft, {
+        await submitTransportReport(kind, draft, {
           idempotencyKey: idempotencyKeyRef.current,
         }),
       );
@@ -334,7 +301,7 @@ export function AidLocationForm({
       setFormErrors([
         error instanceof Error
           ? error.message
-          : "No fue posible registrar el punto. Intenta nuevamente.",
+          : "No fue posible registrar el transporte. Intenta nuevamente.",
       ]);
       if (error instanceof ReportRejectedError && error.fields.length > 0) {
         setInvalidFields(new Set(error.fields));
@@ -352,16 +319,22 @@ export function AidLocationForm({
 
   if (receipt) {
     return (
-      <LocationConfirmation receipt={receipt} onHome={onHome ?? onBack} />
+      <TransportConfirmation receipt={receipt} onHome={onHome ?? onBack} />
     );
   }
 
-  const parentSectionBody = () => {
+  const sideSectionBody = (
+    side: TransportSide,
+    candidates: CandidatesState,
+  ) => {
+    const fields = SIDE_FIELDS[side];
+    const sideCopy = transportSideCopy[side];
+    const municipality = draft[fields.municipality].trim();
     if (!municipality) {
       return (
         <Text style={styles.fieldNote}>
-          Escribe primero el municipio (sección 02): los centros
-          disponibles dependen de la ciudad.
+          Escribe primero la ciudad: los centros disponibles dependen de
+          ella.
         </Text>
       );
     }
@@ -376,11 +349,10 @@ export function AidLocationForm({
       );
     }
     if (candidates.status === "success" && candidates.items.length === 0) {
-      // §6 del contrato: sin centro disponible no hay registro posible.
       return (
-        <View style={styles.missingParent} accessibilityRole="alert">
-          <Text style={styles.missingParentText}>
-            {copy.missingParentMessage}
+        <View style={styles.missingCenter} accessibilityRole="alert">
+          <Text style={styles.missingCenterText}>
+            {sideCopy.missingCenterMessage}
           </Text>
         </View>
       );
@@ -390,22 +362,22 @@ export function AidLocationForm({
         <View
           style={styles.candidateList}
           accessibilityRole="radiogroup"
-          accessibilityLabel={copy.parentLabel}
+          accessibilityLabel={sideCopy.centerLabel}
         >
           {candidates.items.map((candidate) => {
-            const selected = draft.parentId === candidate.id;
+            const selected = draft[fields.locationId] === candidate.id;
             return (
               <Pressable
                 key={candidate.id}
                 accessibilityRole="radio"
                 accessibilityLabel={`${candidate.name}, ${candidate.address}`}
                 accessibilityState={{ selected }}
-                onPress={() => setField("parentId", candidate.id)}
+                onPress={() => setField(fields.locationId, candidate.id)}
                 style={[
                   styles.candidate,
                   selected && styles.candidateSelected,
                 ]}
-                testID={`parent-candidate-${candidate.id}`}
+                testID={`${side}-center-${candidate.id}`}
               >
                 <View style={styles.candidateCopy}>
                   <Text style={styles.candidateName}>{candidate.name}</Text>
@@ -431,8 +403,39 @@ export function AidLocationForm({
     return null;
   };
 
+  const sideSection = (
+    code: string,
+    side: TransportSide,
+    candidates: CandidatesState,
+  ) => {
+    const fields = SIDE_FIELDS[side];
+    const sideCopy = transportSideCopy[side];
+    return (
+      <FormSection
+        code={code}
+        title={sideCopy.sectionTitle}
+        description={sideCopy.sectionDescription}
+        onPosition={registerSection}
+      >
+        <FormField
+          label={sideCopy.cityLabel}
+          hint="Los centros disponibles dependen de la ciudad"
+          invalid={invalidFields.has(fields.municipality)}
+          value={draft[fields.municipality]}
+          maxLength={MAX_TRANSPORT_CITY_LENGTH}
+          onChangeText={(value) => setField(fields.municipality, value)}
+        />
+        {sideSectionBody(side, candidates)}
+        {invalidFields.has(fields.locationId) && (
+          <Text style={styles.errorText} accessibilityRole="alert">
+            Elige el {sideCopy.centerLabel.toLocaleLowerCase("es-CO")}.
+          </Text>
+        )}
+      </FormSection>
+    );
+  };
+
   return (
-    <MapScrollLockProvider value={scrollLock}>
     <LinearGradient
       colors={["#070c14", colors.canvas, "#080b12"]}
       style={styles.root}
@@ -446,7 +449,7 @@ export function AidLocationForm({
           sessionSource={sessionSource}
           session={session}
         />
-        <View style={styles.header} testID="aid-location-action-bar">
+        <View style={styles.header} testID="transport-action-bar">
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Volver a la portada"
@@ -459,7 +462,7 @@ export function AidLocationForm({
           <View style={styles.headerStatus}>
             <View style={styles.statusDot} />
             <Text style={styles.headerStatusText}>
-              PUBLICACIÓN INMEDIATA · VISIBLE EN EL MAPA
+              REGISTRO CON TRAZABILIDAD · SOLO CON CUENTA
             </Text>
           </View>
         </View>
@@ -467,7 +470,6 @@ export function AidLocationForm({
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={styles.scroll}
-          scrollEnabled={scrollEnabled}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -483,271 +485,131 @@ export function AidLocationForm({
               <Text style={styles.introText}>{copy.intro}</Text>
             </View>
 
-            {/* CHG-161: acopio local y punto de distribución exigen
-                sesión — sin cuenta el formulario explica y ofrece
-                registrarse o iniciar sesión; nunca envía. */}
+            {/* Portón de sesión (criterio 2): sin cuenta el formulario
+                explica y ofrece registrarse o iniciar sesión; las
+                secciones y el botón de publicar ni siquiera existen. */}
             <SessionGate
-              required={AID_LOCATION_REQUIRES_SESSION[kind]}
               session={session}
-              explanation={aidLocationSessionExplanation[kind] ?? ""}
+              explanation={copy.sessionExplanation}
               onRegister={onRegister}
               onLogin={onLogin}
             >
-            <ReportConsiderations
-              purpose={copy.legend}
-              considerations={[
-                copy.contextNotice,
-                "El nombre, la dirección y el punto del mapa son públicos: así la comunidad sabe dónde está el punto y qué hace.",
-                "La comunidad puede denunciar un punto que no exista o funcione mal; con suficientes denuncias queda EN OBSERVACIÓN y lo revisa el equipo de la plataforma.",
-                ...(requiresParent
-                  ? [
-                      `Este tipo de punto no puede existir solo: debe asociarse a un ${copy.parentLabel?.toLocaleLowerCase("es-CO")} de su misma ciudad.`,
-                    ]
-                  : []),
-              ]}
-              onRegister={onRegister}
-              onLogin={onLogin}
-              session={session}
-            />
+              {sideSection("01", "origin", originCandidates)}
+              {sideSection("02", "destination", destinationCandidates)}
 
-            <FormSection
-              code="01"
-              title="Cómo se llama"
-              description="El nombre con el que la comunidad reconocerá este punto."
-              onPosition={registerSection}
-            >
-              <FormField
-                label="Nombre del punto *"
-                hint={`Entre ${MIN_NAME_LENGTH} y ${MAX_NAME_LENGTH} caracteres`}
-                invalid={invalidFields.has("name")}
-                value={draft.name}
-                maxLength={MAX_NAME_LENGTH}
-                onChangeText={(value) => setField("name", value)}
-              />
-            </FormSection>
-
-            <FormSection
-              code="02"
-              title="Dónde funciona"
-              description="Municipio, departamento y dirección; si puedes, fija también el punto en el mapa."
-              onPosition={registerSection}
-            >
-              <FieldGrid>
-                <FormField
-                  label="Municipio *"
-                  hint="Ciudad donde funciona el punto"
-                  invalid={invalidFields.has("municipality")}
-                  value={draft.municipality}
-                  maxLength={MAX_CITY_LENGTH}
-                  onChangeText={(value) => setField("municipality", value)}
-                />
-                <FormField
-                  label="Departamento *"
-                  invalid={invalidFields.has("department")}
-                  value={draft.department}
-                  maxLength={MAX_CITY_LENGTH}
-                  onChangeText={(value) => setField("department", value)}
-                />
-              </FieldGrid>
-              <FormField
-                label="Dirección *"
-                hint="Se completa sola al fijar el punto; siempre editable"
-                invalid={invalidFields.has("address")}
-                value={draft.address}
-                maxLength={MAX_ADDRESS_LENGTH}
-                onChangeText={(value) => setField("address", value)}
-              />
-              <LastSeenLocationPicker
-                addressQuery={
-                  draft.address.trim()
-                    ? `${draft.address.trim()}, ${
-                        draft.municipality.trim() || "Colombia"
-                      }`
-                    : ""
-                }
-                value={parseDraftCoordinates(draft.latitude, draft.longitude)}
-                onChange={(coordinates) =>
-                  setDraft((current) => ({
-                    ...current,
-                    latitude: coordinates
-                      ? coordinates.latitude.toFixed(5)
-                      : "",
-                    longitude: coordinates
-                      ? coordinates.longitude.toFixed(5)
-                      : "",
-                  }))
-                }
-                // CHG-156: la Dirección queda corta (vía, barrio,
-                // comuna); municipio y departamento van a sus campos
-                // solo si estaban vacíos (siempre editables).
-                onAddressResolved={(address) =>
-                  setDraft((current) => ({
-                    ...current,
-                    address: address.addressLine ?? address.label,
-                    municipality:
-                      current.municipality.trim() ||
-                      (address.municipality ?? ""),
-                    department:
-                      current.department.trim() ||
-                      (address.department ?? ""),
-                  }))
-                }
-                locateVisitor={locateVisitor}
-                title="UBICACIÓN EN EL MAPA · OPCIONAL"
-                helper="Si puedes, cruza la dirección escrita arriba con el mapa, toca «¿Dónde estoy?» para usar tu GPS, o arrastra el muñequito hasta el lugar exacto. Con la dirección escrita basta."
-                locateActionLabel="¿Dónde estoy?"
-              />
-              {invalidFields.has("location") && (
-                <Text style={styles.errorText} accessibilityRole="alert">
-                  Las coordenadas del punto están fuera de rango.
-                </Text>
-              )}
-            </FormSection>
-
-            {requiresParent && (
               <FormSection
                 code="03"
-                title="Centro asociado"
-                description={`${copy.parentLabel} *. Solo aparecen centros publicados de la ciudad indicada.`}
+                title="Qué lleva"
+                description="Opcional: un resumen de los insumos que viajan, para la trazabilidad."
                 onPosition={registerSection}
               >
-                {parentSectionBody()}
-                {invalidFields.has("parentId") && (
-                  <Text style={styles.errorText} accessibilityRole="alert">
-                    Elige el centro al que estará asociado este punto.
-                  </Text>
-                )}
+                <FormField
+                  label="Insumos que lleva"
+                  hint={`Máximo ${MAX_SUPPLIES_LENGTH} caracteres`}
+                  multiline
+                  invalid={invalidFields.has("suppliesSummary")}
+                  value={draft.suppliesSummary}
+                  maxLength={MAX_SUPPLIES_LENGTH}
+                  onChangeText={(value) => setField("suppliesSummary", value)}
+                />
               </FormSection>
-            )}
 
-            <FormSection
-              code="04"
-              title="Cómo opera"
-              description="Opcional: horario, contacto y una descripción de lo que hace el punto."
-              onPosition={registerSection}
-            >
-              <FieldGrid>
-                <FormField
-                  label="Horario"
-                  hint="Por ejemplo: L-V 8am-5pm"
-                  invalid={invalidFields.has("schedule")}
-                  value={draft.schedule}
-                  maxLength={MAX_SCHEDULE_LENGTH}
-                  onChangeText={(value) => setField("schedule", value)}
-                />
-                <FormField
-                  label="Contacto"
-                  hint="Teléfono o correo público del punto"
-                  invalid={invalidFields.has("contact")}
-                  value={draft.contact}
-                  maxLength={MAX_CONTACT_LENGTH}
-                  onChangeText={(value) => setField("contact", value)}
-                />
-              </FieldGrid>
-              <FormField
-                label="Descripción"
-                hint={`Máximo ${MAX_DESCRIPTION_LENGTH} caracteres`}
-                multiline
-                invalid={invalidFields.has("description")}
-                value={draft.description}
-                maxLength={MAX_DESCRIPTION_LENGTH}
-                onChangeText={(value) => setField("description", value)}
-              />
-            </FormSection>
-
-            <FormSection
-              code="05"
-              title="Confirmación"
-              description="Lee y confirma antes de publicar."
-              onPosition={registerSection}
-            >
-              <Pressable
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: draft.truthConfirmed }}
-                accessibilityLabel="Confirmo que el punto existe y la información es real."
-                onPress={() =>
-                  setField("truthConfirmed", !draft.truthConfirmed)
-                }
-                style={({ pressed }) => [
-                  styles.consent,
-                  draft.truthConfirmed && styles.consentChecked,
-                  pressed && styles.pressedButton,
-                ]}
+              <FormSection
+                code="04"
+                title="Confirmación"
+                description="Lee y confirma antes de publicar."
+                onPosition={registerSection}
               >
-                <View
-                  style={[
-                    styles.checkbox,
-                    draft.truthConfirmed && styles.checkboxChecked,
+                <Pressable
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: draft.truthConfirmed }}
+                  accessibilityLabel={`Confirmo que ${copy.vehicle} y su viaje son reales.`}
+                  onPress={() =>
+                    setField("truthConfirmed", !draft.truthConfirmed)
+                  }
+                  style={({ pressed }) => [
+                    styles.consent,
+                    draft.truthConfirmed && styles.consentChecked,
+                    pressed && styles.pressedButton,
                   ]}
                 >
-                  <Text style={styles.checkmark}>
-                    {draft.truthConfirmed ? "✓" : ""}
+                  <View
+                    style={[
+                      styles.checkbox,
+                      draft.truthConfirmed && styles.checkboxChecked,
+                    ]}
+                  >
+                    <Text style={styles.checkmark}>
+                      {draft.truthConfirmed ? "✓" : ""}
+                    </Text>
+                  </View>
+                  <Text style={styles.consentText}>
+                    Confirmo que {copy.vehicle} y su viaje son reales.
                   </Text>
+                </Pressable>
+              </FormSection>
+
+              {formErrors.length > 0 && (
+                <View style={styles.errorSummary} accessibilityRole="alert">
+                  <Text style={styles.errorSummaryTitle}>
+                    Revisa el registro antes de continuar
+                  </Text>
+                  {formErrors.map((error) => (
+                    <Text key={error} style={styles.errorSummaryItem}>
+                      • {error}
+                    </Text>
+                  ))}
                 </View>
-                <Text style={styles.consentText}>
-                  Confirmo que el punto existe y la información es real.
-                </Text>
-              </Pressable>
-            </FormSection>
+              )}
 
-            {formErrors.length > 0 && (
-              <View style={styles.errorSummary} accessibilityRole="alert">
-                <Text style={styles.errorSummaryTitle}>
-                  Revisa el registro antes de continuar
-                </Text>
-                {formErrors.map((error) => (
-                  <Text key={error} style={styles.errorSummaryItem}>
-                    • {error}
-                  </Text>
-                ))}
-              </View>
-            )}
-
-            <View
-              style={[styles.submitPanel, compact && styles.submitPanelCompact]}
-            >
-              <View style={styles.submitCopy}>
-                <Text style={styles.submitTitle}>PUBLICACIÓN Y REVISIÓN</Text>
-                <Text style={styles.submitText}>
-                  El punto se publica de inmediato en el mapa y en el
-                  directorio. La comunidad puede denunciarlo si no existe o
-                  funciona mal; con suficientes denuncias queda EN
-                  OBSERVACIÓN y lo revisa el equipo de la plataforma.
-                </Text>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Publicar ${aidLocationKindLabel[kind].toLocaleLowerCase("es-CO")}`}
-                disabled={submitting}
-                onPress={() => void submit()}
-                style={({ pressed }) => [
-                  styles.submitButton,
-                  pressed && styles.pressedButton,
+              <View
+                style={[
+                  styles.submitPanel,
+                  compact && styles.submitPanelCompact,
                 ]}
               >
-                {submitting ? (
-                  <ActivityIndicator color="#07101b" />
-                ) : (
-                  <Text style={styles.submitButtonText}>
-                    PUBLICAR PUNTO →
+                <View style={styles.submitCopy}>
+                  <Text style={styles.submitTitle}>
+                    TRAZABILIDAD DE LOS SUMINISTROS
                   </Text>
-                )}
-              </Pressable>
-            </View>
+                  <Text style={styles.submitText}>
+                    El transporte queda registrado a tu nombre con su origen
+                    y su destino. En próximas fases podrá reportar su
+                    posición para verse en el mapa durante el viaje.
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Registrar ${transportKindLabel[kind].toLocaleLowerCase("es-CO")}`}
+                  disabled={submitting}
+                  onPress={() => void submit()}
+                  style={({ pressed }) => [
+                    styles.submitButton,
+                    pressed && styles.pressedButton,
+                  ]}
+                >
+                  {submitting ? (
+                    <ActivityIndicator color="#07101b" />
+                  ) : (
+                    <Text style={styles.submitButtonText}>
+                      REGISTRAR TRANSPORTE →
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
             </SessionGate>
           </View>
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
-    </MapScrollLockProvider>
   );
 }
 
-function LocationConfirmation({
+function TransportConfirmation({
   receipt,
   onHome,
 }: {
-  receipt: AidLocationReceipt;
+  receipt: TransportReceipt;
   onHome: () => void;
 }) {
   return (
@@ -761,22 +623,22 @@ function LocationConfirmation({
         </View>
         <Text style={styles.overline}>CONSTANCIA / CUSOL</Text>
         <Text style={styles.confirmationTitle} accessibilityRole="header">
-          Punto registrado
+          Transporte registrado
         </Text>
         <Text style={styles.confirmationText}>
-          El {aidLocationKindLabel[receipt.kind].toLocaleLowerCase("es-CO")} ya
-          aparece en el mapa y en el directorio desde el{" "}
-          {createdFormatter.format(new Date(receipt.createdAt))}.
+          {transportKindLabel[receipt.kind]} quedó registrada con su origen
+          y su destino desde el{" "}
+          {createdFormatter.format(new Date(receipt.createdAt))}. Los
+          suministros que lleva ya son trazables.
         </Text>
         <View style={styles.receiptCode}>
-          <Text style={styles.receiptLabel}>TIPO DE PUNTO</Text>
+          <Text style={styles.receiptLabel}>TIPO DE TRANSPORTE</Text>
           <Text style={styles.receiptValue}>
-            {aidLocationKindLabel[receipt.kind]}
+            {transportKindLabel[receipt.kind]}
           </Text>
           <Text style={styles.reviewStatus}>
-            {receipt.operationalStatus === "open"
-              ? "ABIERTO"
-              : receipt.operationalStatus.toUpperCase()}
+            {transportStatusLabel[receipt.status] ??
+              receipt.status.toUpperCase()}
           </Text>
         </View>
         <Pressable
@@ -824,10 +686,6 @@ function FormSection({
   );
 }
 
-function FieldGrid({ children }: { children: React.ReactNode }) {
-  return <View style={styles.fieldGrid}>{children}</View>;
-}
-
 function FormField({
   label,
   hint,
@@ -841,7 +699,6 @@ function FormField({
   onChangeText: (value: string) => void;
   hint?: string;
   multiline?: boolean;
-  keyboardType?: "default" | "number-pad";
   maxLength?: number;
   invalid?: boolean;
   placeholder?: string;
@@ -989,7 +846,6 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   sectionBody: { gap: 24, padding: 20 },
-  fieldGrid: fieldGridLayout.grid,
   field: fieldGridLayout.field,
   fieldWide: fieldGridLayout.fieldWide,
   fieldLabelRow: {
@@ -1018,7 +874,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,103,136,0.06)",
   },
   fieldNote: { color: colors.inkDim, fontSize: 10, lineHeight: 16 },
-  // CHG-153: selector del centro asociado (lista de candidatos).
   candidateList: { gap: 10 },
   candidate: {
     flexDirection: "row",
@@ -1050,14 +905,14 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7,
   },
   candidateStatusSelected: { color: colors.cyan },
-  missingParent: {
+  missingCenter: {
     padding: 15,
     borderWidth: 1,
     borderColor: "rgba(255,181,71,0.35)",
     borderRadius: 9,
     backgroundColor: "rgba(255,181,71,0.07)",
   },
-  missingParentText: { color: "#e8c890", fontSize: 11, lineHeight: 18 },
+  missingCenterText: { color: "#e8c890", fontSize: 11, lineHeight: 18 },
   consent: {
     flexDirection: "row",
     alignItems: "flex-start",

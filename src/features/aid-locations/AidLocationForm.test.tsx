@@ -32,6 +32,20 @@ const anonymousSession = {
   getCurrentAccount: () => Promise.reject(new Error("sin sesión")),
 };
 
+// CHG-161: acopio local y punto de distribución exigen sesión, así que
+// sus flujos se prueban con una cuenta activa.
+const authenticatedSession = {
+  getCurrentAccount: () =>
+    Promise.resolve({
+      id: "99999999-9999-4999-8999-999999999909",
+      displayName: "Sara Angarita",
+      email: "sara@example.org",
+      assignedRole: "user" as const,
+      status: "active" as const,
+      sessionExpiresAt: "2026-08-19T00:00:00Z",
+    }),
+};
+
 const validDraft = {
   ...initialAidLocationDraft,
   name: "Acopio Solidario Norte",
@@ -190,14 +204,15 @@ describe("AidLocationForm (CHG-153)", () => {
       <AidLocationForm
         kind="distribution_point"
         onBack={jest.fn()}
-        sessionSource={anonymousSession}
+        sessionSource={authenticatedSession}
         submitLocation={submitLocation}
         loadParentCandidates={loadParentCandidates}
       />,
     );
 
+    // CHG-161: el formulario aparece cuando la sesión queda resuelta.
     fireEvent.changeText(
-      screen.getByLabelText("Municipio *"),
+      await screen.findByLabelText("Municipio *"),
       "Bucaramanga",
     );
     await waitFor(
@@ -262,12 +277,15 @@ describe("AidLocationForm (CHG-153)", () => {
       <AidLocationForm
         kind="distribution_point"
         onBack={jest.fn()}
-        sessionSource={anonymousSession}
+        sessionSource={authenticatedSession}
         loadParentCandidates={loadParentCandidates}
       />,
     );
 
-    fireEvent.changeText(screen.getByLabelText("Municipio *"), "Aratoca");
+    fireEvent.changeText(
+      await screen.findByLabelText("Municipio *"),
+      "Aratoca",
+    );
     await waitFor(
       () =>
         expect(
@@ -295,12 +313,14 @@ describe("paridad de ubicación entre los 4 tipos (CHG-160)", () => {
     "distribution_point",
   ] as const;
 
-  it.each(kinds)("el formulario de %s trae las reglas de mapa y autocompletado", (kind) => {
+  it.each(kinds)("el formulario de %s trae las reglas de mapa y autocompletado", async (kind) => {
+    // CHG-161: con sesión activa para atravesar el portón de los tipos
+    // que ahora la exigen — la paridad de ubicación es la misma.
     render(
       <AidLocationForm
         kind={kind}
         onBack={jest.fn()}
-        sessionSource={anonymousSession}
+        sessionSource={authenticatedSession}
         submitLocation={jest.fn()}
         loadParentCandidates={jest.fn().mockResolvedValue([])}
       />,
@@ -308,7 +328,9 @@ describe("paridad de ubicación entre los 4 tipos (CHG-160)", () => {
 
     // Dirección autocompletable desde el muñequito (CHG-156).
     expect(
-      screen.getByText("Se completa sola al fijar el punto; siempre editable"),
+      await screen.findByText(
+        "Se completa sola al fijar el punto; siempre editable",
+      ),
     ).toBeTruthy();
     // Mapa con las mismas acciones del acopio local.
     expect(screen.getByText("UBICACIÓN EN EL MAPA · OPCIONAL")).toBeTruthy();
@@ -322,4 +344,54 @@ describe("paridad de ubicación entre los 4 tipos (CHG-160)", () => {
     expect(screen.getByLabelText("Municipio *")).toBeTruthy();
     expect(screen.getByLabelText("Departamento *")).toBeTruthy();
   });
+});
+
+// CHG-161 (criterio 3) — El acopio local y el punto de distribución
+// exigen sesión: sin cuenta el formulario explica y ofrece registrarse
+// o iniciar sesión, y el botón de publicar ni siquiera existe. Los
+// otros dos tipos siguen abiertos al registro anónimo.
+describe("portón de sesión de la logística (CHG-161)", () => {
+  it.each(["collection_center", "distribution_point"] as const)(
+    "sin sesión el alta de %s queda detrás del portón",
+    async (kind) => {
+      render(
+        <AidLocationForm
+          kind={kind}
+          onBack={jest.fn()}
+          onRegister={jest.fn()}
+          onLogin={jest.fn()}
+          sessionSource={anonymousSession}
+          submitLocation={jest.fn()}
+          loadParentCandidates={jest.fn().mockResolvedValue([])}
+        />,
+      );
+
+      expect(await screen.findByTestId("session-gate")).toBeTruthy();
+      expect(
+        screen.getByLabelText("Registrarme para continuar"),
+      ).toBeTruthy();
+      expect(
+        screen.getByLabelText("Iniciar sesión para continuar"),
+      ).toBeTruthy();
+      expect(screen.queryByLabelText("Nombre del punto *")).toBeNull();
+    },
+  );
+
+  it.each(["collection_point", "receiver_center"] as const)(
+    "el alta de %s sigue disponible sin sesión",
+    async (kind) => {
+      render(
+        <AidLocationForm
+          kind={kind}
+          onBack={jest.fn()}
+          sessionSource={anonymousSession}
+          submitLocation={jest.fn()}
+          loadParentCandidates={jest.fn().mockResolvedValue([])}
+        />,
+      );
+
+      expect(await screen.findByLabelText("Nombre del punto *")).toBeTruthy();
+      expect(screen.queryByTestId("session-gate")).toBeNull();
+    },
+  );
 });

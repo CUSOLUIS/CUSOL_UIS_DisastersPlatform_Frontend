@@ -40,6 +40,11 @@ interface ReportActionsProps {
   // CHG-153: los dos tipos logísticos nuevos.
   onRegisterReceiverCenter: () => void;
   onRegisterDistributionPoint: () => void;
+  // CHG-161: transportes de insumos (mula y lancha).
+  onRegisterMuleTransport: () => void;
+  onRegisterBoatTransport: () => void;
+  // CHG-162: informe de hogar en malas condiciones.
+  onReportDamagedHome: () => void;
   onOfferCommunityMeals: () => void;
   onOfferTemporaryShelter: () => void;
   // CHG-125: solicitud pública de ayuda de emergencia.
@@ -156,6 +161,9 @@ export function ReportActions({
   onRegisterDonationPoint,
   onRegisterReceiverCenter,
   onRegisterDistributionPoint,
+  onRegisterMuleTransport,
+  onRegisterBoatTransport,
+  onReportDamagedHome,
   onOfferCommunityMeals,
   onOfferTemporaryShelter,
   onRequestHelp,
@@ -218,6 +226,23 @@ export function ReportActions({
         columns={columns}
         onPress={onRegisterDistributionPoint}
       />
+      {/* CHG-161: transportes de insumos con trazabilidad. */}
+      <ReportAction
+        testID="register-mule-transport-action"
+        action={reportActionCatalog["mule-transport"]}
+        icon={<TransportIcon glyph="M" />}
+        compact={compact}
+        columns={columns}
+        onPress={onRegisterMuleTransport}
+      />
+      <ReportAction
+        testID="register-boat-transport-action"
+        action={reportActionCatalog["boat-transport"]}
+        icon={<TransportIcon glyph="L" />}
+        compact={compact}
+        columns={columns}
+        onPress={onRegisterBoatTransport}
+      />
       <ReportAction
         testID="offer-community-meals-action"
         action={reportActionCatalog["community-meals"]}
@@ -233,6 +258,15 @@ export function ReportActions({
         compact={compact}
         columns={columns}
         onPress={onOfferTemporaryShelter}
+      />
+      {/* CHG-162: informe de hogar en malas condiciones. */}
+      <ReportAction
+        testID="report-damaged-home-action"
+        action={reportActionCatalog["damaged-home"]}
+        icon={<DamagedHomeIcon />}
+        compact={compact}
+        columns={columns}
+        onPress={onReportDamagedHome}
       />
       {/* CHG-125: solicitud pública de ayuda de emergencia. */}
       <ReportAction
@@ -505,6 +539,85 @@ function DonationPointIcon() {
 }
 
 // CHG-153 — Bodega con camión: recibe cargamentos y redistribuye.
+// CHG-161: mula (carga sobre patas) y lancha (casco sobre olas).
+function TransportIcon({ glyph }: { glyph: "M" | "L" }) {
+  if (glyph === "M") {
+    return (
+      <Svg width={36} height={36} viewBox="0 0 36 36">
+        <Rect
+          x={9}
+          y={9}
+          width={14}
+          height={9}
+          rx={2}
+          fill="none"
+          stroke={reportActionIconColor}
+          strokeWidth={2}
+        />
+        <Path
+          d="M11 18v7M15 18v7M19 18v7M23 18v7M23 12h5l2 3"
+          fill="none"
+          stroke={reportActionIconColor}
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <Path
+          d="M5 29h26"
+          fill="none"
+          stroke={reportActionIconColor}
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeDasharray="3 3"
+        />
+      </Svg>
+    );
+  }
+  return (
+    <Svg width={36} height={36} viewBox="0 0 36 36">
+      <Path
+        d="M6 20h24l-4 6H10l-4-6Z"
+        fill="none"
+        stroke={reportActionIconColor}
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M18 20v-9M18 11l7 6M4 30c2 2 5 2 7 0s5-2 7 0 5 2 7 0"
+        fill="none"
+        stroke={reportActionIconColor}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+// CHG-162: casa con la grieta que la parte.
+function DamagedHomeIcon() {
+  return (
+    <Svg width={36} height={36} viewBox="0 0 36 36">
+      <Path
+        d="M5 16 18 6l13 10M8 14v14h20V14"
+        fill="none"
+        stroke={reportActionIconColor}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M18 12l-3 5 4 3-3 5 2 3"
+        fill="none"
+        stroke={reportActionIconColor}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 function ReceiverCenterIcon() {
   return (
     <Svg width={36} height={36} viewBox="0 0 36 36">

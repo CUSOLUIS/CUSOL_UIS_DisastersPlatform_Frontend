@@ -13,6 +13,7 @@ interface CategoryMeta {
     | "collectionPoint"
     | "receiverCenter"
     | "distributionPoint"
+    | "damagedHome"
     | "rubbleReviewed"
     | "rubblePending"
     | "buildingPending"
@@ -107,6 +108,15 @@ export const categoryMeta: Record<OperationalMapCategory, CategoryMeta> = {
     color: "#f28dd0",
     markerKind: "building",
     summaryKey: "temporaryShelter",
+  },
+  // CHG-162: hogares en muy malas condiciones («Mi casita partida»).
+  damaged_home: {
+    label: "Hogares en malas condiciones",
+    shortLabel: "Hogar en malas condiciones",
+    glyph: "🏚",
+    color: "#fb7185",
+    markerKind: "building",
+    summaryKey: "damagedHome",
   },
   // CHG-069: alerta ciudadana de que se necesita gente en un punto.
   volunteers_needed: {

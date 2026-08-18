@@ -65,6 +65,10 @@ interface AppProps {
   // CHG-153: acopio receptor y punto de distribución.
   onRegisterReceiverCenter?: () => void;
   onRegisterDistributionPoint?: () => void;
+  // CHG-161/162: transportes y hogar en malas condiciones.
+  onRegisterMuleTransport?: () => void;
+  onRegisterBoatTransport?: () => void;
+  onReportDamagedHome?: () => void;
   onOfferCommunityMeals?: () => void;
   onOfferTemporaryShelter?: () => void;
   onRequestHelp?: () => void;
@@ -95,6 +99,9 @@ export function App({
   onRegisterDonationPoint = () => undefined,
   onRegisterReceiverCenter = () => undefined,
   onRegisterDistributionPoint = () => undefined,
+  onRegisterMuleTransport = () => undefined,
+  onRegisterBoatTransport = () => undefined,
+  onReportDamagedHome = () => undefined,
   onOfferCommunityMeals = () => undefined,
   onOfferTemporaryShelter = () => undefined,
   onRequestHelp = () => undefined,
@@ -182,6 +189,9 @@ export function App({
         onRegisterDonationPoint={onRegisterDonationPoint}
         onRegisterReceiverCenter={onRegisterReceiverCenter}
         onRegisterDistributionPoint={onRegisterDistributionPoint}
+        onRegisterMuleTransport={onRegisterMuleTransport}
+        onRegisterBoatTransport={onRegisterBoatTransport}
+        onReportDamagedHome={onReportDamagedHome}
         onOfferCommunityMeals={onOfferCommunityMeals}
         onOfferTemporaryShelter={onOfferTemporaryShelter}
         onRequestHelp={onRequestHelp}
@@ -214,6 +224,9 @@ function DashboardLoader({
   onRegisterDonationPoint,
   onRegisterReceiverCenter,
   onRegisterDistributionPoint,
+  onRegisterMuleTransport,
+  onRegisterBoatTransport,
+  onReportDamagedHome,
   onOfferCommunityMeals,
   onOfferTemporaryShelter,
   onRequestHelp,
@@ -238,6 +251,9 @@ function DashboardLoader({
   onRegisterDonationPoint: () => void;
   onRegisterReceiverCenter: () => void;
   onRegisterDistributionPoint: () => void;
+  onRegisterMuleTransport: () => void;
+  onRegisterBoatTransport: () => void;
+  onReportDamagedHome: () => void;
   onOfferCommunityMeals: () => void;
   onOfferTemporaryShelter: () => void;
   onRequestHelp: () => void;
@@ -359,6 +375,9 @@ function DashboardLoader({
       onRegisterDonationPoint={onRegisterDonationPoint}
       onRegisterReceiverCenter={onRegisterReceiverCenter}
       onRegisterDistributionPoint={onRegisterDistributionPoint}
+      onRegisterMuleTransport={onRegisterMuleTransport}
+      onRegisterBoatTransport={onRegisterBoatTransport}
+      onReportDamagedHome={onReportDamagedHome}
       onOfferCommunityMeals={onOfferCommunityMeals}
       onOfferTemporaryShelter={onOfferTemporaryShelter}
       onRequestHelp={onRequestHelp}

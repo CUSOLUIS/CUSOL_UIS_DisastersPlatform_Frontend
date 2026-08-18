@@ -16,6 +16,8 @@ export const operationalMapCategories = [
   // collection_point de arriba).
   "receiver_center",
   "distribution_point",
+  // CHG-162: hogares en malas condiciones («Mi casita partida»).
+  "damaged_home",
   // CHG-125: solicitudes «Necesitamos ayuda» vigentes (fusionadas en
   // cliente, DEC-125-10; nunca vienen del overview del backend).
   "help_request",
@@ -36,6 +38,7 @@ export const operationalResponseCategories = [
   "rubble_reviewed",
   "rubble_pending",
   "building_pending",
+  "damaged_home",
   "community_meal",
   "temporary_shelter",
   "volunteers_needed",
@@ -49,6 +52,8 @@ export const infrastructureLegendCategories = [
   "rubble_reviewed",
   "rubble_pending",
   "building_pending",
+  // CHG-162: hogares en malas condiciones.
+  "damaged_home",
 ] as const satisfies readonly OperationalMapCategory[];
 
 export const humanitarianAidLegendCategories = [
@@ -105,6 +110,8 @@ export interface OperationalMapSummary {
   // CHG-153: logística humanitaria.
   receiverCenter: number;
   distributionPoint: number;
+  // CHG-162: hogares en malas condiciones.
+  damagedHome: number;
   // CHG-125: cuenta de solicitudes de ayuda vigentes fusionadas en
   // cliente; el backend no la envía y se normaliza a 0.
   helpRequests: number;

@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -31,89 +31,77 @@ import {
   type SubmitReportOptions,
 } from "../missing-persons/reportSubmission";
 import { ReportConsiderations } from "../reporting/ReportConsiderations";
+import { submitDamagedHomeReport } from "./reportSubmission";
 import {
-  fetchParentCandidates,
-  submitAidLocation,
-} from "./reportSubmission";
-import { SessionGate } from "../auth/SessionGate";
-import {
-  AID_LOCATION_PARENT_KIND,
-  AID_LOCATION_REQUIRES_SESSION,
-  aidLocationSessionExplanation,
-  MAX_ADDRESS_LENGTH,
-  MAX_CITY_LENGTH,
-  MAX_CONTACT_LENGTH,
-  MAX_DESCRIPTION_LENGTH,
-  MAX_NAME_LENGTH,
-  MAX_SCHEDULE_LENGTH,
-  MIN_ADDRESS_LENGTH,
-  MIN_NAME_LENGTH,
-  aidLocationFormCopy,
-  aidLocationKindLabel,
-  type AidLocationDraft,
-  type AidLocationKind,
-  type AidLocationParentCandidate,
-  type AidLocationReceipt,
+  MAX_DAMAGE_DESCRIPTION_LENGTH,
+  MAX_HOME_ADDRESS_LENGTH,
+  MAX_HOME_CITY_LENGTH,
+  MIN_DAMAGE_DESCRIPTION_LENGTH,
+  MIN_HOME_ADDRESS_LENGTH,
+  type DamagedHomeDraft,
+  type DamagedHomeReceipt,
 } from "./types";
 
-// CHG-153 — Formulario único de alta de los cuatro tipos de puntos
-// logísticos, con la misma silueta de los reportes ciudadanos
-// (plantilla «Necesitamos ayuda»). Los tipos dependientes (recolección
-// y distribución) exigen elegir el centro asociado de su ciudad; los
-// candidatos los filtra el backend y el servicio revalida al crear.
+// CHG-162 — Formulario de «Mi casita partida»: la misma silueta de los
+// reportes ciudadanos (anónimo permitido, publicación inmediata) con
+// las reglas de ubicación de CHG-160 — dirección que se completa sola
+// al fijar el muñequito, «CRUZAR DIRECCIÓN», GPS y paneo táctil. El
+// informe sale en el mapa con la categoría `damaged_home` (🏚).
 
-export const initialAidLocationDraft: AidLocationDraft = {
-  name: "",
-  address: "",
+export const initialDamagedHomeDraft: DamagedHomeDraft = {
+  description: "",
   municipality: "",
   department: "",
+  address: "",
   latitude: "",
   longitude: "",
-  schedule: "",
-  contact: "",
-  description: "",
-  parentId: "",
   truthConfirmed: false,
 };
 
-export type AidLocationIssueField =
-  | keyof AidLocationDraft
-  | "location";
+export type DamagedHomeIssueField = keyof DamagedHomeDraft | "location";
 
-export interface AidLocationIssue {
-  field: AidLocationIssueField;
+export interface DamagedHomeIssue {
+  field: DamagedHomeIssueField;
   message: string;
 }
 
-// Espejo del contrato (`AidLocationInput`): las mismas reglas que
-// aplicará el backend, avisadas antes del viaje.
-export function collectAidLocationIssues(
-  kind: AidLocationKind,
-  draft: AidLocationDraft,
-): AidLocationIssue[] {
-  const issues: AidLocationIssue[] = [];
-  const push = (field: AidLocationIssueField, message: string) =>
+// Espejo del contrato (`DamagedHomeReportInput`): las mismas reglas
+// que aplicará el backend, avisadas antes del viaje.
+export function collectDamagedHomeIssues(
+  draft: DamagedHomeDraft,
+): DamagedHomeIssue[] {
+  const issues: DamagedHomeIssue[] = [];
+  const push = (field: DamagedHomeIssueField, message: string) =>
     issues.push({ field, message });
 
-  const name = draft.name.trim();
-  if (name.length < MIN_NAME_LENGTH) {
-    push("name", `Escribe el nombre del punto (mínimo ${MIN_NAME_LENGTH} caracteres).`);
-  } else if (name.length > MAX_NAME_LENGTH) {
-    push("name", `El nombre no puede superar los ${MAX_NAME_LENGTH} caracteres.`);
+  const description = draft.description.trim();
+  if (description.length < MIN_DAMAGE_DESCRIPTION_LENGTH) {
+    push(
+      "description",
+      `Cuenta qué le pasó al hogar (mínimo ${MIN_DAMAGE_DESCRIPTION_LENGTH} caracteres).`,
+    );
+  } else if (description.length > MAX_DAMAGE_DESCRIPTION_LENGTH) {
+    push(
+      "description",
+      `La descripción no puede superar los ${MAX_DAMAGE_DESCRIPTION_LENGTH} caracteres.`,
+    );
   }
 
   if (!draft.municipality.trim()) {
-    push("municipality", "Indica el municipio donde funciona el punto.");
+    push("municipality", "Indica el municipio donde está el hogar.");
   }
   if (!draft.department.trim()) {
-    push("department", "Indica el departamento donde funciona el punto.");
+    push("department", "Indica el departamento donde está el hogar.");
   }
 
   const address = draft.address.trim();
-  if (address.length < MIN_ADDRESS_LENGTH) {
-    push("address", "Escribe la dirección del lugar o resuélvela desde el mapa.");
-  } else if (address.length > MAX_ADDRESS_LENGTH) {
-    push("address", `La dirección no puede superar los ${MAX_ADDRESS_LENGTH} caracteres.`);
+  if (address.length < MIN_HOME_ADDRESS_LENGTH) {
+    push("address", "Escribe la dirección del hogar o resuélvela desde el mapa.");
+  } else if (address.length > MAX_HOME_ADDRESS_LENGTH) {
+    push(
+      "address",
+      `La dirección no puede superar los ${MAX_HOME_ADDRESS_LENGTH} caracteres.`,
+    );
   }
 
   const coordinates = parseDraftCoordinates(draft.latitude, draft.longitude);
@@ -124,23 +112,7 @@ export function collectAidLocationIssues(
       coordinates.longitude < -180 ||
       coordinates.longitude > 180)
   ) {
-    push("location", "Las coordenadas del punto están fuera de rango.");
-  }
-
-  // Dependencia obligatoria (§6): recolección exige acopio local;
-  // distribución exige acopio receptor.
-  if (AID_LOCATION_PARENT_KIND[kind] && !draft.parentId.trim()) {
-    push(
-      "parentId",
-      `Elige el ${aidLocationFormCopy[kind].parentLabel?.toLocaleLowerCase("es-CO")}.`,
-    );
-  }
-
-  if (draft.description.trim().length > MAX_DESCRIPTION_LENGTH) {
-    push(
-      "description",
-      `La descripción no puede superar los ${MAX_DESCRIPTION_LENGTH} caracteres.`,
-    );
+    push("location", "Las coordenadas del hogar están fuera de rango.");
   }
 
   if (!draft.truthConfirmed) {
@@ -150,30 +122,19 @@ export function collectAidLocationIssues(
   return issues;
 }
 
-// Sección (01..05) de cada campo, para el scroll al primer error.
+// Sección (01..03) de cada campo, para el scroll al primer error.
 const FIELD_SECTIONS: Record<string, string> = {
-  name: "01",
+  description: "01",
   municipality: "02",
   department: "02",
   address: "02",
   location: "02",
   latitude: "02",
   longitude: "02",
-  parentId: "03",
-  schedule: "04",
-  contact: "04",
-  description: "04",
-  truthConfirmed: "05",
+  truthConfirmed: "03",
 };
 
-type ParentCandidatesState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "success"; items: AidLocationParentCandidate[] }
-  | { status: "error"; message: string };
-
-interface AidLocationFormProps {
-  kind: AidLocationKind;
+interface DamagedHomeFormProps {
   onBack: () => void;
   onHome?: () => void;
   onRegister?: () => void;
@@ -181,16 +142,10 @@ interface AidLocationFormProps {
   sessionSource?: SessionAccountSource;
   // CHG-080: obtención de la posición GPS, inyectable en pruebas.
   locateVisitor?: () => Promise<{ latitude: number; longitude: number }>;
-  submitLocation?: (
-    kind: AidLocationKind,
-    draft: AidLocationDraft,
+  submitReport?: (
+    draft: DamagedHomeDraft,
     options?: SubmitReportOptions,
-  ) => Promise<AidLocationReceipt>;
-  loadParentCandidates?: (
-    kind: AidLocationKind,
-    municipality: string,
-    options?: { signal?: AbortSignal },
-  ) => Promise<AidLocationParentCandidate[]>;
+  ) => Promise<DamagedHomeReceipt>;
 }
 
 const createdFormatter = new Intl.DateTimeFormat("es-CO", {
@@ -201,43 +156,27 @@ const createdFormatter = new Intl.DateTimeFormat("es-CO", {
   timeZone: "America/Bogota",
 });
 
-// Estado operativo humano de un candidato, para la lista del selector.
-const candidateStatusLabel: Record<string, string> = {
-  open: "ABIERTO",
-  closed: "CERRADO",
-  at_capacity: "CAPACIDAD COMPLETA",
-  under_observation: "EN OBSERVACIÓN",
-};
-
-export function AidLocationForm({
-  kind,
+export function DamagedHomeForm({
   onBack,
   onHome,
   onRegister,
   onLogin,
   sessionSource,
   locateVisitor,
-  submitLocation = submitAidLocation,
-  loadParentCandidates = (candidateKind, municipality, options) =>
-    fetchParentCandidates(candidateKind, municipality, options),
-}: AidLocationFormProps) {
-  const copy = aidLocationFormCopy[kind];
-  const requiresParent = AID_LOCATION_PARENT_KIND[kind] !== undefined;
+  submitReport = submitDamagedHomeReport,
+}: DamagedHomeFormProps) {
   const { width } = useWindowDimensions();
   const compact = width < 760;
   const session = useSessionAccount(sessionSource);
-  const [draft, setDraft] = useState<AidLocationDraft>(
-    initialAidLocationDraft,
+  const [draft, setDraft] = useState<DamagedHomeDraft>(
+    initialDamagedHomeDraft,
   );
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [receipt, setReceipt] = useState<AidLocationReceipt | null>(null);
+  const [receipt, setReceipt] = useState<DamagedHomeReceipt | null>(null);
   const [invalidFields, setInvalidFields] = useState<Set<string>>(
     () => new Set(),
   );
-  const [candidates, setCandidates] = useState<ParentCandidatesState>({
-    status: "idle",
-  });
   const idempotencyKeyRef = useRef<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Record<string, number>>({});
@@ -248,58 +187,10 @@ export function AidLocationForm({
     sectionOffsets.current[code] = y;
   };
 
-  const setField = <Key extends keyof AidLocationDraft>(
+  const setField = <Key extends keyof DamagedHomeDraft>(
     key: Key,
-    value: AidLocationDraft[Key],
+    value: DamagedHomeDraft[Key],
   ) => setDraft((current) => ({ ...current, [key]: value }));
-
-  // Los candidatos dependen de la ciudad escrita: al cambiarla se
-  // consultan de nuevo (con un respiro para no disparar por tecla) y
-  // se descarta la selección previa si ya no aplica.
-  const municipality = draft.municipality.trim();
-  useEffect(() => {
-    if (!requiresParent) {
-      return;
-    }
-    if (!municipality) {
-      setCandidates({ status: "idle" });
-      setField("parentId", "");
-      return;
-    }
-    const controller = new AbortController();
-    const timer = globalThis.setTimeout(() => {
-      setCandidates({ status: "loading" });
-      loadParentCandidates(kind, municipality, {
-        signal: controller.signal,
-      })
-        .then((items) => {
-          setCandidates({ status: "success", items });
-          setDraft((current) =>
-            current.parentId &&
-            !items.some((item) => item.id === current.parentId)
-              ? { ...current, parentId: "" }
-              : current,
-          );
-        })
-        .catch((error: unknown) => {
-          if (error instanceof Error && error.name === "AbortError") {
-            return;
-          }
-          setCandidates({
-            status: "error",
-            message:
-              "No fue posible consultar los centros de esta ciudad. Intenta de nuevo.",
-          });
-        });
-    }, 600);
-    return () => {
-      controller.abort();
-      globalThis.clearTimeout(timer);
-    };
-    // `loadParentCandidates` queda fuera de las dependencias adrede:
-    // el valor por defecto se recrea en cada render y relanzaría la
-    // consulta en bucle.
-  }, [kind, municipality, requiresParent]);
 
   const scrollToField = (field: string) => {
     const section = FIELD_SECTIONS[field];
@@ -313,7 +204,7 @@ export function AidLocationForm({
   };
 
   const submit = async () => {
-    const issues = collectAidLocationIssues(kind, draft);
+    const issues = collectDamagedHomeIssues(draft);
     setFormErrors(issues.map((issue) => issue.message));
     setInvalidFields(new Set(issues.map((issue) => issue.field)));
     if (issues.length > 0) {
@@ -325,7 +216,7 @@ export function AidLocationForm({
     idempotencyKeyRef.current ??= createIdempotencyKey();
     try {
       setReceipt(
-        await submitLocation(kind, draft, {
+        await submitReport(draft, {
           idempotencyKey: idempotencyKeyRef.current,
         }),
       );
@@ -334,7 +225,7 @@ export function AidLocationForm({
       setFormErrors([
         error instanceof Error
           ? error.message
-          : "No fue posible registrar el punto. Intenta nuevamente.",
+          : "No fue posible enviar el informe. Intenta nuevamente.",
       ]);
       if (error instanceof ReportRejectedError && error.fields.length > 0) {
         setInvalidFields(new Set(error.fields));
@@ -352,84 +243,9 @@ export function AidLocationForm({
 
   if (receipt) {
     return (
-      <LocationConfirmation receipt={receipt} onHome={onHome ?? onBack} />
+      <DamagedHomeConfirmation receipt={receipt} onHome={onHome ?? onBack} />
     );
   }
-
-  const parentSectionBody = () => {
-    if (!municipality) {
-      return (
-        <Text style={styles.fieldNote}>
-          Escribe primero el municipio (sección 02): los centros
-          disponibles dependen de la ciudad.
-        </Text>
-      );
-    }
-    if (candidates.status === "loading") {
-      return <ActivityIndicator color={colors.cyan} />;
-    }
-    if (candidates.status === "error") {
-      return (
-        <Text style={styles.errorText} accessibilityRole="alert">
-          {candidates.message}
-        </Text>
-      );
-    }
-    if (candidates.status === "success" && candidates.items.length === 0) {
-      // §6 del contrato: sin centro disponible no hay registro posible.
-      return (
-        <View style={styles.missingParent} accessibilityRole="alert">
-          <Text style={styles.missingParentText}>
-            {copy.missingParentMessage}
-          </Text>
-        </View>
-      );
-    }
-    if (candidates.status === "success") {
-      return (
-        <View
-          style={styles.candidateList}
-          accessibilityRole="radiogroup"
-          accessibilityLabel={copy.parentLabel}
-        >
-          {candidates.items.map((candidate) => {
-            const selected = draft.parentId === candidate.id;
-            return (
-              <Pressable
-                key={candidate.id}
-                accessibilityRole="radio"
-                accessibilityLabel={`${candidate.name}, ${candidate.address}`}
-                accessibilityState={{ selected }}
-                onPress={() => setField("parentId", candidate.id)}
-                style={[
-                  styles.candidate,
-                  selected && styles.candidateSelected,
-                ]}
-                testID={`parent-candidate-${candidate.id}`}
-              >
-                <View style={styles.candidateCopy}>
-                  <Text style={styles.candidateName}>{candidate.name}</Text>
-                  <Text style={styles.candidateMeta}>
-                    {candidate.address}
-                  </Text>
-                </View>
-                <Text
-                  style={[
-                    styles.candidateStatus,
-                    selected && styles.candidateStatusSelected,
-                  ]}
-                >
-                  {candidateStatusLabel[candidate.operationalStatus] ??
-                    candidate.operationalStatus.toUpperCase()}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      );
-    }
-    return null;
-  };
 
   return (
     <MapScrollLockProvider value={scrollLock}>
@@ -446,7 +262,7 @@ export function AidLocationForm({
           sessionSource={sessionSource}
           session={session}
         />
-        <View style={styles.header} testID="aid-location-action-bar">
+        <View style={styles.header} testID="damaged-home-action-bar">
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Volver a la portada"
@@ -473,37 +289,27 @@ export function AidLocationForm({
         >
           <View style={[styles.content, compact && styles.contentCompact]}>
             <View style={styles.intro}>
-              <Text style={styles.overline}>{copy.overline}</Text>
+              <Text style={styles.overline}>HOGAR / MI CASITA PARTIDA</Text>
               <Text
                 style={[styles.title, compact && styles.titleCompact]}
                 accessibilityRole="header"
               >
-                {copy.title}
+                Informar un hogar en malas condiciones
               </Text>
-              <Text style={styles.introText}>{copy.intro}</Text>
+              <Text style={styles.introText}>
+                Genera un informe sobre un hogar que quedó en muy malas
+                condiciones después del desastre. El informe se publica de
+                inmediato y aparece en el mapa, para que la ayuda sepa a
+                dónde llegar.
+              </Text>
             </View>
 
-            {/* CHG-161: acopio local y punto de distribución exigen
-                sesión — sin cuenta el formulario explica y ofrece
-                registrarse o iniciar sesión; nunca envía. */}
-            <SessionGate
-              required={AID_LOCATION_REQUIRES_SESSION[kind]}
-              session={session}
-              explanation={aidLocationSessionExplanation[kind] ?? ""}
-              onRegister={onRegister}
-              onLogin={onLogin}
-            >
             <ReportConsiderations
-              purpose={copy.legend}
+              purpose="Un informe del hogar que quedó en muy malas condiciones; también sale en el mapa."
               considerations={[
-                copy.contextNotice,
-                "El nombre, la dirección y el punto del mapa son públicos: así la comunidad sabe dónde está el punto y qué hace.",
-                "La comunidad puede denunciar un punto que no exista o funcione mal; con suficientes denuncias queda EN OBSERVACIÓN y lo revisa el equipo de la plataforma.",
-                ...(requiresParent
-                  ? [
-                      `Este tipo de punto no puede existir solo: debe asociarse a un ${copy.parentLabel?.toLocaleLowerCase("es-CO")} de su misma ciudad.`,
-                    ]
-                  : []),
+                "Describe el daño con tus palabras: qué se cayó, qué se inundó, qué quedó inservible.",
+                "La dirección y el punto del mapa son públicos: así la ayuda puede llegar al hogar.",
+                "El informe se publica de inmediato; el equipo de la plataforma puede retirarlo si no corresponde.",
               ]}
               onRegister={onRegister}
               onLogin={onLogin}
@@ -512,40 +318,41 @@ export function AidLocationForm({
 
             <FormSection
               code="01"
-              title="Cómo se llama"
-              description="El nombre con el que la comunidad reconocerá este punto."
+              title="Qué pasó con el hogar"
+              description="Cuenta el estado en el que quedó: daños, riesgos y lo que ya no funciona."
               onPosition={registerSection}
             >
               <FormField
-                label="Nombre del punto *"
-                hint={`Entre ${MIN_NAME_LENGTH} y ${MAX_NAME_LENGTH} caracteres`}
-                invalid={invalidFields.has("name")}
-                value={draft.name}
-                maxLength={MAX_NAME_LENGTH}
-                onChangeText={(value) => setField("name", value)}
+                label="Descripción del daño *"
+                hint={`Entre ${MIN_DAMAGE_DESCRIPTION_LENGTH} y ${MAX_DAMAGE_DESCRIPTION_LENGTH} caracteres`}
+                multiline
+                invalid={invalidFields.has("description")}
+                value={draft.description}
+                maxLength={MAX_DAMAGE_DESCRIPTION_LENGTH}
+                onChangeText={(value) => setField("description", value)}
               />
             </FormSection>
 
             <FormSection
               code="02"
-              title="Dónde funciona"
+              title="Dónde está el hogar"
               description="Municipio, departamento y dirección; si puedes, fija también el punto en el mapa."
               onPosition={registerSection}
             >
               <FieldGrid>
                 <FormField
                   label="Municipio *"
-                  hint="Ciudad donde funciona el punto"
+                  hint="Ciudad donde está el hogar"
                   invalid={invalidFields.has("municipality")}
                   value={draft.municipality}
-                  maxLength={MAX_CITY_LENGTH}
+                  maxLength={MAX_HOME_CITY_LENGTH}
                   onChangeText={(value) => setField("municipality", value)}
                 />
                 <FormField
                   label="Departamento *"
                   invalid={invalidFields.has("department")}
                   value={draft.department}
-                  maxLength={MAX_CITY_LENGTH}
+                  maxLength={MAX_HOME_CITY_LENGTH}
                   onChangeText={(value) => setField("department", value)}
                 />
               </FieldGrid>
@@ -554,7 +361,7 @@ export function AidLocationForm({
                 hint="Se completa sola al fijar el punto; siempre editable"
                 invalid={invalidFields.has("address")}
                 value={draft.address}
-                maxLength={MAX_ADDRESS_LENGTH}
+                maxLength={MAX_HOME_ADDRESS_LENGTH}
                 onChangeText={(value) => setField("address", value)}
               />
               <LastSeenLocationPicker
@@ -599,64 +406,13 @@ export function AidLocationForm({
               />
               {invalidFields.has("location") && (
                 <Text style={styles.errorText} accessibilityRole="alert">
-                  Las coordenadas del punto están fuera de rango.
+                  Las coordenadas del hogar están fuera de rango.
                 </Text>
               )}
             </FormSection>
 
-            {requiresParent && (
-              <FormSection
-                code="03"
-                title="Centro asociado"
-                description={`${copy.parentLabel} *. Solo aparecen centros publicados de la ciudad indicada.`}
-                onPosition={registerSection}
-              >
-                {parentSectionBody()}
-                {invalidFields.has("parentId") && (
-                  <Text style={styles.errorText} accessibilityRole="alert">
-                    Elige el centro al que estará asociado este punto.
-                  </Text>
-                )}
-              </FormSection>
-            )}
-
             <FormSection
-              code="04"
-              title="Cómo opera"
-              description="Opcional: horario, contacto y una descripción de lo que hace el punto."
-              onPosition={registerSection}
-            >
-              <FieldGrid>
-                <FormField
-                  label="Horario"
-                  hint="Por ejemplo: L-V 8am-5pm"
-                  invalid={invalidFields.has("schedule")}
-                  value={draft.schedule}
-                  maxLength={MAX_SCHEDULE_LENGTH}
-                  onChangeText={(value) => setField("schedule", value)}
-                />
-                <FormField
-                  label="Contacto"
-                  hint="Teléfono o correo público del punto"
-                  invalid={invalidFields.has("contact")}
-                  value={draft.contact}
-                  maxLength={MAX_CONTACT_LENGTH}
-                  onChangeText={(value) => setField("contact", value)}
-                />
-              </FieldGrid>
-              <FormField
-                label="Descripción"
-                hint={`Máximo ${MAX_DESCRIPTION_LENGTH} caracteres`}
-                multiline
-                invalid={invalidFields.has("description")}
-                value={draft.description}
-                maxLength={MAX_DESCRIPTION_LENGTH}
-                onChangeText={(value) => setField("description", value)}
-              />
-            </FormSection>
-
-            <FormSection
-              code="05"
+              code="03"
               title="Confirmación"
               description="Lee y confirma antes de publicar."
               onPosition={registerSection}
@@ -664,7 +420,7 @@ export function AidLocationForm({
               <Pressable
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: draft.truthConfirmed }}
-                accessibilityLabel="Confirmo que el punto existe y la información es real."
+                accessibilityLabel="Confirmo que el hogar está en las condiciones descritas y la información es real."
                 onPress={() =>
                   setField("truthConfirmed", !draft.truthConfirmed)
                 }
@@ -685,7 +441,8 @@ export function AidLocationForm({
                   </Text>
                 </View>
                 <Text style={styles.consentText}>
-                  Confirmo que el punto existe y la información es real.
+                  Confirmo que el hogar está en las condiciones descritas y
+                  la información es real.
                 </Text>
               </Pressable>
             </FormSection>
@@ -693,7 +450,7 @@ export function AidLocationForm({
             {formErrors.length > 0 && (
               <View style={styles.errorSummary} accessibilityRole="alert">
                 <Text style={styles.errorSummaryTitle}>
-                  Revisa el registro antes de continuar
+                  Revisa el informe antes de continuar
                 </Text>
                 {formErrors.map((error) => (
                   <Text key={error} style={styles.errorSummaryItem}>
@@ -709,15 +466,14 @@ export function AidLocationForm({
               <View style={styles.submitCopy}>
                 <Text style={styles.submitTitle}>PUBLICACIÓN Y REVISIÓN</Text>
                 <Text style={styles.submitText}>
-                  El punto se publica de inmediato en el mapa y en el
-                  directorio. La comunidad puede denunciarlo si no existe o
-                  funciona mal; con suficientes denuncias queda EN
-                  OBSERVACIÓN y lo revisa el equipo de la plataforma.
+                  El informe se publica de inmediato y aparece en el mapa
+                  como hogar en malas condiciones. El equipo de la
+                  plataforma puede revisarlo y retirarlo si no corresponde.
                 </Text>
               </View>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Publicar ${aidLocationKindLabel[kind].toLocaleLowerCase("es-CO")}`}
+                accessibilityLabel="Publicar informe del hogar"
                 disabled={submitting}
                 onPress={() => void submit()}
                 style={({ pressed }) => [
@@ -729,12 +485,11 @@ export function AidLocationForm({
                   <ActivityIndicator color="#07101b" />
                 ) : (
                   <Text style={styles.submitButtonText}>
-                    PUBLICAR PUNTO →
+                    PUBLICAR INFORME →
                   </Text>
                 )}
               </Pressable>
             </View>
-            </SessionGate>
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -743,11 +498,11 @@ export function AidLocationForm({
   );
 }
 
-function LocationConfirmation({
+function DamagedHomeConfirmation({
   receipt,
   onHome,
 }: {
-  receipt: AidLocationReceipt;
+  receipt: DamagedHomeReceipt;
   onHome: () => void;
 }) {
   return (
@@ -761,24 +516,13 @@ function LocationConfirmation({
         </View>
         <Text style={styles.overline}>CONSTANCIA / CUSOL</Text>
         <Text style={styles.confirmationTitle} accessibilityRole="header">
-          Punto registrado
+          Informe publicado
         </Text>
         <Text style={styles.confirmationText}>
-          El {aidLocationKindLabel[receipt.kind].toLocaleLowerCase("es-CO")} ya
-          aparece en el mapa y en el directorio desde el{" "}
-          {createdFormatter.format(new Date(receipt.createdAt))}.
+          El informe del hogar ya aparece en el mapa desde el{" "}
+          {createdFormatter.format(new Date(receipt.createdAt))}. Gracias
+          por avisar: así la ayuda sabe a dónde llegar.
         </Text>
-        <View style={styles.receiptCode}>
-          <Text style={styles.receiptLabel}>TIPO DE PUNTO</Text>
-          <Text style={styles.receiptValue}>
-            {aidLocationKindLabel[receipt.kind]}
-          </Text>
-          <Text style={styles.reviewStatus}>
-            {receipt.operationalStatus === "open"
-              ? "ABIERTO"
-              : receipt.operationalStatus.toUpperCase()}
-          </Text>
-        </View>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Volver a la portada"
@@ -841,7 +585,6 @@ function FormField({
   onChangeText: (value: string) => void;
   hint?: string;
   multiline?: boolean;
-  keyboardType?: "default" | "number-pad";
   maxLength?: number;
   invalid?: boolean;
   placeholder?: string;
@@ -1017,47 +760,6 @@ const styles = StyleSheet.create({
     borderColor: colors.reported,
     backgroundColor: "rgba(255,103,136,0.06)",
   },
-  fieldNote: { color: colors.inkDim, fontSize: 10, lineHeight: 16 },
-  // CHG-153: selector del centro asociado (lista de candidatos).
-  candidateList: { gap: 10 },
-  candidate: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 9,
-    backgroundColor: "rgba(5,9,17,0.55)",
-  },
-  candidateSelected: {
-    borderColor: colors.cyan,
-    backgroundColor: "rgba(81,229,255,0.10)",
-  },
-  candidateCopy: { minWidth: 0, flex: 1 },
-  candidateName: { color: colors.ink, fontSize: 12, fontWeight: "700" },
-  candidateMeta: {
-    marginTop: 3,
-    color: colors.inkDim,
-    fontSize: 10,
-    lineHeight: 15,
-  },
-  candidateStatus: {
-    color: colors.inkDim,
-    fontFamily: fontFamilies.mono,
-    fontSize: 8,
-    fontWeight: "800",
-    letterSpacing: 0.7,
-  },
-  candidateStatusSelected: { color: colors.cyan },
-  missingParent: {
-    padding: 15,
-    borderWidth: 1,
-    borderColor: "rgba(255,181,71,0.35)",
-    borderRadius: 9,
-    backgroundColor: "rgba(255,181,71,0.07)",
-  },
-  missingParentText: { color: "#e8c890", fontSize: 11, lineHeight: 18 },
   consent: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -1187,35 +889,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 20,
     textAlign: "center",
-  },
-  receiptCode: {
-    width: "100%",
-    alignItems: "center",
-    gap: 7,
-    marginVertical: 8,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 10,
-  },
-  receiptLabel: {
-    color: colors.inkDim,
-    fontFamily: fontFamilies.mono,
-    fontSize: 8,
-    letterSpacing: 0.8,
-  },
-  receiptValue: {
-    color: colors.cyan,
-    fontFamily: fontFamilies.mono,
-    fontSize: 21,
-    fontWeight: "800",
-    textAlign: "center",
-  },
-  reviewStatus: {
-    color: colors.alive,
-    fontFamily: fontFamilies.mono,
-    fontSize: 9,
-    fontWeight: "800",
-    letterSpacing: 1,
   },
 });

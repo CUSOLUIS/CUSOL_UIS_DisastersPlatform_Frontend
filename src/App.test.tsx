@@ -401,8 +401,13 @@ describe("App universal", () => {
       // CHG-153: acopio receptor y punto de distribución.
       "register-receiver-center-action",
       "register-distribution-point-action",
+      // CHG-161: transportes de insumos con trazabilidad.
+      "register-mule-transport-action",
+      "register-boat-transport-action",
       "offer-community-meals-action",
       "offer-temporary-shelter-action",
+      // CHG-162: informe de hogar en malas condiciones.
+      "report-damaged-home-action",
       "request-help-action",
     ]);
 
@@ -962,8 +967,9 @@ describe("App universal", () => {
     expect(
       screen.getAllByTestId("building-marker-icon", { includeHiddenElements: true }),
       // CHG-049: chip de edificios + 2 marcadores demo + chip de
-      // alojamiento temporal (también con icono de edificio).
-    ).toHaveLength(4);
+      // alojamiento temporal (también con icono de edificio) +
+      // CHG-162: chip de hogares en malas condiciones.
+    ).toHaveLength(5);
   });
 
   it("representa las 2.012 personas distribuidas por Colombia en clusters trazables", async () => {
@@ -1170,6 +1176,7 @@ describe("App universal", () => {
           volunteersNeeded: 0,
           receiverCenter: 0,
           distributionPoint: 0,
+          damagedHome: 0,
           helpRequests: 0,
         },
         items: [],
