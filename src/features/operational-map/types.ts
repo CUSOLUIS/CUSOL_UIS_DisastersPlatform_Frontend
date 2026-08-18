@@ -11,6 +11,11 @@ export const operationalMapCategories = [
   "temporary_shelter",
   // CHG-069: alertas ciudadanas de voluntariado.
   "volunteers_needed",
+  // CHG-153: logística humanitaria — acopio receptor y distribución
+  // (acopio local y recolección reutilizan collection_center /
+  // collection_point de arriba).
+  "receiver_center",
+  "distribution_point",
   // CHG-125: solicitudes «Necesitamos ayuda» vigentes (fusionadas en
   // cliente, DEC-125-10; nunca vienen del overview del backend).
   "help_request",
@@ -22,8 +27,12 @@ export type OperationalMapCategory = (typeof operationalMapCategories)[number];
 // su categoría lista; sus marcadores aparecerán cuando la moderación
 // publique ubicaciones (las ofertas siguen bloqueadas por DEC-021).
 export const operationalResponseCategories = [
+  // CHG-153: los 4 tipos logísticos juntos — acopio local, acopio
+  // receptor, recolección y distribución.
   "collection_center",
+  "receiver_center",
   "collection_point",
+  "distribution_point",
   "rubble_reviewed",
   "rubble_pending",
   "building_pending",
@@ -73,6 +82,9 @@ export interface OperationalMapSummary {
   communityMeal: number;
   temporaryShelter: number;
   volunteersNeeded: number;
+  // CHG-153: logística humanitaria.
+  receiverCenter: number;
+  distributionPoint: number;
   // CHG-125: cuenta de solicitudes de ayuda vigentes fusionadas en
   // cliente; el backend no la envía y se normaliza a 0.
   helpRequests: number;

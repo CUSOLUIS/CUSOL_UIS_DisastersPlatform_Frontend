@@ -59,6 +59,8 @@ type LegacyOperationalMapOverview = Omit<OperationalMapOverview, "summary"> & {
     | "communityMeal"
     | "temporaryShelter"
     | "volunteersNeeded"
+    | "receiverCenter"
+    | "distributionPoint"
     | "helpRequests"
   > & {
     buildingPending?: number;
@@ -66,6 +68,9 @@ type LegacyOperationalMapOverview = Omit<OperationalMapOverview, "summary"> & {
     communityMeal?: number;
     temporaryShelter?: number;
     volunteersNeeded?: number;
+    // CHG-153: logística humanitaria.
+    receiverCenter?: number;
+    distributionPoint?: number;
     // CHG-125: el backend no envía esta cuenta; la fusión en cliente
     // la sobreescribe con las solicitudes vigentes.
     helpRequests?: number;
@@ -87,6 +92,8 @@ export function normalizeOperationalMapOverview(
     communityMeal: 0,
     temporaryShelter: 0,
     volunteersNeeded: 0,
+    receiverCenter: 0,
+    distributionPoint: 0,
     helpRequests: 0,
   };
 
@@ -118,6 +125,12 @@ export function normalizeOperationalMapOverview(
         break;
       case "volunteers_needed":
         summary.volunteersNeeded += 1;
+        break;
+      case "receiver_center":
+        summary.receiverCenter += 1;
+        break;
+      case "distribution_point":
+        summary.distributionPoint += 1;
         break;
       case "help_request":
         summary.helpRequests += 1;

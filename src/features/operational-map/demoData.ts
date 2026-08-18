@@ -50,6 +50,8 @@ export const operationalMapDemoData: OperationalMapOverview = {
     communityMeal: 0,
     temporaryShelter: 0,
     volunteersNeeded: 0,
+    receiverCenter: 0,
+    distributionPoint: 0,
     helpRequests: 0,
   },
   generatedAt: "2026-08-12T18:30:00.000Z",

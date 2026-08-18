@@ -943,7 +943,7 @@ describe("App universal", () => {
     expect(
       screen.queryByRole("button", { name: "Filtrar mapa por Desaparecidos" }),
     ).toBeNull();
-    expect(screen.getByRole("button", { name: "Filtrar mapa por Centros de acopio" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Filtrar mapa por Centros de acopio local" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Filtrar mapa por Escombros revisados" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Filtrar mapa por Escombros pendientes" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Filtrar mapa por Edificios sin revisar" })).toBeTruthy();
@@ -1044,7 +1044,7 @@ describe("App universal", () => {
     ).toBeNull();
 
     fireEvent.press(
-      screen.getByRole("button", { name: "Filtrar mapa por Centros de acopio" }),
+      screen.getByRole("button", { name: "Filtrar mapa por Centros de acopio local" }),
     );
 
     // Quedan 6 puntos operativos + 2 solicitudes de ayuda (CHG-125),
@@ -1105,7 +1105,7 @@ describe("App universal", () => {
     render(<App dataSource={demoDataSource} mapDataSource={demoMapDataSource} />);
 
     const marker = await screen.findByRole("button", {
-      name: "Centros de acopio: Centro de acopio Norte, Bogotá, Distrito Capital",
+      name: "Centros de acopio local: Centro de acopio Norte, Bogotá, Distrito Capital",
     });
     fireEvent.press(marker);
 
@@ -1166,6 +1166,8 @@ describe("App universal", () => {
           communityMeal: 0,
           temporaryShelter: 0,
           volunteersNeeded: 0,
+          receiverCenter: 0,
+          distributionPoint: 0,
           helpRequests: 0,
         },
         items: [],

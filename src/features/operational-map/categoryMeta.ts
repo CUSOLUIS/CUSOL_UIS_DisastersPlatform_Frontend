@@ -11,6 +11,8 @@ interface CategoryMeta {
     | "missingPerson"
     | "collectionCenter"
     | "collectionPoint"
+    | "receiverCenter"
+    | "distributionPoint"
     | "rubbleReviewed"
     | "rubblePending"
     | "buildingPending"
@@ -29,13 +31,24 @@ export const categoryMeta: Record<OperationalMapCategory, CategoryMeta> = {
     markerKind: "person",
     summaryKey: "missingPerson",
   },
+  // CHG-153: los 4 tipos logísticos. El acopio local conserva la
+  // categoría collection_center histórica; receptor y distribución
+  // llegan del backend con sus propias categorías.
   collection_center: {
-    label: "Centros de acopio",
-    shortLabel: "Centro de acopio",
+    label: "Centros de acopio local",
+    shortLabel: "Centro de acopio local",
     glyph: "+",
     color: colors.cyan,
     markerKind: "person",
     summaryKey: "collectionCenter",
+  },
+  receiver_center: {
+    label: "Centros de acopio receptor",
+    shortLabel: "Centro de acopio receptor",
+    glyph: "▣",
+    color: "#2dd4bf",
+    markerKind: "person",
+    summaryKey: "receiverCenter",
   },
   // CHG-049: categorías de las acciones comunitarias recientes, con
   // colores propios que no chocan con las categorías previas.
@@ -46,6 +59,14 @@ export const categoryMeta: Record<OperationalMapCategory, CategoryMeta> = {
     color: colors.deceased,
     markerKind: "person",
     summaryKey: "collectionPoint",
+  },
+  distribution_point: {
+    label: "Puntos de distribución",
+    shortLabel: "Punto de distribución",
+    glyph: "▼",
+    color: "#c084fc",
+    markerKind: "person",
+    summaryKey: "distributionPoint",
   },
   rubble_reviewed: {
     label: "Escombros revisados",
