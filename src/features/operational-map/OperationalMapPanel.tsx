@@ -11,11 +11,16 @@ import { colors, fontFamilies } from "../../theme";
 import { font } from "../../typography";
 import { useDataRefreshTick } from "../../platform/dataRefresh";
 import { CountdownLabel } from "../help-requests/CountdownLabel";
+import { HelpRequestActionSheet } from "../help-requests/HelpRequestActionSheet";
 import {
   helpRequestIdFromPointId,
   helpRequestsToMapPoints,
 } from "../help-requests/mapPoints";
-import type { ActiveHelpRequest } from "../help-requests/types";
+import type {
+  ActiveHelpRequest,
+  HelpRequestAttendReceipt,
+} from "../help-requests/types";
+import type { SelectedPhoto } from "../missing-persons/reportTypes";
 import type { HumanStatus } from "../human-impact/types";
 import { categoryMeta } from "./categoryMeta";
 import { CategoryMarkerIcon } from "./CategoryMarkerIcon";
@@ -65,6 +70,19 @@ const precisionLabels = {
   municipality: "Referencia municipal",
 } as const;
 
+// CHG-148: al tocar una solicitud en el mapa se abre su ventana de
+// acción. Con estas acciones presentes, quien tiene cuenta atiende y
+// quien no la tiene se ofrece como voluntario. Sin ellas (contextos que
+// no las pasan) la solicitud solo muestra información.
+export interface HelpRequestMapActions {
+  isAuthenticated: boolean;
+  attend: (id: string) => Promise<HelpRequestAttendReceipt>;
+  onAttended?: () => void;
+  onLogin?: () => void;
+  onRegister?: () => void;
+  pickPhoto?: () => Promise<SelectedPhoto[]>;
+}
+
 interface OperationalMapPanelProps {
   dataSource: OperationalMapDataSource;
   humanDataSource: HumanMapDataSource;
@@ -72,6 +90,7 @@ interface OperationalMapPanelProps {
   // CHG-125 / DEC-125-10: solicitudes de ayuda vigentes fusionadas en
   // cliente como marcadores `help_request`; nunca vienen del overview.
   helpRequests?: ActiveHelpRequest[];
+  helpRequestActions?: HelpRequestMapActions;
 }
 
 const INITIAL_HUMAN_VIEWPORT: HumanMapViewport = {
@@ -101,6 +120,7 @@ export function OperationalMapPanel({
   humanDataSource,
   compact,
   helpRequests = [],
+  helpRequestActions,
 }: OperationalMapPanelProps) {
   const [loadState, setLoadState] = useState<MapLoadState>(() =>
     dataSource.initialOverview
@@ -226,6 +246,7 @@ export function OperationalMapPanel({
       stale={loadState.stale}
       compact={compact}
       helpRequests={helpRequests}
+      helpRequestActions={helpRequestActions}
       activeCategories={activeCategories}
       setActiveCategories={setActiveCategories}
       selectedId={selectedId}
@@ -248,6 +269,7 @@ function MapContent({
   stale,
   compact,
   helpRequests,
+  helpRequestActions,
   activeCategories,
   setActiveCategories,
   selectedId,
@@ -266,6 +288,7 @@ function MapContent({
   stale: boolean;
   compact: boolean;
   helpRequests: ActiveHelpRequest[];
+  helpRequestActions?: HelpRequestMapActions;
   activeCategories: OperationalMapCategory[];
   setActiveCategories: React.Dispatch<React.SetStateAction<OperationalMapCategory[]>>;
   selectedId: string | null;
@@ -307,9 +330,30 @@ function MapContent({
       ? (helpRequests.find((request) => request.id === rawId) ?? null)
       : null;
   }, [helpRequests, selectedPoint]);
+  // CHG-148: la solicitud cuya ventana de acción está abierta (solo al
+  // tocar explícitamente su marcador; nunca por la selección inicial).
+  const [actionRequestId, setActionRequestId] = useState<string | null>(null);
   const handleSelect = useCallback(
-    (pointId: string) => setSelectedId(pointId),
-    [setSelectedId],
+    (pointId: string) => {
+      setSelectedId(pointId);
+      const rawId = helpRequestIdFromPointId(pointId);
+      if (
+        helpRequestActions &&
+        rawId &&
+        helpRequests.some((request) => request.id === rawId)
+      ) {
+        setActionRequestId(rawId);
+      }
+    },
+    [setSelectedId, helpRequestActions, helpRequests],
+  );
+  const actionRequest = useMemo(
+    () =>
+      actionRequestId
+        ? (helpRequests.find((request) => request.id === actionRequestId) ??
+          null)
+        : null,
+    [actionRequestId, helpRequests],
   );
   const humanData =
     humanLoadState.status === "success" ? humanLoadState.data : null;
@@ -401,6 +445,22 @@ function MapContent({
             </Text>
           </View>
         </View>
+      )}
+
+      {/* CHG-148: ventana de acción al tocar la solicitud — con cuenta
+          se atiende; sin cuenta se ofrece como voluntario. */}
+      {helpRequestActions && actionRequest && (
+        <HelpRequestActionSheet
+          request={actionRequest}
+          visible
+          onClose={() => setActionRequestId(null)}
+          isAuthenticated={helpRequestActions.isAuthenticated}
+          attend={helpRequestActions.attend}
+          onAttended={helpRequestActions.onAttended}
+          onLogin={helpRequestActions.onLogin}
+          onRegister={helpRequestActions.onRegister}
+          pickPhoto={helpRequestActions.pickPhoto}
+        />
       )}
 
       <View

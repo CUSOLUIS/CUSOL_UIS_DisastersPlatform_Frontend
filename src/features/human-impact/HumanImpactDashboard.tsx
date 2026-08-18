@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import {
   Animated,
@@ -34,6 +34,7 @@ import type {
 } from "../humanitarian-directory/types";
 import { HelpRequestProximityAlert } from "../help-requests/HelpRequestProximityAlert";
 import { useActiveHelpRequests } from "../help-requests/useActiveHelpRequests";
+import { pickVolunteerPhoto } from "../help-requests/pickVolunteerPhoto";
 import type { HelpRequestsDataSource } from "../help-requests/types";
 import { ReportActions } from "../missing-persons/MissingPersonCommandCenter";
 import { OperationalMapPanel } from "../operational-map/OperationalMapPanel";
@@ -272,11 +273,22 @@ export function HumanImpactDashboard({
 
   // CHG-125 / CHG-148: una sola consulta de solicitudes vigentes
   // alimenta el mapa (marcadores + contador del legend) y la alerta de
-  // proximidad. La LISTA y la acción de atender ya no viven en el
-  // inicio: la lista está en el espacio personal y la acción de
-  // voluntario se abre desde el detalle del mapa (CHG-148 fase B).
-  const { state: helpRequestsState } =
+  // proximidad. La LISTA ya no vive en el inicio (está en el espacio
+  // personal); la acción se abre desde el detalle del mapa: con cuenta
+  // se atiende, sin cuenta se ofrece como voluntario.
+  const { state: helpRequestsState, refresh: refreshHelpRequests } =
     useActiveHelpRequests(helpRequestsDataSource);
+  const helpRequestActions = useMemo(
+    () => ({
+      isAuthenticated: account !== null,
+      attend: (id: string) => helpRequestsDataSource.attend(id),
+      onAttended: refreshHelpRequests,
+      onLogin,
+      onRegister,
+      pickPhoto: pickVolunteerPhoto,
+    }),
+    [account, helpRequestsDataSource, refreshHelpRequests, onLogin, onRegister],
+  );
 
   return (
     <LinearGradient
@@ -413,6 +425,7 @@ export function HumanImpactDashboard({
                 humanDataSource={humanMapDataSource}
                 compact={compact}
                 helpRequests={helpRequestsState.items}
+                helpRequestActions={helpRequestActions}
               />
             </View>
 
