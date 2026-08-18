@@ -19,7 +19,12 @@ export type AdminSubmissionKind =
   | "person_status_report"
   | "aid_location_rating"
   | "collection_center_registration"
-  | "collection_point_registration";
+  | "collection_point_registration"
+  // CHG-044: las ofertas comunitarias también viven en la bandeja.
+  | "community_meal_offer"
+  | "temporary_shelter_offer";
+// CHG-159: temas de la bandeja (mismos ejes que el mapa público).
+export type AdminSubmissionTheme = "personas" | "infraestructura" | "ayuda";
 export type AdminModerationStatus =
   | "under_review"
   | "needs_information"
@@ -31,7 +36,9 @@ export type AdminAction =
   | "reject"
   | "request_changes"
   | "archive"
-  | "restore";
+  | "restore"
+  // CHG-159: borrado definitivo (solo desde archivado/rechazado).
+  | "delete";
 export type AdminAccountStatus =
   | "pending_verification"
   | "active"
@@ -120,6 +127,8 @@ export interface AdminSubmissionDetail extends AdminSubmissionSummary {
 export interface AdminSubmissionFilters {
   q?: string;
   kind?: AdminSubmissionKind;
+  // CHG-159: filtro por tema; un kind explícito manda sobre el tema.
+  theme?: AdminSubmissionTheme;
   status?: AdminModerationStatus;
   receivedFrom?: string;
   receivedTo?: string;
@@ -142,6 +151,13 @@ export interface AdminDecisionInput {
 export interface AdminVersionedReasonInput {
   expectedVersion: number;
   reason: string;
+}
+
+// CHG-159: recibo del borrado definitivo — la fila ya no existe.
+export interface AdminSubmissionDeleteReceipt {
+  id: string;
+  auditEventId: string;
+  deletedAt: string;
 }
 
 export interface AdminMutationReceipt {
@@ -402,6 +418,10 @@ export interface AdminDataSource {
     id: string,
     input: AdminVersionedReasonInput,
   ): Promise<AdminMutationReceipt>;
+  deleteSubmissionPermanently(
+    id: string,
+    input: AdminVersionedReasonInput,
+  ): Promise<AdminSubmissionDeleteReceipt>;
   restoreSubmission(
     id: string,
     input: AdminVersionedReasonInput,

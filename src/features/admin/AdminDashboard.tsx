@@ -33,6 +33,7 @@ import type {
   AdminSection,
   AdminSubmissionDetail,
   AdminSubmissionKind,
+  AdminSubmissionTheme,
   AdminSubmissionPage,
 } from "./types";
 import type { AccountRole, AuthenticatedAccount } from "../auth/types";
@@ -70,6 +71,27 @@ const KIND_LABELS: Record<AdminSubmissionKind, string> = {
   aid_location_rating: "Valoración de ayuda",
   collection_center_registration: "Centro de acopio",
   collection_point_registration: "Punto de recolección",
+  community_meal_offer: "Comida comunitaria",
+  temporary_shelter_offer: "Alojamiento temporal",
+};
+
+// CHG-159: los tres temas de la bandeja (mismos ejes que el mapa) y
+// sus subtemas; el backend comparte este mapa (admin.py::THEME_KINDS).
+const THEME_LABELS: Record<AdminSubmissionTheme, string> = {
+  personas: "Personas / Geo Clusters",
+  infraestructura: "Infraestructura",
+  ayuda: "Ayuda humanitaria",
+};
+const THEME_KINDS: Record<AdminSubmissionTheme, AdminSubmissionKind[]> = {
+  personas: ["missing_person_report", "person_status_report"],
+  infraestructura: ["unverified_building_report"],
+  ayuda: [
+    "aid_location_rating",
+    "collection_center_registration",
+    "collection_point_registration",
+    "community_meal_offer",
+    "temporary_shelter_offer",
+  ],
 };
 
 const STATUS_LABELS: Record<AdminModerationStatus, string> = {
@@ -96,8 +118,10 @@ const ACTION_LABELS: Record<AdminAction, string> = {
   accept: "Aceptar",
   reject: "Rechazar",
   request_changes: "Solicitar información",
-  archive: "Archivar",
+  // CHG-159: archivar es la deshabilitación reversible.
+  archive: "Deshabilitar (archivar)",
   restore: "Restaurar",
+  delete: "Eliminar definitivamente",
 };
 
 interface AdminDashboardProps {
@@ -130,6 +154,8 @@ function guardAdminDataSource(
       guarded(source.decideSubmission(id, input)),
     archiveSubmission: (id, input) =>
       guarded(source.archiveSubmission(id, input)),
+    deleteSubmissionPermanently: (id, input) =>
+      guarded(source.deleteSubmissionPermanently(id, input)),
     restoreSubmission: (id, input) =>
       guarded(source.restoreSubmission(id, input)),
     grantEvidenceAccess: (submissionId, evidenceId) =>
@@ -319,6 +345,7 @@ export function AdminDashboard({
                 dataSource={protectedDataSource}
                 refreshKey={refreshKey}
                 onMutated={refreshAll}
+                onNavigate={setSection}
               />
             )}
             {section === "accounts" && (
@@ -508,13 +535,15 @@ function OverviewSection({
           ))}
         </Panel>
       </View>
-      <InlineNotice message="Eliminar significa archivar de forma reversible. No existe borrado físico ni acceso root desde esta consola." tone="safe" />
+      <InlineNotice message="Deshabilitar (archivar) es reversible. El borrado definitivo existe (CHG-159) pero solo procede sobre expedientes ya deshabilitados o rechazados, y siempre queda auditado." tone="safe" />
     </View>
   );
 }
 
-function SubmissionsSection({ dataSource, refreshKey, onMutated }: { dataSource: AdminDataSource; refreshKey: number; onMutated: () => void }) {
+function SubmissionsSection({ dataSource, refreshKey, onMutated, onNavigate }: { dataSource: AdminDataSource; refreshKey: number; onMutated: () => void; onNavigate: (section: AdminSection) => void }) {
   const [query, setQuery] = useState("");
+  // CHG-159: filtro de dos niveles — tema y subtema (tipo).
+  const [theme, setTheme] = useState<AdminSubmissionTheme | undefined>();
   const [kind, setKind] = useState<AdminSubmissionKind | undefined>();
   const [status, setStatus] = useState<AdminModerationStatus | undefined>();
   const [receivedFrom, setReceivedFrom] = useState("");
@@ -530,13 +559,13 @@ function SubmissionsSection({ dataSource, refreshKey, onMutated }: { dataSource:
     setLoading(true);
     setError(null);
     try {
-      setPage(await dataSource.listSubmissions({ q: query.trim() || undefined, kind, status, receivedFrom: dateBoundary(receivedFrom, "start"), receivedTo: dateBoundary(receivedTo, "end"), limit: 25, offset }));
+      setPage(await dataSource.listSubmissions({ q: query.trim() || undefined, kind, theme: kind ? undefined : theme, status, receivedFrom: dateBoundary(receivedFrom, "start"), receivedTo: dateBoundary(receivedTo, "end"), limit: 25, offset }));
     } catch (caught: unknown) {
       setError(caught instanceof Error ? caught.message : "No fue posible cargar los ingresos.");
     } finally {
       setLoading(false);
     }
-  }, [dataSource, kind, offset, query, receivedFrom, receivedTo, status]);
+  }, [dataSource, kind, offset, query, receivedFrom, receivedTo, status, theme]);
 
   useEffect(() => { void load(); }, [load, refreshKey]);
 
@@ -553,7 +582,19 @@ function SubmissionsSection({ dataSource, refreshKey, onMutated }: { dataSource:
       <SectionHeading code="02" title="Ingresos de usuarios" description="Busca, revisa y modera cada expediente sin exponer datos privados en el listado." />
       <Panel title="FILTROS DE BANDEJA" meta={page ? `${page.total} COINCIDENCIAS` : "CONSULTANDO"}>
         <TextInput accessibilityLabel="Buscar ingresos" value={query} onChangeText={(value) => { setQuery(value); setOffset(0); }} placeholder="Código, título o ubicación" placeholderTextColor="#536074" style={styles.searchInput} />
-        <FilterRow label="Tipo" value={kind} options={Object.keys(KIND_LABELS) as AdminSubmissionKind[]} labels={KIND_LABELS} onChange={(value) => { setKind(value); setOffset(0); }} />
+        <FilterRow label="Tema" value={theme} options={Object.keys(THEME_LABELS) as AdminSubmissionTheme[]} labels={THEME_LABELS} onChange={(value) => { setTheme(value); setKind(undefined); setOffset(0); }} />
+        <FilterRow label={theme ? "Subtema" : "Tipo"} value={kind} options={(theme ? THEME_KINDS[theme] : Object.keys(KIND_LABELS)) as AdminSubmissionKind[]} labels={KIND_LABELS} onChange={(value) => { setKind(value); setOffset(0); }} />
+        {/* CHG-159: enlaces cruzados en vez de listas duplicadas. */}
+        {theme === "personas" && (
+          <Pressable accessibilityRole="button" accessibilityLabel="Abrir la sección de registros de personas" onPress={() => onNavigate("peopleRecords")} style={({ pressed }) => [styles.crossLink, pressed && styles.pressed]}>
+            <Text style={styles.crossLinkText}>Los REGISTROS publicados de personas (ocultar, editar, restaurar) se gestionan en la sección 08 · Personas →</Text>
+          </Pressable>
+        )}
+        {theme === "ayuda" && (
+          <Pressable accessibilityRole="button" accessibilityLabel="Abrir la sección de solicitudes Necesitamos ayuda" onPress={() => onNavigate("helpRequests")} style={({ pressed }) => [styles.crossLink, pressed && styles.pressed]}>
+            <Text style={styles.crossLinkText}>Las solicitudes «NECESITAMOS AYUDA» activas se gestionan en su propia sección →</Text>
+          </Pressable>
+        )}
         <FilterRow label="Estado" value={status} options={Object.keys(STATUS_LABELS) as AdminModerationStatus[]} labels={STATUS_LABELS} onChange={(value) => { setStatus(value); setOffset(0); }} />
         <View style={styles.dateFilters}><TextInput accessibilityLabel="Fecha inicial de ingresos" value={receivedFrom} onChangeText={(value) => { setReceivedFrom(value); setOffset(0); }} placeholder="Desde · AAAA-MM-DD" placeholderTextColor="#536074" inputMode="numeric" maxLength={10} style={[styles.searchInput, styles.dateInput]} /><TextInput accessibilityLabel="Fecha final de ingresos" value={receivedTo} onChangeText={(value) => { setReceivedTo(value); setOffset(0); }} placeholder="Hasta · AAAA-MM-DD" placeholderTextColor="#536074" inputMode="numeric" maxLength={10} style={[styles.searchInput, styles.dateInput]} /></View>
       </Panel>
@@ -589,12 +630,17 @@ function SubmissionsSection({ dataSource, refreshKey, onMutated }: { dataSource:
           await load();
           onMutated();
         }}
+        onDeleted={async () => {
+          setSelected(null);
+          await load();
+          onMutated();
+        }}
       />
     </View>
   );
 }
 
-function SubmissionDetailModal({ dataSource, detail, onClose, onChanged }: { dataSource: AdminDataSource; detail: AdminSubmissionDetail | null; onClose: () => void; onChanged: () => Promise<void> }) {
+function SubmissionDetailModal({ dataSource, detail, onClose, onChanged, onDeleted }: { dataSource: AdminDataSource; detail: AdminSubmissionDetail | null; onClose: () => void; onChanged: () => Promise<void>; onDeleted: () => Promise<void> }) {
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -624,6 +670,14 @@ function SubmissionDetailModal({ dataSource, detail, onClose, onChanged }: { dat
     try {
       if (pendingAction === "archive") await dataSource.archiveSubmission(detail.id, { expectedVersion: detail.version, reason: reason.trim() });
       else if (pendingAction === "restore") await dataSource.restoreSubmission(detail.id, { expectedVersion: detail.version, reason: reason.trim() });
+      else if (pendingAction === "delete") {
+        // CHG-159: el expediente deja de existir — se cierra el modal
+        // y se recarga la bandeja, sin re-consultar el detalle.
+        await dataSource.deleteSubmissionPermanently(detail.id, { expectedVersion: detail.version, reason: reason.trim() });
+        setPendingAction(null);
+        await onDeleted();
+        return;
+      }
       else await dataSource.decideSubmission(detail.id, { expectedVersion: detail.version, action: pendingAction, reason: reason.trim() });
       setNotice(`${ACTION_LABELS[pendingAction]} aplicado y auditado.`); setPendingAction(null); await onChanged();
     } catch (caught: unknown) { setError(messageOf(caught)); }
@@ -665,8 +719,8 @@ function SubmissionDetailModal({ dataSource, detail, onClose, onChanged }: { dat
             <View style={styles.reasonField}><Text style={styles.adminFieldLabel}>Motivo obligatorio de edición o decisión</Text><TextInput accessibilityLabel="Motivo administrativo" value={reason} onChangeText={setReason} multiline placeholder="Describe por qué realizas este cambio (mínimo 10 caracteres)" placeholderTextColor="#536074" style={[styles.adminInput, styles.adminInputMultiline]} /></View>
             {error && <InlineNotice message={error} tone="error" />}{notice && <InlineNotice message={notice} tone="safe" />}
             <Pressable accessibilityRole="button" accessibilityLabel="Guardar cambios del expediente" disabled={working} onPress={() => void save()} style={styles.primaryButton}><Text style={styles.primaryButtonText}>GUARDAR CAMPOS EDITABLES</Text></Pressable>
-            <View style={styles.actionGrid}>{detail.availableActions.map((action) => <Pressable key={action} accessibilityRole="button" accessibilityLabel={`${ACTION_LABELS[action]} expediente`} onPress={() => setPendingAction(action)} style={[styles.actionButton, action === "reject" || action === "archive" ? styles.dangerAction : styles.safeAction]}><Text style={styles.actionButtonText}>{ACTION_LABELS[action].toUpperCase()}</Text></Pressable>)}</View>
-            {pendingAction && <View style={styles.confirmPanel}><Text style={styles.confirmTitle}>Confirmar: {ACTION_LABELS[pendingAction]}</Text><Text style={styles.confirmText}>La acción se enviará con la versión {detail.version}, el motivo escrito y una entrada de auditoría.</Text><View style={styles.confirmActions}><Pressable accessibilityRole="button" onPress={() => setPendingAction(null)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>CANCELAR</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Confirmar ${ACTION_LABELS[pendingAction]}`} disabled={working} onPress={() => void applyAction()} style={styles.primaryButton}><Text style={styles.primaryButtonText}>CONFIRMAR</Text></Pressable></View></View>}
+            <View style={styles.actionGrid}>{detail.availableActions.map((action) => <Pressable key={action} accessibilityRole="button" accessibilityLabel={`${ACTION_LABELS[action]} expediente`} onPress={() => setPendingAction(action)} style={[styles.actionButton, action === "reject" || action === "archive" || action === "delete" ? styles.dangerAction : styles.safeAction]}><Text style={styles.actionButtonText}>{ACTION_LABELS[action].toUpperCase()}</Text></Pressable>)}</View>
+            {pendingAction && <View style={styles.confirmPanel}><Text style={styles.confirmTitle}>Confirmar: {ACTION_LABELS[pendingAction]}</Text><Text style={styles.confirmText}>{pendingAction === "delete" ? "IRREVERSIBLE: el expediente y su evidencia se eliminan de la base de datos. Se enviará con la versión " + detail.version + ", el motivo escrito y una entrada de auditoría." : `La acción se enviará con la versión ${detail.version}, el motivo escrito y una entrada de auditoría.`}</Text><View style={styles.confirmActions}><Pressable accessibilityRole="button" onPress={() => setPendingAction(null)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>CANCELAR</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Confirmar ${ACTION_LABELS[pendingAction]}`} disabled={working} onPress={() => void applyAction()} style={styles.primaryButton}><Text style={styles.primaryButtonText}>CONFIRMAR</Text></Pressable></View></View>}
           </ScrollView>
         </View>
       </View>
@@ -817,7 +871,7 @@ const styles = StyleSheet.create({
   shell: { width: "100%", maxWidth: contentMaxWidth, alignSelf: "center", flex: 1, flexDirection: "row" }, shellCompact: { flexDirection: "column" }, navigation: { width: 220, justifyContent: "space-between", padding: 16, borderRightWidth: 1, borderRightColor: colors.line, backgroundColor: "rgba(7,11,21,0.78)" }, navigationCompact: { width: "100%", padding: 8, borderRightWidth: 0, borderBottomWidth: 1, borderBottomColor: colors.line }, navItems: { gap: 7 }, navItemsCompact: { flexDirection: "row" }, navItem: { flexDirection: "row", alignItems: "center", gap: 11, minHeight: 48, paddingHorizontal: 12, borderRadius: 8 }, navItemCompact: { minWidth: 0, flex: 1, flexDirection: "column", justifyContent: "center", gap: 1, paddingHorizontal: 4 }, navItemActive: { backgroundColor: "rgba(81,229,255,0.10)" }, navCode: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 9 }, navCodeActive: { color: colors.cyan }, navLabel: { color: colors.inkSoft, fontSize: 11, fontWeight: "700" }, navLabelActive: { color: colors.ink }, transportNotice: { flexDirection: "row", alignItems: "center", gap: 7, padding: 10, borderWidth: 1, borderColor: colors.line, borderRadius: 8 }, transportNoticeCompact: { alignSelf: "center", marginTop: 7, paddingVertical: 6 }, transportDot: { width: 6, height: 6, borderRadius: 3 }, apiDot: { backgroundColor: colors.alive }, demoDot: { backgroundColor: colors.missing }, transportText: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 7, fontWeight: "800" },
   main: { flex: 1 }, mainScroll: { flexGrow: 1, padding: 26, paddingBottom: 90 }, sectionContent: { gap: 18 }, sectionIntro: { maxWidth: 850, marginBottom: 4 }, sectionOverline: { color: colors.cyan, fontFamily: fontFamilies.mono, fontSize: 8, fontWeight: "800", letterSpacing: 1.1 }, sectionTitle: { marginTop: 6, color: colors.ink, fontSize: 38, fontWeight: "800", letterSpacing: -1.8, lineHeight: 43 }, sectionLead: { maxWidth: 760, marginTop: 8, color: colors.inkSoft, fontSize: 12, lineHeight: 20 },
   metricGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 }, metricCard: { minWidth: 160, flex: 1, minHeight: 125, overflow: "hidden", padding: 17, borderWidth: 1, borderColor: colors.line, borderRadius: 11, backgroundColor: colors.panel }, metricAccent: { position: "absolute", top: 0, bottom: 0, left: 0, width: 3 }, metricValue: { color: colors.ink, fontFamily: fontFamilies.mono, fontSize: 31, fontWeight: "800" }, metricLabel: { marginTop: 14, color: colors.inkSoft, fontSize: 10, fontWeight: "700" }, dashboardColumns: { flexDirection: Platform.OS === "web" ? "row" : "column", alignItems: "flex-start", gap: 12 }, panel: { minWidth: 280, flex: 1, overflow: "hidden", borderWidth: 1, borderColor: colors.line, borderRadius: 11, backgroundColor: colors.panel }, panelHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, padding: 14, borderBottomWidth: 1, borderBottomColor: colors.line }, panelTitle: { color: colors.ink, fontFamily: fontFamilies.mono, fontSize: 8, fontWeight: "800", letterSpacing: 0.8 }, panelMeta: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 7 }, panelBody: { gap: 8, padding: 14 }, countRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: "rgba(137,166,207,0.09)" }, countLabel: { color: colors.inkSoft, fontSize: 10 }, countValue: { color: colors.cyan, fontFamily: fontFamilies.mono, fontSize: 12, fontWeight: "800" }, activityRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 7 }, activityDot: { width: 7, height: 7, borderRadius: 4 }, activitySuccess: { backgroundColor: colors.alive }, activityFailure: { backgroundColor: colors.reported }, activityCopy: { minWidth: 0, flex: 1 }, activityAction: { color: colors.ink, fontSize: 10, fontWeight: "700" }, activityMeta: { marginTop: 3, color: colors.inkDim, fontSize: 8 },
-  generatedAt: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 7, letterSpacing: 0.6, textAlign: "right" }, searchInput: { minHeight: 48, paddingHorizontal: 13, borderWidth: 1, borderColor: "rgba(137,166,207,0.24)", borderRadius: 8, color: colors.ink, backgroundColor: "rgba(5,9,17,0.78)", fontSize: 11 }, dateFilters: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, dateInput: { minWidth: 180, flex: 1 }, filterBlock: { gap: 7 }, filterLabel: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 7, fontWeight: "800", letterSpacing: 0.7 }, filterChips: { gap: 6, paddingRight: 12 }, filterChip: { minHeight: 35, justifyContent: "center", paddingHorizontal: 11, borderWidth: 1, borderColor: colors.line, borderRadius: 18 }, filterChipActive: { borderColor: colors.cyan, backgroundColor: "rgba(81,229,255,0.09)" }, filterChipText: { color: colors.inkDim, fontSize: 8, fontWeight: "700" }, filterChipTextActive: { color: colors.cyan },
+  generatedAt: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 7, letterSpacing: 0.6, textAlign: "right" }, searchInput: { minHeight: 48, paddingHorizontal: 13, borderWidth: 1, borderColor: "rgba(137,166,207,0.24)", borderRadius: 8, color: colors.ink, backgroundColor: "rgba(5,9,17,0.78)", fontSize: 11 }, dateFilters: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, dateInput: { minWidth: 180, flex: 1 }, filterBlock: { gap: 7 }, crossLink: { borderWidth: 1, borderColor: "#233247", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: "rgba(81,229,255,0.05)" }, crossLinkText: { color: colors.cyan, fontSize: 12, lineHeight: 17 }, filterLabel: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 7, fontWeight: "800", letterSpacing: 0.7 }, filterChips: { gap: 6, paddingRight: 12 }, filterChip: { minHeight: 35, justifyContent: "center", paddingHorizontal: 11, borderWidth: 1, borderColor: colors.line, borderRadius: 18 }, filterChipActive: { borderColor: colors.cyan, backgroundColor: "rgba(81,229,255,0.09)" }, filterChipText: { color: colors.inkDim, fontSize: 8, fontWeight: "700" }, filterChipTextActive: { color: colors.cyan },
   listPanel: { gap: 9 }, recordCard: { gap: 8, padding: 15, borderWidth: 1, borderColor: colors.line, borderRadius: 10, backgroundColor: colors.panel }, recordTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 }, kindBadge: { alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 5, borderRadius: 5, backgroundColor: "rgba(81,229,255,0.09)" }, kindBadgeText: { color: colors.cyan, fontFamily: fontFamilies.mono, fontSize: 6, fontWeight: "900", letterSpacing: 0.5 }, statusBadge: { alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 5, borderRadius: 5, backgroundColor: "rgba(255,207,102,0.12)" }, statusAccepted: { backgroundColor: "rgba(67,231,173,0.12)" }, statusRejected: { backgroundColor: "rgba(255,103,136,0.12)" }, statusArchived: { backgroundColor: "rgba(99,112,134,0.17)" }, statusBadgeText: { color: colors.inkSoft, fontFamily: fontFamilies.mono, fontSize: 6, fontWeight: "900" }, recordTitle: { color: colors.ink, fontSize: 14, fontWeight: "800" }, recordCode: { color: colors.cyan, fontFamily: fontFamilies.mono, fontSize: 7, fontWeight: "800", letterSpacing: 0.5 }, recordMeta: { color: colors.inkSoft, fontSize: 10 }, recordFooter: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.line }, recordFooterText: { color: colors.inkDim, fontSize: 8, lineHeight: 13 },
   pagination: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 8, padding: 10, borderWidth: 1, borderColor: colors.line, borderRadius: 8 }, pageButton: { padding: 9 }, pageButtonText: { color: colors.cyan, fontFamily: fontFamilies.mono, fontSize: 7, fontWeight: "800" }, pageInfo: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 7 },
   modalBackdrop: { flex: 1, alignItems: "center", justifyContent: "center", padding: 16, backgroundColor: "rgba(0,0,0,0.76)" }, modalCard: { width: "100%", maxWidth: 920, maxHeight: "94%", overflow: "hidden", borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 14, backgroundColor: "#0b111e" }, modalCardSmall: { width: "100%", maxWidth: 690, maxHeight: "94%", overflow: "hidden", borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 14, backgroundColor: "#0b111e" }, modalHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 16, padding: 18, borderBottomWidth: 1, borderBottomColor: colors.line }, modalHeaderCopy: { minWidth: 0, flex: 1, gap: 7 }, modalTitle: { color: colors.ink, fontSize: 23, fontWeight: "800", letterSpacing: -0.7 }, closeButton: { width: 38, height: 38, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.line, borderRadius: 8 }, closeText: { color: colors.inkSoft, fontSize: 24 }, modalScroll: { gap: 15, padding: 18, paddingBottom: 38 }, detailMeta: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 10 }, detailMetaText: { color: colors.inkDim, fontSize: 9 }, detailSectionLabel: { marginTop: 4, color: colors.cyan, fontFamily: fontFamilies.mono, fontSize: 7, fontWeight: "800", letterSpacing: 0.8 }, fieldList: { gap: 9 }, adminField: { gap: 7, padding: 12, borderWidth: 1, borderColor: colors.line, borderRadius: 8 }, adminFieldHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }, adminFieldLabel: { color: colors.inkSoft, fontSize: 9, fontWeight: "800" }, classification: { color: colors.deceased, fontFamily: fontFamilies.mono, fontSize: 6, fontWeight: "900" }, classPublic: { color: colors.alive }, classProtected: { color: colors.reported }, adminInput: { minHeight: 44, paddingHorizontal: 11, paddingVertical: 9, borderWidth: 1, borderColor: "rgba(137,166,207,0.24)", borderRadius: 7, color: colors.ink, backgroundColor: "rgba(4,8,15,0.74)", fontSize: 10 }, adminInputMultiline: { minHeight: 84, textAlignVertical: "top" }, readonlyValue: { color: colors.ink, fontSize: 10, lineHeight: 17 }, evidenceRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, padding: 11, borderWidth: 1, borderColor: colors.line, borderRadius: 8 }, evidenceTitle: { color: colors.ink, fontSize: 9, fontWeight: "800" }, evidenceMeta: { marginTop: 3, color: colors.inkDim, fontSize: 8 }, reasonField: { gap: 7 },

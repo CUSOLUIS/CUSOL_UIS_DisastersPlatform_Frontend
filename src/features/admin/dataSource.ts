@@ -19,6 +19,7 @@ import type {
   AdminVisitorPresencePage,
   AdminEvidenceAccessGrant,
   AdminMutationReceipt,
+  AdminSubmissionDeleteReceipt,
   AdminOverview,
   AdminSubmissionDetail,
   AdminSubmissionPage,
@@ -127,6 +128,12 @@ const apiAdminDataSource: AdminDataSource = {
     apiRequest<AdminMutationReceipt>(
       `/api/v1/admin/submissions/${id}/restore`,
       { method: "POST", body: JSON.stringify(input) },
+    ),
+  // CHG-159: borrado definitivo (solo desde archivado/rechazado).
+  deleteSubmissionPermanently: (id, input) =>
+    apiRequest<AdminSubmissionDeleteReceipt>(
+      `/api/v1/admin/submissions/${id}/permanent`,
+      { method: "DELETE", body: JSON.stringify(input) },
     ),
   grantEvidenceAccess: (submissionId, evidenceId) =>
     apiRequest<AdminEvidenceAccessGrant>(
@@ -684,6 +691,25 @@ export const demoAdminDataSource: AdminDataSource = {
     item.updatedAt = nowIso();
     audit("submission_archived", item.kind, item.id, input.reason);
     return clone(mutationReceipt(item));
+  },
+  // CHG-159: en demo el borrado definitivo respeta la misma regla que
+  // el backend — solo desde archivado o rechazado.
+  async deleteSubmissionPermanently(id, input) {
+    const item = findSubmission(id);
+    assertVersion(item.version, input.expectedVersion);
+    if (item.status !== "archived" && item.status !== "rejected") {
+      throw new Error(
+        "Solo puede eliminarse definitivamente un expediente archivado o rechazado.",
+      );
+    }
+    const index = demoSubmissions.indexOf(item);
+    if (index >= 0) demoSubmissions.splice(index, 1);
+    audit("submission_deleted", item.kind, item.id, input.reason);
+    return clone({
+      id: item.id,
+      auditEventId: `audit-${item.id}`,
+      deletedAt: nowIso(),
+    });
   },
   async restoreSubmission(id, input) {
     const item = findSubmission(id);

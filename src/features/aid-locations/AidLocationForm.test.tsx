@@ -279,3 +279,47 @@ describe("AidLocationForm (CHG-153)", () => {
     );
   });
 });
+
+// CHG-160 — Paridad de reglas de mapa y autocompletado entre los 4
+// tipos logísticos: el centro de acopio receptor (y todos los demás)
+// deben ofrecer exactamente las mismas herramientas de ubicación que
+// el centro de acopio local — dirección que se completa sola al fijar
+// el punto (CHG-156), «CRUZAR DIRECCIÓN», «COLOCAR MUÑEQUITO» y el
+// mapa (CHG-147/155). Si alguien condiciona la sección por tipo, este
+// test lo delata.
+describe("paridad de ubicación entre los 4 tipos (CHG-160)", () => {
+  const kinds = [
+    "collection_center",
+    "receiver_center",
+    "collection_point",
+    "distribution_point",
+  ] as const;
+
+  it.each(kinds)("el formulario de %s trae las reglas de mapa y autocompletado", (kind) => {
+    render(
+      <AidLocationForm
+        kind={kind}
+        onBack={jest.fn()}
+        sessionSource={anonymousSession}
+        submitLocation={jest.fn()}
+        loadParentCandidates={jest.fn().mockResolvedValue([])}
+      />,
+    );
+
+    // Dirección autocompletable desde el muñequito (CHG-156).
+    expect(
+      screen.getByText("Se completa sola al fijar el punto; siempre editable"),
+    ).toBeTruthy();
+    // Mapa con las mismas acciones del acopio local.
+    expect(screen.getByText("UBICACIÓN EN EL MAPA · OPCIONAL")).toBeTruthy();
+    expect(
+      screen.getByLabelText("Cruzar la dirección escrita con el mapa"),
+    ).toBeTruthy();
+    expect(
+      screen.getByLabelText("Colocar el muñequito en el centro del mapa"),
+    ).toBeTruthy();
+    // Municipio y departamento propios, donde cae el autocompletado.
+    expect(screen.getByLabelText("Municipio *")).toBeTruthy();
+    expect(screen.getByLabelText("Departamento *")).toBeTruthy();
+  });
+});

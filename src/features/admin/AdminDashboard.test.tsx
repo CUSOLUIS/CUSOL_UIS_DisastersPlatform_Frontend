@@ -122,6 +122,12 @@ function createDataSource(
       auditEventId: "30000000-0000-4000-8000-000000000003",
       updatedAt: "2026-08-14T14:00:00Z",
     }),
+    // CHG-159: borrado definitivo.
+    deleteSubmissionPermanently: jest.fn().mockResolvedValue({
+      id: submission.id,
+      auditEventId: "30000000-0000-4000-8000-000000000005",
+      deletedAt: "2026-08-14T14:00:00Z",
+    }),
     grantEvidenceAccess: jest.fn().mockResolvedValue({
       url: "https://example.invalid/evidence",
       expiresAt: "2026-08-14T14:05:00Z",
@@ -345,11 +351,12 @@ describe("AdminDashboard", () => {
       }),
     );
 
+    // CHG-159: archivar se presenta como deshabilitación reversible.
     fireEvent.press(
-      screen.getByRole("button", { name: "Archivar expediente" }),
+      screen.getByRole("button", { name: "Deshabilitar (archivar) expediente" }),
     );
     fireEvent.press(
-      screen.getByRole("button", { name: "Confirmar Archivar" }),
+      screen.getByRole("button", { name: "Confirmar Deshabilitar (archivar)" }),
     );
 
     await waitFor(() =>
@@ -358,7 +365,109 @@ describe("AdminDashboard", () => {
         reason: "Corrección verificada por moderación",
       }),
     );
-    expect(await screen.findByText("Archivar aplicado y auditado.")).toBeTruthy();
+    expect(await screen.findByText("Deshabilitar (archivar) aplicado y auditado.")).toBeTruthy();
+  });
+
+  it("filtra la bandeja por tema y por subtema (CHG-159)", async () => {
+    const dataSource = createDataSource();
+
+    render(
+      <AdminDashboard
+        dataSource={dataSource}
+        onHome={jest.fn()}
+        onLogin={jest.fn()}
+      />,
+    );
+
+    await screen.findByRole("header", { name: "Panorama de control" });
+    fireEvent.press(screen.getByRole("tab", { name: "Ingresos" }));
+    await screen.findByRole("button", {
+      name: "Abrir expediente BR-2026-TEST",
+    });
+
+    fireEvent.press(screen.getByRole("button", { name: "Ayuda humanitaria" }));
+    await waitFor(() =>
+      expect(dataSource.listSubmissions).toHaveBeenCalledWith(
+        expect.objectContaining({ theme: "ayuda", kind: undefined }),
+        undefined,
+      ),
+    );
+    // El enlace cruzado evita duplicar la gestión de «Necesitamos ayuda».
+    expect(
+      screen.getByRole("button", {
+        name: "Abrir la sección de solicitudes Necesitamos ayuda",
+      }),
+    ).toBeTruthy();
+
+    // El subtema manda sobre el tema al consultar.
+    fireEvent.press(screen.getByRole("button", { name: "Comida comunitaria" }));
+    await waitFor(() =>
+      expect(dataSource.listSubmissions).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: "community_meal_offer",
+          theme: undefined,
+        }),
+        undefined,
+      ),
+    );
+  });
+
+  it("elimina definitivamente un expediente deshabilitado (CHG-159)", async () => {
+    const dataSource = createDataSource();
+    dataSource.getSubmission = jest.fn().mockResolvedValue({
+      ...submission,
+      status: "archived",
+      availableActions: ["restore", "delete"],
+    });
+
+    render(
+      <AdminDashboard
+        dataSource={dataSource}
+        onHome={jest.fn()}
+        onLogin={jest.fn()}
+      />,
+    );
+
+    await screen.findByRole("header", { name: "Panorama de control" });
+    fireEvent.press(screen.getByRole("tab", { name: "Ingresos" }));
+    fireEvent.press(
+      await screen.findByRole("button", {
+        name: "Abrir expediente BR-2026-TEST",
+      }),
+    );
+
+    await screen.findByRole("header", { name: submission.title });
+    fireEvent.changeText(
+      screen.getByLabelText("Motivo administrativo"),
+      "Expediente duplicado; retiro definitivo.",
+    );
+    fireEvent.press(
+      screen.getByRole("button", {
+        name: "Eliminar definitivamente expediente",
+      }),
+    );
+    expect(screen.getByText(/IRREVERSIBLE/)).toBeTruthy();
+    fireEvent.press(
+      screen.getByRole("button", {
+        name: "Confirmar Eliminar definitivamente",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(dataSource.deleteSubmissionPermanently).toHaveBeenCalledWith(
+        submission.id,
+        {
+          expectedVersion: 1,
+          reason: "Expediente duplicado; retiro definitivo.",
+        },
+      ),
+    );
+    // El modal se cierra: el expediente ya no existe.
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("header", { name: submission.title }),
+      ).toBeNull(),
+    );
   });
 
   it("cierra la sesión antes de enviar al formulario de acceso", async () => {
