@@ -118,6 +118,9 @@ export function parseDraftCoordinates(
 // autocompletar el campo Dirección (siempre editable).
 export interface ResolvedAddress {
   label: string;
+  // CHG-156: dirección corta (vía, barrio, comuna) sin la cola
+  // administrativa; null cuando el proxy no pudo recortarla.
+  addressLine: string | null;
   municipality: string | null;
   department: string | null;
 }
@@ -146,6 +149,7 @@ export async function reverseGeocode(
 
   const payload = (await response.json()) as {
     label?: unknown;
+    addressLine?: unknown;
     municipality?: unknown;
     department?: unknown;
   };
@@ -155,6 +159,10 @@ export async function reverseGeocode(
   }
   return {
     label,
+    addressLine:
+      typeof payload.addressLine === "string" && payload.addressLine.trim()
+        ? payload.addressLine.trim()
+        : null,
     municipality:
       typeof payload.municipality === "string" && payload.municipality.trim()
         ? payload.municipality.trim()

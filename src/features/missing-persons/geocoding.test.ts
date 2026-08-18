@@ -106,6 +106,7 @@ describe("reverseGeocode", () => {
         ok: true,
         json: async () => ({
           label: "Parque García Rovira, Bucaramanga, Santander, Colombia",
+          addressLine: "Parque García Rovira",
           municipality: "Bucaramanga",
           department: "Santander",
         }),
@@ -116,9 +117,26 @@ describe("reverseGeocode", () => {
       reverseGeocode({ latitude: 7.1193, longitude: -73.1227 }, fetchFn),
     ).resolves.toEqual({
       label: "Parque García Rovira, Bucaramanga, Santander, Colombia",
+      addressLine: "Parque García Rovira",
       municipality: "Bucaramanga",
       department: "Santander",
     });
+  });
+
+  it("deja addressLine nulo cuando el proxy no lo trae o viene vacío", async () => {
+    const fetchFn = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        label: "Vereda El Roble, Colombia",
+        addressLine: "  ",
+        municipality: null,
+        department: null,
+      }),
+    }));
+
+    await expect(
+      reverseGeocode({ latitude: 7.2, longitude: -73.2 }, fetchFn),
+    ).resolves.toMatchObject({ addressLine: null });
   });
 
   it("tolera municipio y departamento nulos en zonas rurales", async () => {
@@ -135,6 +153,7 @@ describe("reverseGeocode", () => {
       reverseGeocode({ latitude: 7.2, longitude: -73.2 }, fetchFn),
     ).resolves.toEqual({
       label: "Vereda El Roble, Colombia",
+      addressLine: null,
       municipality: null,
       department: null,
     });

@@ -478,10 +478,22 @@ export function HelpRequestForm({
                       : "",
                   }))
                 }
+                // CHG-156: sin campos propios de municipio y
+                // departamento, la Dirección los conserva junto a la
+                // dirección corta, pero sin la cola de área
+                // metropolitana, región, código postal y país.
                 onAddressResolved={(address) =>
                   setDraft((current) => ({
                     ...current,
-                    address: address.label,
+                    address: address.addressLine
+                      ? [
+                          address.addressLine,
+                          address.municipality,
+                          address.department,
+                        ]
+                          .filter(Boolean)
+                          .join(", ")
+                      : address.label,
                   }))
                 }
                 locateVisitor={locateVisitor}

@@ -564,10 +564,19 @@ export function AidLocationForm({
                       : "",
                   }))
                 }
+                // CHG-156: la Dirección queda corta (vía, barrio,
+                // comuna); municipio y departamento van a sus campos
+                // solo si estaban vacíos (siempre editables).
                 onAddressResolved={(address) =>
                   setDraft((current) => ({
                     ...current,
-                    address: address.label,
+                    address: address.addressLine ?? address.label,
+                    municipality:
+                      current.municipality.trim() ||
+                      (address.municipality ?? ""),
+                    department:
+                      current.department.trim() ||
+                      (address.department ?? ""),
                   }))
                 }
                 locateVisitor={locateVisitor}

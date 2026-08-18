@@ -305,6 +305,7 @@ export function LastSeenLocationPicker({
     skipResolveRef.current = true;
     onAddressResolved?.({
       label: candidate.label,
+      addressLine: null,
       municipality: null,
       department: null,
     });

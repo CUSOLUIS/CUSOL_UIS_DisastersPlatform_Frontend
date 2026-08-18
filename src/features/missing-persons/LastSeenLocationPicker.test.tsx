@@ -285,6 +285,7 @@ describe("autocompletado de dirección desde el mapa", () => {
 
     expect(onAddressResolved).toHaveBeenCalledWith({
       label: "Parque García Rovira, Bucaramanga",
+      addressLine: null,
       municipality: null,
       department: null,
     });

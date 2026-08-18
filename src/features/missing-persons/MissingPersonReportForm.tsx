@@ -448,11 +448,12 @@ export function MissingPersonReportForm({
                 }
                 // CHG-086: fijar el muñequito autocompleta la
                 // dirección (editable); municipio y departamento solo
-                // se rellenan si estaban vacíos.
+                // se rellenan si estaban vacíos. CHG-156: la zona usa
+                // la dirección corta, sin municipio ni departamento.
                 onAddressResolved={(address) =>
                   setDraft((current) => ({
                     ...current,
-                    lastSeenArea: address.label,
+                    lastSeenArea: address.addressLine ?? address.label,
                     municipality:
                       current.municipality.trim() ||
                       (address.municipality ?? ""),
