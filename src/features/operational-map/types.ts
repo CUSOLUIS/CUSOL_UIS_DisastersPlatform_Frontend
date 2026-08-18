@@ -42,6 +42,26 @@ export const operationalResponseCategories = [
   "help_request",
 ] as const satisfies readonly OperationalMapCategory[];
 
+// CHG-157: la leyenda del mapa se divide en dos bloques —
+// infraestructura y ayuda humanitaria; entre ambos cubren exactamente
+// operationalResponseCategories (que sigue siendo el filtro completo).
+export const infrastructureLegendCategories = [
+  "rubble_reviewed",
+  "rubble_pending",
+  "building_pending",
+] as const satisfies readonly OperationalMapCategory[];
+
+export const humanitarianAidLegendCategories = [
+  "collection_center",
+  "receiver_center",
+  "collection_point",
+  "distribution_point",
+  "community_meal",
+  "temporary_shelter",
+  "volunteers_needed",
+  "help_request",
+] as const satisfies readonly OperationalMapCategory[];
+
 export type CoordinatePrecision = "exact" | "approximate" | "municipality";
 export type VerificationStatus =
   | "unverified"

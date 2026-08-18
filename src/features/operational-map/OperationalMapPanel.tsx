@@ -36,7 +36,28 @@ import type {
   OperationalMapDataSource,
   OperationalMapOverview,
 } from "./types";
-import { humanMapStatuses, operationalResponseCategories } from "./types";
+import {
+  humanMapStatuses,
+  humanitarianAidLegendCategories,
+  infrastructureLegendCategories,
+  operationalResponseCategories,
+} from "./types";
+
+// CHG-157: los dos bloques de la leyenda del mapa.
+const legendSections = [
+  {
+    title: "INFRAESTRUCTURA · FILTRA UBICACIONES",
+    hint: "Estas cifras son ubicaciones operativas, no personas.",
+    accessibilityLabel: "Leyenda de infraestructura",
+    categories: infrastructureLegendCategories,
+  },
+  {
+    title: "AYUDA HUMANITARIA · FILTRA SOLICITUDES Y PUNTOS DE APOYO",
+    hint: "Solicitudes y puntos de apoyo activos; las cifras son ubicaciones, no personas.",
+    accessibilityLabel: "Leyenda de ayuda humanitaria",
+    categories: humanitarianAidLegendCategories,
+  },
+] as const;
 import {
   type HumanMapLoadState,
   useHumanMapLayer,
@@ -463,49 +484,51 @@ function MapContent({
         />
       )}
 
-      <View
-        style={styles.legend}
-        accessibilityLabel="Leyenda de respuesta e infraestructura"
-      >
-        <View style={styles.legendHeading}>
-          <Text style={styles.legendTitle}>
-            RESPUESTA E INFRAESTRUCTURA · FILTRA UBICACIONES
-          </Text>
-          <Text style={styles.legendHint}>
-            Estas cifras son ubicaciones operativas, no personas.
-          </Text>
-        </View>
-        <View style={styles.filters}>
-        {operationalResponseCategories.map((category) => {
-          const meta = categoryMeta[category];
-          const active = activeCategories.includes(category);
+      {/* CHG-157: la leyenda se divide en dos bloques — la
+          infraestructura por un lado y la ayuda humanitaria
+          (solicitudes y puntos de apoyo) por el otro. */}
+      {legendSections.map((section) => (
+        <View
+          key={section.title}
+          style={styles.legend}
+          accessibilityLabel={section.accessibilityLabel}
+        >
+          <View style={styles.legendHeading}>
+            <Text style={styles.legendTitle}>{section.title}</Text>
+            <Text style={styles.legendHint}>{section.hint}</Text>
+          </View>
+          <View style={styles.filters}>
+          {section.categories.map((category) => {
+            const meta = categoryMeta[category];
+            const active = activeCategories.includes(category);
 
-          return (
-            <Pressable
-              key={category}
-              accessibilityRole="button"
-              accessibilityLabel={`Filtrar mapa por ${meta.label}`}
-              accessibilityState={{ selected: active }}
-              onPress={() => toggleCategory(category)}
-              style={[
-                styles.filter,
-                active && { borderColor: meta.color, backgroundColor: `${meta.color}12` },
-              ]}
-            >
-              <CategoryMarkerIcon category={category} animated={false} />
-              <View style={styles.filterCopy}>
-                <Text style={[styles.filterCount, { color: active ? meta.color : colors.inkDim }]}>
-                  {displaySummary[meta.summaryKey]}
-                </Text>
-                <Text style={[styles.filterLabel, !active && styles.filterLabelInactive]}>
-                  {meta.label}
-                </Text>
-              </View>
-            </Pressable>
-          );
-        })}
+            return (
+              <Pressable
+                key={category}
+                accessibilityRole="button"
+                accessibilityLabel={`Filtrar mapa por ${meta.label}`}
+                accessibilityState={{ selected: active }}
+                onPress={() => toggleCategory(category)}
+                style={[
+                  styles.filter,
+                  active && { borderColor: meta.color, backgroundColor: `${meta.color}12` },
+                ]}
+              >
+                <CategoryMarkerIcon category={category} animated={false} />
+                <View style={styles.filterCopy}>
+                  <Text style={[styles.filterCount, { color: active ? meta.color : colors.inkDim }]}>
+                    {displaySummary[meta.summaryKey]}
+                  </Text>
+                  <Text style={[styles.filterLabel, !active && styles.filterLabelInactive]}>
+                    {meta.label}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
+          </View>
         </View>
-      </View>
+      ))}
 
     </MapFrame>
   );
@@ -585,7 +608,7 @@ export function HumanMapControls({
     >
       <View style={styles.humanLayerHeading}>
         <View style={styles.humanLayerCopy}>
-          <Text style={styles.humanLayerOverline}>PEOPLE / GEO CLUSTERS</Text>
+          <Text style={styles.humanLayerOverline}>PERSONAS / GEO CLUSTERS</Text>
           <Text style={styles.humanLayerTitle}>Situación humana</Text>
           <Text style={styles.humanLayerDescription}>
             Todos los registros georreferenciables se agrupan y se dividen al acercar.

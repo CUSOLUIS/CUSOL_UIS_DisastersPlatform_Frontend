@@ -948,7 +948,9 @@ describe("App universal", () => {
     expect(screen.getByRole("button", { name: "Filtrar mapa por Escombros pendientes" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Filtrar mapa por Edificios sin revisar" })).toBeTruthy();
     expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(8);
-    expect(screen.getByLabelText("Leyenda de respuesta e infraestructura")).toBeTruthy();
+    // CHG-157: la leyenda vive en dos bloques separados.
+    expect(screen.getByLabelText("Leyenda de infraestructura")).toBeTruthy();
+    expect(screen.getByLabelText("Leyenda de ayuda humanitaria")).toBeTruthy();
     expect(
       screen.getByText("Estas cifras son ubicaciones operativas, no personas."),
     ).toBeTruthy();
