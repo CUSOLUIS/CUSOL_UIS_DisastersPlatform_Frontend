@@ -141,6 +141,8 @@ describe("DamagedHomeForm (CHG-162)", () => {
           "El techo se vino abajo y la pared del patio quedó en el suelo.",
         municipality: "Mompós",
       }),
+      // CHG-162 (F2): las fotografías son opcionales y viajan aparte.
+      [],
       expect.objectContaining({ idempotencyKey: expect.any(String) }),
     );
   });
@@ -188,5 +190,95 @@ describe("DamagedHomeForm (CHG-162)", () => {
     ).toBeTruthy();
     expect(screen.getByLabelText("Municipio *")).toBeTruthy();
     expect(screen.getByLabelText("Departamento *")).toBeTruthy();
+  });
+
+  // CHG-162 (F2): las fotos del daño acompañan al informe.
+  it("adjunta fotografías del daño y las envía con el informe", async () => {
+    const receipt: DamagedHomeReceipt = {
+      id: "44444444-4444-4444-8444-444444444405",
+      createdAt: "2026-08-18T12:00:00Z",
+    };
+    const submitReport = jest.fn().mockResolvedValue(receipt);
+    const pickPhotos = jest.fn().mockResolvedValue([
+      {
+        uri: "file:///casita.jpg",
+        name: "casita.jpg",
+        size: 1024,
+        mimeType: "image/jpeg",
+      },
+    ]);
+
+    render(
+      <DamagedHomeForm
+        onBack={jest.fn()}
+        sessionSource={anonymousSession}
+        pickPhotos={pickPhotos}
+        submitReport={submitReport}
+      />,
+    );
+
+    fireEvent.press(
+      screen.getByLabelText("Seleccionar fotografías del daño"),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("selected-damaged-home-photo-0")).toBeTruthy(),
+    );
+
+    fireEvent.changeText(
+      screen.getByLabelText("Descripción del daño *"),
+      "El techo se vino abajo y la pared del patio quedó en el suelo.",
+    );
+    fireEvent.changeText(screen.getByLabelText("Municipio *"), "Mompós");
+    fireEvent.changeText(screen.getByLabelText("Departamento *"), "Bolívar");
+    fireEvent.changeText(
+      screen.getByLabelText("Dirección *"),
+      "Albarrada del medio #12-40",
+    );
+    fireEvent.press(
+      screen.getByLabelText(
+        "Confirmo que el hogar está en las condiciones descritas y la información es real.",
+      ),
+    );
+    fireEvent.press(screen.getByLabelText("Publicar informe del hogar"));
+
+    await waitFor(() =>
+      expect(screen.getByText("Informe publicado")).toBeTruthy(),
+    );
+    expect(submitReport).toHaveBeenCalledWith(
+      expect.anything(),
+      [expect.objectContaining({ name: "casita.jpg" })],
+      expect.anything(),
+    );
+  });
+
+  it("permite quitar una fotografía adjuntada", async () => {
+    const pickPhotos = jest.fn().mockResolvedValue([
+      {
+        uri: "file:///casita.jpg",
+        name: "casita.jpg",
+        size: 1024,
+        mimeType: "image/jpeg",
+      },
+    ]);
+
+    render(
+      <DamagedHomeForm
+        onBack={jest.fn()}
+        sessionSource={anonymousSession}
+        pickPhotos={pickPhotos}
+        submitReport={jest.fn()}
+      />,
+    );
+
+    fireEvent.press(
+      screen.getByLabelText("Seleccionar fotografías del daño"),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("selected-damaged-home-photo-0")).toBeTruthy(),
+    );
+
+    fireEvent.press(screen.getByLabelText("Quitar fotografía casita.jpg"));
+
+    expect(screen.queryByTestId("selected-damaged-home-photo-0")).toBeNull();
   });
 });

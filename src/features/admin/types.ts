@@ -21,6 +21,8 @@ export type AdminSection =
 export type AdminSubmissionKind =
   | "missing_person_report"
   | "unverified_building_report"
+  // CHG-162 (F2): «Mi casita partida» entra en Infraestructura.
+  | "damaged_home_report"
   | "person_status_report"
   | "aid_location_rating"
   | "collection_center_registration"

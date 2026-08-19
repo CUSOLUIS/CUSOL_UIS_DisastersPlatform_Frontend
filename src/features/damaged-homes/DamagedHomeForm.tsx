@@ -1,3 +1,4 @@
+import * as DocumentPicker from "expo-document-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRef, useState } from "react";
 import {
@@ -20,6 +21,17 @@ import {
   type SessionAccountSource,
 } from "../auth/useSessionAccount";
 import { parseDraftCoordinates } from "../missing-persons/geocoding";
+import {
+  preparePhotosForUpload,
+  totalSizeNotice,
+} from "../missing-persons/photoProcessing";
+import {
+  ALLOWED_PHOTO_HELP,
+  ALLOWED_PHOTO_MIME_TYPES,
+  MAX_PHOTO_COUNT,
+  validateAndMergePhotos,
+} from "../missing-persons/photoValidation";
+import type { SelectedPhoto } from "../missing-persons/reportTypes";
 import { LastSeenLocationPicker } from "../missing-persons/LastSeenLocationPicker";
 import {
   MapScrollLockProvider,
@@ -47,6 +59,10 @@ import {
 // las reglas de ubicación de CHG-160 — dirección que se completa sola
 // al fijar el muñequito, «CRUZAR DIRECCIÓN», GPS y paneo táctil. El
 // informe sale en el mapa con la categoría `damaged_home` (🏚).
+//
+// F2: acepta hasta tres fotografías del daño (opcionales), con el mismo
+// pipeline de evidencia que los demás reportes — se comprimen si hace
+// falta y viajan en multipart hacia claves opacas del servidor.
 
 export const initialDamagedHomeDraft: DamagedHomeDraft = {
   description: "",
@@ -131,7 +147,7 @@ const FIELD_SECTIONS: Record<string, string> = {
   location: "02",
   latitude: "02",
   longitude: "02",
-  truthConfirmed: "03",
+  truthConfirmed: "04",
 };
 
 interface DamagedHomeFormProps {
@@ -140,13 +156,35 @@ interface DamagedHomeFormProps {
   onRegister?: () => void;
   onLogin?: () => void;
   sessionSource?: SessionAccountSource;
+  // Selector de fotografías, inyectable en pruebas.
+  pickPhotos?: () => Promise<SelectedPhoto[]>;
   // CHG-080: obtención de la posición GPS, inyectable en pruebas.
   locateVisitor?: () => Promise<{ latitude: number; longitude: number }>;
   submitReport?: (
     draft: DamagedHomeDraft,
+    photos: SelectedPhoto[],
     options?: SubmitReportOptions,
   ) => Promise<DamagedHomeReceipt>;
 }
+
+const defaultPickPhotos = async (): Promise<SelectedPhoto[]> => {
+  const result = await DocumentPicker.getDocumentAsync({
+    type: ALLOWED_PHOTO_MIME_TYPES,
+    multiple: true,
+    copyToCacheDirectory: true,
+  });
+
+  if (result.canceled) {
+    return [];
+  }
+
+  return result.assets.map((asset) => ({
+    uri: asset.uri,
+    name: asset.name,
+    size: asset.size ?? null,
+    mimeType: asset.mimeType ?? null,
+  }));
+};
 
 const createdFormatter = new Intl.DateTimeFormat("es-CO", {
   day: "2-digit",
@@ -162,6 +200,7 @@ export function DamagedHomeForm({
   onRegister,
   onLogin,
   sessionSource,
+  pickPhotos = defaultPickPhotos,
   locateVisitor,
   submitReport = submitDamagedHomeReport,
 }: DamagedHomeFormProps) {
@@ -172,6 +211,9 @@ export function DamagedHomeForm({
     initialDamagedHomeDraft,
   );
   const [formErrors, setFormErrors] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<SelectedPhoto[]>([]);
+  const [photoErrors, setPhotoErrors] = useState<string[]>([]);
+  const [selectingPhotos, setSelectingPhotos] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [receipt, setReceipt] = useState<DamagedHomeReceipt | null>(null);
   const [invalidFields, setInvalidFields] = useState<Set<string>>(
@@ -191,6 +233,20 @@ export function DamagedHomeForm({
     key: Key,
     value: DamagedHomeDraft[Key],
   ) => setDraft((current) => ({ ...current, [key]: value }));
+
+  const selectPhotos = async () => {
+    setSelectingPhotos(true);
+    try {
+      const picked = await pickPhotos();
+      const result = validateAndMergePhotos(photos, picked);
+      setPhotos(result.photos);
+      setPhotoErrors(result.errors);
+    } catch {
+      setPhotoErrors(["No fue posible abrir el selector de fotografías."]);
+    } finally {
+      setSelectingPhotos(false);
+    }
+  };
 
   const scrollToField = (field: string) => {
     const section = FIELD_SECTIONS[field];
@@ -215,8 +271,10 @@ export function DamagedHomeForm({
     setSubmitting(true);
     idempotencyKeyRef.current ??= createIdempotencyKey();
     try {
+      // CHG-071: comprime lo que exceda el presupuesto antes de subir.
+      const prepared = await preparePhotosForUpload(photos);
       setReceipt(
-        await submitReport(draft, {
+        await submitReport(draft, prepared.photos, {
           idempotencyKey: idempotencyKeyRef.current,
         }),
       );
@@ -413,6 +471,83 @@ export function DamagedHomeForm({
 
             <FormSection
               code="03"
+              title="Fotografías del daño"
+              description="Opcionales. Ayudan a entender en qué estado quedó la vivienda."
+              onPosition={registerSection}
+            >
+              <View style={styles.photoRules}>
+                <Text style={styles.photoRulesTitle}>FORMATOS PERMITIDOS</Text>
+                <Text style={styles.photoRulesText}>{ALLOWED_PHOTO_HELP}</Text>
+                <Text style={styles.photoRulesText}>
+                  Máximo {MAX_PHOTO_COUNT} fotografías; si pesan demasiado se
+                  comprimen automáticamente antes de enviarse.
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Seleccionar fotografías del daño"
+                disabled={selectingPhotos || photos.length >= MAX_PHOTO_COUNT}
+                onPress={() => void selectPhotos()}
+                style={({ pressed }) => [
+                  styles.photoButton,
+                  pressed && styles.pressedButton,
+                  photos.length >= MAX_PHOTO_COUNT && styles.disabledButton,
+                ]}
+              >
+                {selectingPhotos ? (
+                  <ActivityIndicator color={colors.cyan} />
+                ) : (
+                  <Text style={styles.photoButtonText}>
+                    + SELECCIONAR FOTOGRAFÍAS
+                  </Text>
+                )}
+              </Pressable>
+              {photoErrors.map((error) => (
+                <Text
+                  key={error}
+                  style={styles.errorText}
+                  accessibilityRole="alert"
+                >
+                  {error}
+                </Text>
+              ))}
+              {totalSizeNotice(photos) && (
+                <Text style={styles.photoRulesText} accessibilityRole="alert">
+                  {totalSizeNotice(photos)}
+                </Text>
+              )}
+              {photos.map((photo, index) => (
+                <View
+                  key={`${photo.uri}-${index}`}
+                  style={styles.photoItem}
+                  testID={`selected-damaged-home-photo-${index}`}
+                >
+                  <View style={styles.photoItemCopy}>
+                    <Text style={styles.photoName} numberOfLines={1}>
+                      {photo.name}
+                    </Text>
+                    <Text style={styles.photoMeta}>{photo.mimeType}</Text>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Quitar fotografía ${photo.name}`}
+                    onPress={() =>
+                      setPhotos((current) =>
+                        current.filter(
+                          (_, photoIndex) => photoIndex !== index,
+                        ),
+                      )
+                    }
+                    style={styles.removePhoto}
+                  >
+                    <Text style={styles.removePhotoText}>QUITAR</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </FormSection>
+
+            <FormSection
+              code="04"
               title="Confirmación"
               description="Lee y confirma antes de publicar."
               onPosition={registerSection}
@@ -851,6 +986,66 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   pressedButton: { opacity: 0.72 },
+  disabledButton: { opacity: 0.45 },
+  // CHG-162 (F2): bloque de fotografías del daño.
+  photoRules: {
+    gap: 4,
+    padding: 15,
+    borderWidth: 1,
+    borderColor: "rgba(81,229,255,0.20)",
+    borderRadius: 9,
+    backgroundColor: "rgba(81,229,255,0.05)",
+  },
+  photoRulesTitle: {
+    color: colors.cyan,
+    fontFamily: fontFamilies.mono,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+  },
+  photoRulesText: { color: colors.inkSoft, fontSize: 10, lineHeight: 16 },
+  photoButton: {
+    minHeight: 52,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: colors.cyan,
+    borderRadius: 9,
+    backgroundColor: "rgba(81,229,255,0.06)",
+  },
+  photoButtonText: {
+    color: colors.cyan,
+    fontFamily: fontFamilies.mono,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.9,
+  },
+  photoItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 8,
+    backgroundColor: colors.panelSoft,
+  },
+  photoItemCopy: { minWidth: 0, flex: 1 },
+  photoName: { color: colors.ink, fontSize: 10, fontWeight: "700" },
+  photoMeta: {
+    marginTop: 2,
+    color: colors.inkDim,
+    fontFamily: fontFamilies.mono,
+    fontSize: 7,
+  },
+  removePhoto: { paddingHorizontal: 8, paddingVertical: 7 },
+  removePhotoText: {
+    color: colors.reported,
+    fontFamily: fontFamilies.mono,
+    fontSize: 7,
+    fontWeight: "800",
+  },
   confirmationRoot: {
     alignItems: "center",
     justifyContent: "center",

@@ -77,6 +77,7 @@ const SECTION_OPTIONS: Array<{
 const KIND_LABELS: Record<AdminSubmissionKind, string> = {
   missing_person_report: "Persona desaparecida",
   unverified_building_report: "Edificio pendiente",
+  damaged_home_report: "Hogar en malas condiciones",
   person_status_report: "Novedad de persona",
   aid_location_rating: "Valoración de ayuda",
   collection_center_registration: "Centro de acopio",
@@ -94,7 +95,7 @@ const THEME_LABELS: Record<AdminSubmissionTheme, string> = {
 };
 const THEME_KINDS: Record<AdminSubmissionTheme, AdminSubmissionKind[]> = {
   personas: ["missing_person_report", "person_status_report"],
-  infraestructura: ["unverified_building_report"],
+  infraestructura: ["unverified_building_report", "damaged_home_report"],
   ayuda: [
     "aid_location_rating",
     "collection_center_registration",

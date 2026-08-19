@@ -6,17 +6,23 @@ import {
 } from "../reporting/retryOnUpstreamOutage";
 import {
   ReportRejectedError,
+  appendPhoto,
   createIdempotencyKey,
   extractProblem,
   type SubmitReportOptions,
 } from "../missing-persons/reportSubmission";
+import type { SelectedPhoto } from "../missing-persons/reportTypes";
 import { searchAddressCandidates } from "../missing-persons/geocoding";
 import type { DamagedHomeDraft, DamagedHomeReceipt } from "./types";
 
-// CHG-162 — Alta del informe de hogar en malas condiciones: JSON con
+// CHG-162 — Alta del informe de hogar en malas condiciones, con
 // Idempotency-Key en todos los intentos y reintento acotado durante
 // ventanas de despliegue (CHG-101). La cookie de sesión (si existe)
 // asocia la cuenta; sin sesión el informe sigue siendo anónimo.
+//
+// F2: con fotografías del daño el envío es multipart (parte `payload`
+// + partes `photos`, como los demás reportes con evidencia); sin
+// fotografías se mantiene el JSON suelto que ya aceptaba el backend.
 
 const configuredApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.replace(
   /\/$/,
@@ -49,6 +55,8 @@ export function buildDamagedHomePayload(
 }
 
 const ERROR_MESSAGES_BY_STATUS: Record<number, string> = {
+  413: "Las fotografías superan el máximo permitido. Quita alguna e intenta de nuevo.",
+  415: "Alguna fotografía no pudo procesarse. Prueba con otra imagen.",
   422: "La API rechazó el informe por datos inválidos. Revisa los campos e intenta de nuevo.",
   429: "Se recibieron demasiados envíos seguidos. Espera un momento e intenta de nuevo.",
   503: "El servicio de informes no está disponible en este momento. Intenta más tarde.",
@@ -89,6 +97,7 @@ export async function resolveDraftCoordinates(
 
 export async function submitDamagedHomeReport(
   draft: DamagedHomeDraft,
+  photos: SelectedPhoto[] = [],
   options: SubmitReportOptions & {
     geocodeAddress?: typeof searchAddressCandidates;
   } = {},
@@ -111,18 +120,41 @@ export async function submitDamagedHomeReport(
   // el backend devuelve la constancia ya creada en vez de duplicarla.
   const idempotencyKey = options.idempotencyKey ?? createIdempotencyKey();
 
+  // El cuerpo se arma dentro del intento: un FormData ya enviado no se
+  // puede reutilizar de forma fiable en un reintento.
   const attempt = async (): Promise<Response> => {
+    let body: FormData | string = serializedPayload;
+    // Sin fotos el envío sigue siendo JSON; con ellas, multipart —y el
+    // navegador escribe el `Content-Type` con su frontera.
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+      "Idempotency-Key": idempotencyKey,
+    };
+    if (photos.length > 0) {
+      const form = new FormData();
+      if (Platform.OS === "web") {
+        form.append(
+          "payload",
+          new Blob([serializedPayload], { type: "application/json" }),
+        );
+      } else {
+        form.append("payload", serializedPayload);
+      }
+      for (const photo of photos) {
+        await appendPhoto(form, photo);
+      }
+      body = form;
+    } else {
+      headers["Content-Type"] = "application/json";
+    }
+
     const attemptResponse = await fetch(
       `${requestBaseUrl}/api/v1/damaged-homes`,
       {
         method: "POST",
         credentials: "include",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          "Idempotency-Key": idempotencyKey,
-        },
-        body: serializedPayload,
+        headers,
+        body,
         signal: options.signal,
       },
     );

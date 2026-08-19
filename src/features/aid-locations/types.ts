@@ -25,9 +25,11 @@ export const AID_LOCATION_PARENT_KIND: Partial<
   distribution_point: "receiver_center",
 };
 
-// CHG-161 — Tipos cuya alta exige sesión (portón en el formulario; el
-// refuerzo server-side queda en F2): el acopio local y el punto de
-// distribución, igual que los transportes.
+// CHG-161 — Tipos cuya alta exige sesión: el acopio local y el punto de
+// distribución, igual que los transportes. El portón se pinta en el
+// formulario y desde la F2 lo refuerza el servidor (gateway 401 +
+// disaster-service `AID_LOCATION_KINDS_REQUIRING_ACCOUNT`), así que
+// saltarse la pantalla no sirve de nada.
 export const AID_LOCATION_REQUIRES_SESSION: Record<AidLocationKind, boolean> = {
   collection_point: false,
   collection_center: true,
