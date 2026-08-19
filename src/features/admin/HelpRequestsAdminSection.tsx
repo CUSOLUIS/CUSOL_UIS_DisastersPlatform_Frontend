@@ -1,4 +1,5 @@
-// CHG-138 — Sección «07 · Solicitudes» de la consola: la
+// CHG-138 — Sección «08 · Solicitudes» de la consola (renumerada por
+// CHG-165): la
 // superadministración ve TODO lo que llega de «Necesitamos ayuda»
 // (activas y expiradas) y puede eliminar una a una o vaciar todas.
 // Toda eliminación pasa por una confirmación explícita en dos pasos;

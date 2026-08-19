@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { AdminApiError, adminDataSource } from "./dataSource";
+import { CenterVerificationsSection } from "./CenterVerificationsSection";
 import { HelpRequestsAdminSection } from "./HelpRequestsAdminSection";
 import { PeopleRecordsAdminSection } from "./PeopleRecordsAdminSection";
 import { PlatformResetSection } from "./PlatformResetSection";
@@ -54,14 +55,17 @@ const SECTION_OPTIONS: Array<{
   { value: "accounts", label: "Cuentas", code: "03" },
   { value: "audit", label: "Auditoría", code: "04" },
   { value: "presence", label: "Ubicaciones", code: "05" },
+  // CHG-165: verificación y reactivación de Centros de Acopio Local
+  // (desplaza en uno la numeración de las secciones siguientes).
+  { value: "centerVerifications", label: "Verificaciones", code: "06" },
   // CHG-126: métricas del sistema operativo del servidor.
-  { value: "system", label: "Sistema", code: "06" },
+  { value: "system", label: "Sistema", code: "07" },
   // CHG-138: gestión de solicitudes «Necesitamos ayuda».
-  { value: "helpRequests", label: "Solicitudes", code: "07" },
+  { value: "helpRequests", label: "Solicitudes", code: "08" },
   // CHG-154: gestión de registros de personas (ocultar/editar).
-  { value: "peopleRecords", label: "Personas", code: "08" },
+  { value: "peopleRecords", label: "Personas", code: "09" },
   // CHG-139: reinicio absoluto de la plataforma.
-  { value: "reset", label: "Reinicio", code: "09" },
+  { value: "reset", label: "Reinicio", code: "10" },
 ];
 
 const KIND_LABELS: Record<AdminSubmissionKind, string> = {
@@ -178,6 +182,12 @@ function guardAdminDataSource(
     updatePerson: (id, input) => guarded(source.updatePerson(id, input)),
     hidePerson: (id) => guarded(source.hidePerson(id)),
     restorePerson: (id) => guarded(source.restorePerson(id)),
+    // CHG-165: verificación/reactivación de acopios locales.
+    listCenterVerifications: (signal) =>
+      guarded(source.listCenterVerifications(signal)),
+    decideCenterVerification: (id, input) =>
+      guarded(source.decideCenterVerification(id, input)),
+    reactivateCenter: (id) => guarded(source.reactivateCenter(id)),
   };
 }
 
@@ -361,6 +371,14 @@ export function AdminDashboard({
             )}
             {section === "presence" && (
               <PresenceSection dataSource={protectedDataSource} refreshKey={refreshKey} />
+            )}
+            {/* CHG-165: verificación de acopios locales y reactivación
+                de los deshabilitados por denuncias. */}
+            {section === "centerVerifications" && (
+              <CenterVerificationsSection
+                dataSource={protectedDataSource}
+                onMutated={refreshAll}
+              />
             )}
             {section === "system" && (
               <SystemMetricsSection
@@ -587,7 +605,7 @@ function SubmissionsSection({ dataSource, refreshKey, onMutated, onNavigate }: {
         {/* CHG-159: enlaces cruzados en vez de listas duplicadas. */}
         {theme === "personas" && (
           <Pressable accessibilityRole="button" accessibilityLabel="Abrir la sección de registros de personas" onPress={() => onNavigate("peopleRecords")} style={({ pressed }) => [styles.crossLink, pressed && styles.pressed]}>
-            <Text style={styles.crossLinkText}>Los REGISTROS publicados de personas (ocultar, editar, restaurar) se gestionan en la sección 08 · Personas →</Text>
+            <Text style={styles.crossLinkText}>Los REGISTROS publicados de personas (ocultar, editar, restaurar) se gestionan en la sección 09 · Personas →</Text>
           </Pressable>
         )}
         {theme === "ayuda" && (

@@ -87,6 +87,42 @@ it("muestra el punto humano anónimo con su nota de privacidad", () => {
   expect(screen.getByText(/anónimo por diseño/i)).toBeTruthy();
 });
 
+// CHG-165 — Solo los Centros de Acopio Local llevan la sección de
+// comentarios y denuncias; el resto de tipos no la muestra.
+it("un centro de acopio local ofrece COMENTAR, DENUNCIAR y COMENTARIOS", async () => {
+  render(
+    <MapPointDetailScreen
+      payload={{
+        kind: "operational",
+        point: { ...point, category: "collection_center" },
+      }}
+      onBack={jest.fn()}
+    />,
+  );
+
+  expect(
+    await screen.findByTestId("collection-center-community-panel"),
+  ).toBeTruthy();
+  expect(screen.getByTestId("center-comment-button")).toBeTruthy();
+  expect(screen.getByTestId("center-report-button")).toBeTruthy();
+});
+
+it("otros tipos de punto no llevan la sección comunitaria", () => {
+  render(
+    <MapPointDetailScreen
+      payload={{
+        kind: "operational",
+        point: { ...point, category: "temporary_shelter" },
+      }}
+      onBack={jest.fn()}
+    />,
+  );
+
+  expect(
+    screen.queryByTestId("collection-center-community-panel"),
+  ).toBeNull();
+});
+
 it("sin datos válidos explica la situación y VOLVER responde", () => {
   const onBack = jest.fn();
   render(<MapPointDetailScreen payload={null} onBack={onBack} />);

@@ -6,6 +6,8 @@ export type AdminSection =
   | "accounts"
   | "audit"
   | "presence"
+  // CHG-165: verificación y reactivación de Centros de Acopio Local.
+  | "centerVerifications"
   | "system"
   // CHG-138: gestión de solicitudes «Necesitamos ayuda».
   | "helpRequests"
@@ -471,7 +473,63 @@ export interface AdminDataSource {
   ): Promise<AdminPersonRecord>;
   hidePerson(id: string): Promise<AdminPersonRecord>;
   restorePerson(id: string): Promise<AdminPersonRecord>;
+  // CHG-165: verificación y reactivación de Centros de Acopio Local.
+  listCenterVerifications(
+    signal?: AbortSignal,
+  ): Promise<AdminCenterVerificationsPage>;
+  decideCenterVerification(
+    id: string,
+    input: AdminCenterVerificationDecision,
+  ): Promise<AdminCenterActionReceipt>;
+  reactivateCenter(id: string): Promise<AdminCenterActionReceipt>;
   // CHG-139: reinicio absoluto (frase de confirmación obligatoria).
   resetPlatform(confirm: string): Promise<AdminPlatformResetReceipt>;
   logout(): Promise<void>;
+}
+
+// CHG-165 — Verificación de Centros de Acopio Local: la bandeja trae
+// los pendientes de decisión y los deshabilitados por denuncias.
+// Estado operativo y verificación son independientes.
+export interface AdminCenterVerification {
+  id: string;
+  kind: string;
+  name: string;
+  locationLabel: string;
+  municipality: string;
+  department: string;
+  latitude: number | null;
+  longitude: number | null;
+  description: string | null;
+  schedule: string | null;
+  contact: string | null;
+  createdAt: string;
+  createdByAccountId: string | null;
+  verificationStatus: "unverified" | "under_review" | "verified" | "rejected";
+  operationalStatus:
+    | "open"
+    | "closed"
+    | "at_capacity"
+    | "under_observation"
+    | "inactive";
+  disabledAt: string | null;
+  verifiedAt: string | null;
+  activeReportsCount: number;
+}
+
+export interface AdminCenterVerificationsPage {
+  pending: AdminCenterVerification[];
+  disabled: AdminCenterVerification[];
+}
+
+export interface AdminCenterVerificationDecision {
+  decision: "approve" | "reject";
+  reason?: string;
+}
+
+export interface AdminCenterActionReceipt {
+  id: string;
+  verificationStatus: AdminCenterVerification["verificationStatus"];
+  operationalStatus: AdminCenterVerification["operationalStatus"];
+  disabledAt: string | null;
+  activeReportsCount: number;
 }

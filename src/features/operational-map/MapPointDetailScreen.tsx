@@ -10,6 +10,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { font } from "../../typography";
+import { CollectionCenterCommunityPanel } from "../aid-locations/CollectionCenterCommunityPanel";
+import type { AidLocationCommunityDataSource } from "../aid-locations/communityDataSource";
 import { CountdownLabel } from "../help-requests/CountdownLabel";
 import { resolvePublicMediaUrl } from "../media/publicMediaUrl";
 import { categoryMeta } from "./categoryMeta";
@@ -228,10 +230,20 @@ function buildContent(payload: MapPointDetailPayload): DetailContent {
 export function MapPointDetailScreen({
   payload,
   onBack,
+  communityDataSource,
 }: {
   payload: MapPointDetailPayload | null;
   onBack: () => void;
+  // CHG-165: inyectable en pruebas; por defecto usa el data source real.
+  communityDataSource?: AidLocationCommunityDataSource;
 }) {
+  // CHG-165: solo los Centros de Acopio Local llevan comentarios y
+  // denuncias en su vista completa (alcance del contrato).
+  const collectionCenterId =
+    payload?.kind === "operational" &&
+    payload.point.category === "collection_center"
+      ? payload.point.id
+      : null;
   return (
     <View style={styles.root}>
       <SafeAreaView edges={["top"]} style={styles.safeArea}>
@@ -264,6 +276,13 @@ export function MapPointDetailScreen({
               </View>
             ) : (
               <DetailCard content={buildContent(payload)} />
+            )}
+
+            {collectionCenterId && (
+              <CollectionCenterCommunityPanel
+                locationId={collectionCenterId}
+                dataSource={communityDataSource}
+              />
             )}
           </View>
         </ScrollView>

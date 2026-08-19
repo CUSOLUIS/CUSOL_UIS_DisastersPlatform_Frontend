@@ -6,6 +6,9 @@ import type {
   AdminAccountPage,
   AdminAuditEvent,
   AdminAuditPage,
+  AdminCenterActionReceipt,
+  AdminCenterVerification,
+  AdminCenterVerificationsPage,
   AdminDataSource,
   AdminHelpRequest,
   AdminHelpRequestDeleteReceipt,
@@ -225,6 +228,22 @@ const apiAdminDataSource: AdminDataSource = {
     apiRequest<AdminPersonRecord>(`/api/v1/admin/people/${id}/restore`, {
       method: "POST",
     }),
+  // CHG-165: verificación y reactivación de Centros de Acopio Local.
+  listCenterVerifications: (signal) =>
+    apiRequest<AdminCenterVerificationsPage>(
+      "/api/v1/admin/aid-locations/verifications",
+      { signal },
+    ),
+  decideCenterVerification: (id, input) =>
+    apiRequest<AdminCenterActionReceipt>(
+      `/api/v1/admin/aid-locations/${id}/verification`,
+      { method: "POST", body: JSON.stringify(input) },
+    ),
+  reactivateCenter: (id) =>
+    apiRequest<AdminCenterActionReceipt>(
+      `/api/v1/admin/aid-locations/${id}/reactivate`,
+      { method: "POST" },
+    ),
   // CHG-139: reinicio absoluto de la plataforma.
   resetPlatform: (confirm) =>
     apiRequest<AdminPlatformResetReceipt>(
@@ -550,6 +569,51 @@ function assertVersion(actual: number, expected: number) {
 
 // CHG-154 — Registros de personas demo (uno sembrado y uno con caso
 // ciudadano vinculado) mutables para ensayar ocultar/editar/restaurar.
+// CHG-165 — Acopios locales sintéticos para la sección Verificaciones:
+// uno pendiente de decisión y otro deshabilitado por denuncias.
+const demoCenters: AdminCenterVerification[] = [
+  {
+    id: "cc000000-0000-4000-8000-000000000001",
+    kind: "collection_center",
+    name: "Acopio La Feria",
+    locationLabel: "Calle 10 # 5-51",
+    municipality: "Bucaramanga",
+    department: "Santander",
+    latitude: 7.1193,
+    longitude: -73.1227,
+    description: "Recibe alimentos no perecederos y frazadas.",
+    schedule: "Lunes a domingo, 8 a. m. a 6 p. m.",
+    contact: null,
+    createdAt: "2026-08-18T14:00:00Z",
+    createdByAccountId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+    verificationStatus: "unverified",
+    operationalStatus: "open",
+    disabledAt: null,
+    verifiedAt: null,
+    activeReportsCount: 0,
+  },
+  {
+    id: "cc000000-0000-4000-8000-000000000002",
+    kind: "collection_center",
+    name: "Acopio Puerta del Sol",
+    locationLabel: "Carrera 33 # 90-12",
+    municipality: "Bucaramanga",
+    department: "Santander",
+    latitude: 7.1042,
+    longitude: -73.1112,
+    description: "Punto reportado por la comunidad como inexistente.",
+    schedule: null,
+    contact: null,
+    createdAt: "2026-08-15T09:00:00Z",
+    createdByAccountId: null,
+    verificationStatus: "unverified",
+    operationalStatus: "inactive",
+    disabledAt: "2026-08-19T02:00:00Z",
+    verifiedAt: null,
+    activeReportsCount: 20,
+  },
+];
+
 const demoPeople: AdminPersonRecord[] = [
   {
     id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1",
@@ -969,6 +1033,60 @@ export const demoAdminDataSource: AdminDataSource = {
     person.hiddenBy = null;
     person.updatedAt = nowIso();
     return clone(person);
+  },
+  // CHG-165: verificación/reactivación de acopios locales en demo.
+  async listCenterVerifications() {
+    return clone({
+      pending: demoCenters.filter(
+        (center) => center.verificationStatus === "unverified",
+      ),
+      disabled: demoCenters.filter(
+        (center) => center.disabledAt !== null,
+      ),
+    });
+  },
+  async decideCenterVerification(id, input) {
+    const center = demoCenters.find((item) => item.id === id);
+    if (!center) throw new Error("El centro no existe.");
+    center.verificationStatus =
+      input.decision === "approve" ? "verified" : "rejected";
+    center.verifiedAt = nowIso();
+    audit(
+      input.decision === "approve"
+        ? "aid_location_verification_approved"
+        : "aid_location_verification_rejected",
+      "aid_location",
+      center.id,
+      input.reason ?? "",
+    );
+    return clone({
+      id: center.id,
+      verificationStatus: center.verificationStatus,
+      operationalStatus: center.operationalStatus,
+      disabledAt: center.disabledAt,
+      activeReportsCount: center.activeReportsCount,
+    });
+  },
+  async reactivateCenter(id) {
+    const center = demoCenters.find((item) => item.id === id);
+    if (!center) throw new Error("El centro no existe.");
+    if (center.disabledAt === null) {
+      throw new Error(
+        "Solo puede reactivarse un centro deshabilitado por denuncias.",
+      );
+    }
+    center.operationalStatus = "open";
+    center.disabledAt = null;
+    // §16: el ciclo vuelve a 0; el histórico se conserva en el real.
+    center.activeReportsCount = 0;
+    audit("aid_location_reactivated", "aid_location", center.id, "");
+    return clone({
+      id: center.id,
+      verificationStatus: center.verificationStatus,
+      operationalStatus: center.operationalStatus,
+      disabledAt: center.disabledAt,
+      activeReportsCount: center.activeReportsCount,
+    });
   },
   // CHG-139: en demo el reinicio vacía las colecciones sintéticas.
   async resetPlatform(confirm) {

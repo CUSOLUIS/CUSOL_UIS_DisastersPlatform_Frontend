@@ -207,6 +207,12 @@ function createDataSource(
     updatePerson: jest.fn(),
     hidePerson: jest.fn(),
     restorePerson: jest.fn(),
+    // CHG-165: verificación/reactivación de acopios locales.
+    listCenterVerifications: jest
+      .fn()
+      .mockResolvedValue({ pending: [], disabled: [] }),
+    decideCenterVerification: jest.fn(),
+    reactivateCenter: jest.fn(),
     resetPlatform: jest.fn().mockResolvedValue({
       tablesCleared: 21,
       accountsDeleted: 6,

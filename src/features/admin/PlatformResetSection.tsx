@@ -1,4 +1,5 @@
-// CHG-139 — Sección «08 · Reinicio» de la consola: el reinicio
+// CHG-139 — Sección «10 · Reinicio» de la consola (renumerada por
+// CHG-165): el reinicio
 // absoluto de la plataforma. Borra TODOS los datos de emergencia,
 // fotografías, auditoría y cuentas (excepto la del super admin que lo
 // ordena, cuya sesión sobrevive). Para ejecutarlo hay que escribir la

@@ -28,6 +28,8 @@ env:
   EXPO_PUBLIC_HELP_REQUESTS_DATA_MODE: api
   # CHG-163: ofertas «Ofrecer comida» contra la API real.
   EXPO_PUBLIC_FOOD_OFFERS_DATA_MODE: api
+  # CHG-165: comentarios/denuncias de acopios locales contra la API real.
+  EXPO_PUBLIC_AID_LOCATION_COMMUNITY_DATA_MODE: api
   # CHG-128: revisión embebida en el APK; el portón de actualización la
   # compara con el manifiesto publicado junto al APK en el VPS.
   EXPO_PUBLIC_APP_REVISION: ${{ github.sha }}
