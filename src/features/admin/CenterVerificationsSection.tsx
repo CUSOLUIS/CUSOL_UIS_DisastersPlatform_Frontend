@@ -126,7 +126,9 @@ export function CenterVerificationsSection({
         setNotice(
           confirming.action === "approve"
             ? `${center.name} quedó VERIFICADO; el público lo verá como «Verificado».`
-            : `${center.name} quedó RECHAZADO; el público lo seguirá viendo como «Sin verificar».`,
+            : // CHG-169: rechazar deshabilita el acopio y lo saca del
+              // mapa; queda en DESHABILITADOS por si hay que revertir.
+              `${center.name} quedó RECHAZADO: el centro fue deshabilitado y salió del mapa. Si fue un error, puede reactivarse desde DESHABILITADOS.`,
         );
       }
       setConfirming(null);

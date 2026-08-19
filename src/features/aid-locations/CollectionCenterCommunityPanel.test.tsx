@@ -58,6 +58,7 @@ function fakeDataSource(
       disabled: false,
     }),
     adminDeleteComment: jest.fn().mockResolvedValue(undefined),
+    adminDeleteAidLocation: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }

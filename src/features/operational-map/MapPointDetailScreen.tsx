@@ -1,4 +1,6 @@
+import { useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   Linking,
   Pressable,
@@ -12,10 +14,15 @@ import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { font } from "../../typography";
 import { CollectionCenterCommunityPanel } from "../aid-locations/CollectionCenterCommunityPanel";
 import {
+  aidLocationCommunityDataSource,
   hasAidLocationCommunity,
   type AidLocationCommunityDataSource,
 } from "../aid-locations/communityDataSource";
 import { ratingSummaryLine } from "../aid-locations/ratingStars";
+import {
+  useSessionAccount,
+  type SessionAccountSource,
+} from "../auth/useSessionAccount";
 import { CountdownLabel } from "../help-requests/CountdownLabel";
 import { resolvePublicMediaUrl } from "../media/publicMediaUrl";
 import { categoryMeta } from "./categoryMeta";
@@ -248,11 +255,14 @@ export function MapPointDetailScreen({
   payload,
   onBack,
   communityDataSource,
+  sessionSource,
 }: {
   payload: MapPointDetailPayload | null;
   onBack: () => void;
   // CHG-165: inyectable en pruebas; por defecto usa el data source real.
   communityDataSource?: AidLocationCommunityDataSource;
+  // CHG-170: inyectable en pruebas; por defecto consulta /auth/me.
+  sessionSource?: SessionAccountSource;
 }) {
   // CHG-165: los acopios llevan comentarios y denuncias en su vista
   // completa; CHG-168 extiende el alcance del local al receptor.
@@ -261,6 +271,40 @@ export function MapPointDetailScreen({
     hasAidLocationCommunity(payload.point.category)
       ? payload.point.id
       : null;
+  // CHG-170: solo el super_admin ve ELIMINAR en la ficha del acopio
+  // (ambos tipos); la barrera real es el backend. Dos pasos.
+  const session = useSessionAccount(sessionSource);
+  const isAdmin =
+    session.status === "authenticated" &&
+    session.account.assignedRole === "super_admin";
+  const [deleteArmed, setDeleteArmed] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const dataSource = communityDataSource ?? aidLocationCommunityDataSource;
+
+  const deleteCenter = async () => {
+    if (!collectionCenterId) return;
+    if (!deleteArmed) {
+      setDeleteArmed(true);
+      return;
+    }
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await dataSource.adminDeleteAidLocation(collectionCenterId);
+      // El punto ya no existe: la ficha vuelve al mapa.
+      onBack();
+    } catch (error: unknown) {
+      setDeleteArmed(false);
+      setDeleteError(
+        error instanceof Error
+          ? error.message
+          : "No fue posible eliminar el centro de acopio.",
+      );
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
   return (
     <View style={styles.root}>
       <SafeAreaView edges={["top"]} style={styles.safeArea}>
@@ -295,10 +339,53 @@ export function MapPointDetailScreen({
               <DetailCard content={buildContent(payload)} />
             )}
 
+            {/* CHG-170: ELIMINAR el acopio, solo para super_admin. */}
+            {collectionCenterId && isAdmin && (
+              <View style={styles.deleteBlock} testID="map-point-delete-block">
+                {deleteError && (
+                  <Text
+                    accessibilityRole="alert"
+                    style={styles.deleteError}
+                  >
+                    {deleteError}
+                  </Text>
+                )}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    deleteArmed
+                      ? "Confirmar la eliminación del centro de acopio"
+                      : "Eliminar este centro de acopio"
+                  }
+                  disabled={deleteBusy}
+                  onPress={() => void deleteCenter()}
+                  style={[
+                    styles.deleteButton,
+                    deleteArmed && styles.deleteButtonArmed,
+                  ]}
+                  testID="map-point-delete-center"
+                >
+                  {deleteBusy ? (
+                    <ActivityIndicator color="#07101b" />
+                  ) : (
+                    <Text style={styles.deleteText}>
+                      {deleteArmed ? "¿CONFIRMAR ELIMINACIÓN?" : "ELIMINAR"}
+                    </Text>
+                  )}
+                </Pressable>
+                <Text style={styles.deleteHint}>
+                  Solo la superadministración ve esta opción: elimina
+                  definitivamente este centro de acopio (el acto queda
+                  auditado).
+                </Text>
+              </View>
+            )}
+
             {collectionCenterId && (
               <CollectionCenterCommunityPanel
                 locationId={collectionCenterId}
                 dataSource={communityDataSource}
+                sessionSource={sessionSource}
               />
             )}
           </View>
@@ -430,6 +517,38 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.mono,
     fontSize: font(13),
   },
+  // CHG-170: bloque de eliminación (solo super_admin).
+  deleteBlock: { gap: 8 },
+  deleteButton: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "flex-start",
+    paddingHorizontal: 18,
+    borderRadius: 8,
+    backgroundColor: colors.emergency,
+  },
+  deleteButtonArmed: {
+    borderWidth: 2,
+    borderColor: colors.ink,
+  },
+  deleteText: {
+    color: "#07101b",
+    fontFamily: fontFamilies.mono,
+    fontSize: font(11),
+    fontWeight: "900",
+    letterSpacing: 0.8,
+  },
+  deleteError: {
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,77,94,0.4)",
+    borderRadius: 8,
+    color: colors.inkSoft,
+    fontSize: font(12),
+    lineHeight: 18,
+  },
+  deleteHint: { color: colors.inkDim, fontSize: font(11), lineHeight: 16 },
   countdown: {
     fontFamily: fontFamilies.mono,
     fontSize: font(12),

@@ -136,6 +136,13 @@ it("rechazar guarda el motivo escrito", async () => {
       { decision: "reject", reason: "Dirección inexistente." },
     ),
   );
+  // CHG-169: el aviso explica que el rechazo deshabilita y saca del
+  // mapa, con la puerta de reversa en DESHABILITADOS.
+  await waitFor(() =>
+    expect(
+      screen.getByText(/deshabilitado y salió del mapa/i),
+    ).toBeTruthy(),
+  );
 });
 
 it("REACTIVAR CENTRO confirma anunciando el reinicio del ciclo", async () => {

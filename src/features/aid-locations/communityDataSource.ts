@@ -109,6 +109,9 @@ export interface AidLocationCommunityDataSource {
   // CHG-167: borrado definitivo de un comentario; el gateway exige
   // sesión super_admin (la barrera es backend, no el botón oculto).
   adminDeleteComment(locationId: string, commentId: string): Promise<void>;
+  // CHG-170: borrado definitivo del acopio completo desde su ficha de
+  // VER MÁS; también exclusivo del super_admin y auditado en backend.
+  adminDeleteAidLocation(locationId: string): Promise<void>;
 }
 
 export class AidLocationCommunityApiError extends Error {
@@ -216,6 +219,12 @@ const apiCommunityDataSource: AidLocationCommunityDataSource = {
       { method: "DELETE" },
     );
   },
+  adminDeleteAidLocation: async (locationId) => {
+    await apiRequest<{ deleted: number }>(
+      `/api/v1/admin/aid-locations/${locationId}`,
+      { method: "DELETE" },
+    );
+  },
 };
 
 // --- modo demostración (jest y ambientes sin API) ---------------------
@@ -305,6 +314,10 @@ const demoCommunityDataSource: AidLocationCommunityDataSource = {
     const items = demoCommentsFor(locationId);
     const index = items.findIndex((comment) => comment.id === commentId);
     if (index >= 0) items.splice(index, 1);
+  },
+  async adminDeleteAidLocation(locationId) {
+    demoComments.delete(locationId);
+    demoReports.delete(locationId);
   },
 };
 

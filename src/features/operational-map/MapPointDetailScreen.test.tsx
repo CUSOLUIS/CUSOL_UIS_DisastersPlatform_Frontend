@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react-native";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react-native";
 import { MapPointDetailScreen } from "./MapPointDetailScreen";
 import { normalizeOperationalMapOverview } from "./dataSource";
 import { operationalMapDemoData } from "./demoData";
@@ -200,4 +206,115 @@ it("un acopio receptor muestra promedio, COMENTAR y DENUNCIAR", async () => {
   ).toBeTruthy();
   expect(screen.getByTestId("center-comment-button")).toBeTruthy();
   expect(screen.getByTestId("center-report-button")).toBeTruthy();
+});
+
+// CHG-170 — ELIMINAR el acopio desde su ficha: visible solo para el
+// super_admin, en dos pasos, para ambos tipos de acopio.
+import type { AidLocationCommunityDataSource } from "../aid-locations/communityDataSource";
+
+function fakeCommunitySource(): AidLocationCommunityDataSource {
+  return {
+    transport: "demo",
+    listComments: jest.fn().mockResolvedValue({
+      items: [],
+      total: 0,
+      ratingAverage: null,
+      ratingCount: 0,
+    }),
+    createComment: jest.fn(),
+    reportCenter: jest.fn(),
+    adminDeleteComment: jest.fn().mockResolvedValue(undefined),
+    adminDeleteAidLocation: jest.fn().mockResolvedValue(undefined),
+  };
+}
+
+function adminSessionSource() {
+  return {
+    getCurrentAccount: jest.fn().mockResolvedValue({
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+      displayName: "Admin CUSOL",
+      email: "admin@cusol.local",
+      assignedRole: "super_admin",
+      status: "active",
+      sessionExpiresAt: "2099-01-01T00:00:00Z",
+    }),
+  };
+}
+
+it.each(["collection_center", "receiver_center"] as const)(
+  "el super_admin elimina un %s en dos pasos y vuelve al mapa",
+  async (category) => {
+    const onBack = jest.fn();
+    const dataSource = fakeCommunitySource();
+    render(
+      <MapPointDetailScreen
+        payload={{ kind: "operational", point: { ...point, category } }}
+        onBack={onBack}
+        communityDataSource={dataSource}
+        sessionSource={adminSessionSource()}
+      />,
+    );
+    const button = await screen.findByTestId("map-point-delete-center");
+
+    // Primer toque: arma la confirmación sin llamar a la API.
+    fireEvent.press(button);
+    expect(screen.getByText("¿CONFIRMAR ELIMINACIÓN?")).toBeTruthy();
+    expect(dataSource.adminDeleteAidLocation).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByTestId("map-point-delete-center"));
+    await waitFor(() =>
+      expect(dataSource.adminDeleteAidLocation).toHaveBeenCalledWith(
+        point.id,
+      ),
+    );
+    await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
+  },
+);
+
+it("sin sesión de super_admin la ficha no ofrece ELIMINAR", async () => {
+  render(
+    <MapPointDetailScreen
+      payload={{
+        kind: "operational",
+        point: { ...point, category: "collection_center" },
+      }}
+      onBack={jest.fn()}
+      communityDataSource={fakeCommunitySource()}
+    />,
+  );
+  await screen.findByTestId("center-comments-average");
+
+  expect(screen.queryByTestId("map-point-delete-block")).toBeNull();
+});
+
+it("si el backend rechaza la eliminación, la ficha muestra el motivo y no navega", async () => {
+  const onBack = jest.fn();
+  const dataSource = fakeCommunitySource();
+  (dataSource.adminDeleteAidLocation as jest.Mock).mockRejectedValue(
+    new Error(
+      "El acopio tiene transportes humanitarios registrados y no puede eliminarse mientras existan.",
+    ),
+  );
+  render(
+    <MapPointDetailScreen
+      payload={{
+        kind: "operational",
+        point: { ...point, category: "receiver_center" },
+      }}
+      onBack={onBack}
+      communityDataSource={dataSource}
+      sessionSource={adminSessionSource()}
+    />,
+  );
+  const button = await screen.findByTestId("map-point-delete-center");
+
+  fireEvent.press(button);
+  fireEvent.press(screen.getByTestId("map-point-delete-center"));
+
+  await waitFor(() =>
+    expect(
+      screen.getByText(/transportes humanitarios registrados/i),
+    ).toBeTruthy(),
+  );
+  expect(onBack).not.toHaveBeenCalled();
 });
