@@ -21,6 +21,9 @@ export const operationalMapCategories = [
   // CHG-125: solicitudes «Necesitamos ayuda» vigentes (fusionadas en
   // cliente, DEC-125-10; nunca vienen del overview del backend).
   "help_request",
+  // CHG-171: viajes de La Mulera/La Lanchera en curso (fusionados en
+  // cliente desde /transports/active; nunca vienen del overview).
+  "humanitarian_transport",
 ] as const;
 
 export type OperationalMapCategory = (typeof operationalMapCategories)[number];
@@ -43,6 +46,8 @@ export const operationalResponseCategories = [
   "temporary_shelter",
   "volunteers_needed",
   "help_request",
+  // CHG-171: viajes en curso.
+  "humanitarian_transport",
 ] as const satisfies readonly OperationalMapCategory[];
 
 // CHG-157: la leyenda del mapa se divide en dos bloques —
@@ -65,6 +70,7 @@ export const humanitarianAidLegendCategories = [
   "temporary_shelter",
   "volunteers_needed",
   "help_request",
+  "humanitarian_transport",
 ] as const satisfies readonly OperationalMapCategory[];
 
 export type CoordinatePrecision = "exact" | "approximate" | "municipality";
@@ -120,6 +126,8 @@ export interface OperationalMapSummary {
   // CHG-125: cuenta de solicitudes de ayuda vigentes fusionadas en
   // cliente; el backend no la envía y se normaliza a 0.
   helpRequests: number;
+  // CHG-171: viajes en curso fusionados en cliente (igual que arriba).
+  humanitarianTransports: number;
 }
 
 export interface OperationalMapOverview {
@@ -216,8 +224,17 @@ export interface HumanMapDataSource {
   ) => Promise<HumanMapOverview>;
 }
 
+// CHG-171: puntos del rastro GPS de los viajes — decoración no
+// interactiva que los lienzos dibujan detrás de los marcadores.
+export interface MapTrailDot {
+  id: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface OperationalMapCanvasProps {
   points: OperationalMapPoint[];
+  trailDots?: MapTrailDot[];
   selectedId: string | null;
   onSelect: (pointId: string) => void;
   compact: boolean;

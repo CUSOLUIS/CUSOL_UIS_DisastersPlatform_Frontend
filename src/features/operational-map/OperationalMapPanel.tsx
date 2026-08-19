@@ -25,6 +25,12 @@ import {
   foodOffersToMapPoints,
 } from "../food-offers/mapPoints";
 import type { ActiveFoodOffer } from "../food-offers/types";
+import {
+  transportIdFromPointId,
+  transportsToMapPoints,
+  transportsToTrailDots,
+} from "../transports/mapPoints";
+import type { ActiveTransport } from "../transports/types";
 import type { SelectedPhoto } from "../missing-persons/reportTypes";
 import type { HumanStatus } from "../human-impact/types";
 import { categoryMeta } from "./categoryMeta";
@@ -122,6 +128,9 @@ interface OperationalMapPanelProps {
   // CHG-163: ofertas de comida vigentes fusionadas en cliente como
   // marcadores `community_meal`; misma regla de expiración server-side.
   foodOffers?: ActiveFoodOffer[];
+  // CHG-171: viajes de La Mulera/La Lanchera en curso, fusionados en
+  // cliente como marcadores `humanitarian_transport` con su rastro.
+  transports?: ActiveTransport[];
   // CHG-164: «VER MÁS» del popup de un marcador abre la vista de
   // información completa (/detalle-punto); sin el callback, el popup
   // solo resume y cierra.
@@ -157,6 +166,7 @@ export function OperationalMapPanel({
   helpRequests = [],
   helpRequestActions,
   foodOffers = [],
+  transports = [],
   onOpenPointDetail,
 }: OperationalMapPanelProps) {
   const [loadState, setLoadState] = useState<MapLoadState>(() =>
@@ -285,6 +295,7 @@ export function OperationalMapPanel({
       helpRequests={helpRequests}
       helpRequestActions={helpRequestActions}
       foodOffers={foodOffers}
+      transports={transports}
       onOpenPointDetail={onOpenPointDetail}
       activeCategories={activeCategories}
       setActiveCategories={setActiveCategories}
@@ -310,6 +321,7 @@ function MapContent({
   helpRequests,
   helpRequestActions,
   foodOffers,
+  transports,
   onOpenPointDetail,
   activeCategories,
   setActiveCategories,
@@ -331,6 +343,7 @@ function MapContent({
   helpRequests: ActiveHelpRequest[];
   helpRequestActions?: HelpRequestMapActions;
   foodOffers: ActiveFoodOffer[];
+  transports: ActiveTransport[];
   onOpenPointDetail?: (payload: MapPointDetailPayload) => void;
   activeCategories: OperationalMapCategory[];
   setActiveCategories: React.Dispatch<React.SetStateAction<OperationalMapCategory[]>>;
@@ -356,18 +369,26 @@ function MapContent({
       // CHG-163: las ofertas de comida se fusionan igual; comparten la
       // categoría `community_meal` que existía sin datos desde CHG-044.
       ...foodOffersToMapPoints(foodOffers),
+      // CHG-171: los viajes en curso, con su marcador móvil.
+      ...transportsToMapPoints(transports),
     ],
-    [data.items, helpRequests, foodOffers],
+    [data.items, helpRequests, foodOffers, transports],
+  );
+  // CHG-171: rastro no interactivo del GPS de cada viaje.
+  const transportTrailDots = useMemo(
+    () => transportsToTrailDots(transports),
+    [transports],
   );
   const displaySummary = useMemo(
     () => ({
       ...data.summary,
       helpRequests: helpRequests.length,
+      humanitarianTransports: transports.length,
       // Se SUMA al conteo del overview (hoy 0: la publicación de
       // aid-offers sigue bloqueada por DEC-021) en vez de sustituirlo.
       communityMeal: data.summary.communityMeal + foodOffers.length,
     }),
-    [data.summary, helpRequests.length, foodOffers.length],
+    [data.summary, helpRequests.length, foodOffers.length, transports.length],
   );
   const visiblePoints = useMemo(
     () => mergedItems.filter((point) => activeCategories.includes(point.category)),
@@ -431,11 +452,30 @@ function MapContent({
       const offer = rawFoodId
         ? (foodOffers.find((item) => item.id === rawFoodId) ?? null)
         : null;
+      if (offer) {
+        setPopupTarget({ kind: "food_offer", offer });
+        return;
+      }
+      // CHG-171: el marcador de un viaje abre su popup con estado,
+      // salida y llegada.
+      const rawTransportId = transportIdFromPointId(pointId);
+      const transport = rawTransportId
+        ? (transports.find((item) => item.id === rawTransportId) ?? null)
+        : null;
       setPopupTarget(
-        offer ? { kind: "food_offer", offer } : { kind: "operational", point },
+        transport
+          ? { kind: "transport", transport }
+          : { kind: "operational", point },
       );
     },
-    [setSelectedId, helpRequestActions, helpRequests, foodOffers, mergedItems],
+    [
+      setSelectedId,
+      helpRequestActions,
+      helpRequests,
+      foodOffers,
+      transports,
+      mergedItems,
+    ],
   );
   const actionRequest = useMemo(
     () =>
@@ -501,6 +541,11 @@ function MapContent({
       <View style={styles.canvasWrap}>
         <OperationalMapCanvas
           points={visiblePoints}
+          trailDots={
+            activeCategories.includes("humanitarian_transport")
+              ? transportTrailDots
+              : []
+          }
           selectedId={selectedPoint?.id ?? null}
           onSelect={handleSelect}
           compact={compact}

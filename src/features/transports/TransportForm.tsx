@@ -30,13 +30,25 @@ import {
   fetchTransportCenterCandidates,
   submitTransport,
 } from "./reportSubmission";
+import { CenterPickerModal } from "./CenterPickerModal";
+import { CityAutocompleteField } from "./CityAutocompleteField";
+import { fetchTransportCities, type TransportCity } from "./cityCatalog";
+import { TransportJourneyPanel } from "./TransportJourneyPanel";
 import {
+  DRIVER_DOCUMENT_TYPES,
+  DRIVER_PHONE_PATTERN,
+  MAX_DRIVER_DOCUMENT_LENGTH,
+  MAX_DRIVER_NAME_LENGTH,
+  MAX_DRIVER_PHONE_LENGTH,
   MAX_SUPPLIES_LENGTH,
-  MAX_TRANSPORT_CITY_LENGTH,
+  MAX_VEHICLE_CHARACTERISTICS_LENGTH,
+  PLATE_PATTERN,
+  normalizePlate,
+  transportDriverCopy,
   transportFormCopy,
   transportKindLabel,
   transportSideCopy,
-  transportStatusLabel,
+  transportVehicleCopy,
   type TransportDraft,
   type TransportKind,
   type TransportReceipt,
@@ -55,6 +67,14 @@ export const initialTransportDraft: TransportDraft = {
   destinationLocationId: "",
   suppliesSummary: "",
   truthConfirmed: false,
+  // CHG-171: conductor y vehículo.
+  driverFullName: "",
+  driverDocumentType: "",
+  driverDocumentNumber: "",
+  driverPhone: "",
+  tractorPlate: "",
+  trailerPlate: "",
+  vehicleVisibleCharacteristics: "",
 };
 
 export type TransportIssueField = keyof TransportDraft;
@@ -94,6 +114,53 @@ export function collectTransportIssues(
       "Elige el centro de acopio receptor al que llega el transporte.",
     );
   }
+  // CHG-171 §42: conductor y vehículo obligatorios (espejo backend).
+  if (draft.driverFullName.trim().length < 3) {
+    push(
+      "driverFullName",
+      "Escribe el nombre completo de la persona que conduce.",
+    );
+  }
+  if (!draft.driverDocumentType) {
+    push(
+      "driverDocumentType",
+      "Elige el tipo de documento de quien conduce.",
+    );
+  }
+  if (draft.driverDocumentNumber.trim().length < 3) {
+    push(
+      "driverDocumentNumber",
+      "Escribe el número de documento de quien conduce.",
+    );
+  }
+  if (!DRIVER_PHONE_PATTERN.test(draft.driverPhone.trim())) {
+    push(
+      "driverPhone",
+      "Escribe un número de contacto válido para quien conduce.",
+    );
+  }
+  if (!PLATE_PATTERN.test(normalizePlate(draft.tractorPlate))) {
+    push(
+      "tractorPlate",
+      "La placa debe tener entre 5 y 10 letras o números.",
+    );
+  }
+  if (!PLATE_PATTERN.test(normalizePlate(draft.trailerPlate))) {
+    push(
+      "trailerPlate",
+      "La placa del tráiler debe tener entre 5 y 10 letras o números.",
+    );
+  }
+  const characteristics = draft.vehicleVisibleCharacteristics.trim();
+  if (
+    characteristics.length < 5 ||
+    characteristics.length > MAX_VEHICLE_CHARACTERISTICS_LENGTH
+  ) {
+    push(
+      "vehicleVisibleCharacteristics",
+      `Describe las características visibles del vehículo (5 a ${MAX_VEHICLE_CHARACTERISTICS_LENGTH} caracteres).`,
+    );
+  }
   if (draft.suppliesSummary.trim().length > MAX_SUPPLIES_LENGTH) {
     push(
       "suppliesSummary",
@@ -107,14 +174,22 @@ export function collectTransportIssues(
   return issues;
 }
 
-// Sección (01..04) de cada campo, para el scroll al primer error.
+// Sección (01..06, CHG-171 §4) de cada campo, para el scroll al primer
+// error.
 const FIELD_SECTIONS: Record<string, string> = {
   originMunicipality: "01",
   originLocationId: "01",
   destinationMunicipality: "02",
   destinationLocationId: "02",
-  suppliesSummary: "03",
-  truthConfirmed: "04",
+  driverFullName: "03",
+  driverDocumentType: "03",
+  driverDocumentNumber: "03",
+  driverPhone: "03",
+  tractorPlate: "04",
+  trailerPlate: "04",
+  vehicleVisibleCharacteristics: "04",
+  suppliesSummary: "05",
+  truthConfirmed: "06",
 };
 
 type CandidatesState =
@@ -140,23 +215,9 @@ interface TransportFormProps {
     municipality: string,
     options?: { signal?: AbortSignal },
   ) => Promise<AidLocationParentCandidate[]>;
+  // CHG-171: catálogo de ciudades inyectable en pruebas.
+  loadCities?: () => Promise<TransportCity[]>;
 }
-
-const createdFormatter = new Intl.DateTimeFormat("es-CO", {
-  day: "2-digit",
-  month: "long",
-  hour: "numeric",
-  minute: "2-digit",
-  timeZone: "America/Bogota",
-});
-
-// Estado operativo humano de un candidato, para la lista del selector.
-const candidateStatusLabel: Record<string, string> = {
-  open: "ABIERTO",
-  closed: "CERRADO",
-  at_capacity: "CAPACIDAD COMPLETA",
-  under_observation: "EN OBSERVACIÓN",
-};
 
 // Campos del borrador que guardan la ciudad y el centro de cada lado.
 const SIDE_FIELDS: Record<
@@ -184,6 +245,7 @@ export function TransportForm({
   submitTransportReport = submitTransport,
   loadCenterCandidates = (side, municipality, options) =>
     fetchTransportCenterCandidates(side, municipality, options),
+  loadCities = fetchTransportCities,
 }: TransportFormProps) {
   const copy = transportFormCopy[kind];
   const { width } = useWindowDimensions();
@@ -201,6 +263,10 @@ export function TransportForm({
   });
   const [destinationCandidates, setDestinationCandidates] =
     useState<CandidatesState>({ status: "idle" });
+  // CHG-171: catálogo de ciudades (una sola carga) y popup de centros.
+  const [cities, setCities] = useState<TransportCity[]>([]);
+  const [citiesError, setCitiesError] = useState<string | null>(null);
+  const [pickerSide, setPickerSide] = useState<TransportSide | null>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Record<string, number>>({});
@@ -208,6 +274,26 @@ export function TransportForm({
   const registerSection = (code: string, y: number) => {
     sectionOffsets.current[code] = y;
   };
+
+  // CHG-171 §50/§53: el catálogo se carga una vez y se filtra local.
+  useEffect(() => {
+    let mounted = true;
+    loadCities()
+      .then((items) => {
+        if (mounted) setCities(items);
+      })
+      .catch(() => {
+        if (mounted) {
+          setCitiesError(
+            "No fue posible cargar el catálogo de ciudades. Recarga la página para intentarlo de nuevo.",
+          );
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+    // La versión por defecto se recrearía en cada render.
+  }, []);
 
   const setField = <Key extends keyof TransportDraft>(
     key: Key,
@@ -318,10 +404,23 @@ export function TransportForm({
   };
 
   if (receipt) {
+    // CHG-171 (GPS): la constancia se convierte en la pantalla del
+    // viaje — activa el GPS del conductor y ofrece salida/llegada.
     return (
-      <TransportConfirmation receipt={receipt} onHome={onHome ?? onBack} />
+      <TransportJourneyPanel
+        receipt={receipt}
+        kind={kind}
+        onHome={onHome ?? onBack}
+      />
     );
   }
+
+  // CHG-171 §10-§15: tras elegir la ciudad se muestra el CONTEO de
+  // centros y el botón que abre el popup; nunca la lista suelta.
+  const centerTypeLabel: Record<TransportSide, string> = {
+    origin: "Centros de Acopio Local",
+    destination: "Centros de Acopio Receptores",
+  };
 
   const sideSectionBody = (
     side: TransportSide,
@@ -333,13 +432,20 @@ export function TransportForm({
     if (!municipality) {
       return (
         <Text style={styles.fieldNote}>
-          Escribe primero la ciudad: los centros disponibles dependen de
+          Elige primero la ciudad: los centros disponibles dependen de
           ella.
         </Text>
       );
     }
     if (candidates.status === "loading") {
-      return <ActivityIndicator color={colors.cyan} />;
+      return (
+        <View style={styles.loadingRow}>
+          <ActivityIndicator color={colors.cyan} />
+          <Text style={styles.fieldNote}>
+            Buscando centros disponibles...
+          </Text>
+        </View>
+      );
     }
     if (candidates.status === "error") {
       return (
@@ -348,59 +454,69 @@ export function TransportForm({
         </Text>
       );
     }
-    if (candidates.status === "success" && candidates.items.length === 0) {
+    if (candidates.status !== "success") {
+      return null;
+    }
+    if (candidates.items.length === 0) {
       return (
         <View style={styles.missingCenter} accessibilityRole="alert">
           <Text style={styles.missingCenterText}>
+            0 {centerTypeLabel[side]} disponibles.{" "}
             {sideCopy.missingCenterMessage}
           </Text>
         </View>
       );
     }
-    if (candidates.status === "success") {
-      return (
-        <View
-          style={styles.candidateList}
-          accessibilityRole="radiogroup"
-          accessibilityLabel={sideCopy.centerLabel}
-        >
-          {candidates.items.map((candidate) => {
-            const selected = draft[fields.locationId] === candidate.id;
-            return (
-              <Pressable
-                key={candidate.id}
-                accessibilityRole="radio"
-                accessibilityLabel={`${candidate.name}, ${candidate.address}`}
-                accessibilityState={{ selected }}
-                onPress={() => setField(fields.locationId, candidate.id)}
-                style={[
-                  styles.candidate,
-                  selected && styles.candidateSelected,
-                ]}
-                testID={`${side}-center-${candidate.id}`}
-              >
-                <View style={styles.candidateCopy}>
-                  <Text style={styles.candidateName}>{candidate.name}</Text>
-                  <Text style={styles.candidateMeta}>
-                    {candidate.address}
-                  </Text>
-                </View>
-                <Text
-                  style={[
-                    styles.candidateStatus,
-                    selected && styles.candidateStatusSelected,
-                  ]}
-                >
-                  {candidateStatusLabel[candidate.operationalStatus] ??
-                    candidate.operationalStatus.toUpperCase()}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      );
-    }
-    return null;
+    const selectedCandidate = candidates.items.find(
+      (candidate) => candidate.id === draft[fields.locationId],
+    );
+    return (
+      <View style={styles.centerPickerBlock}>
+        <Text style={styles.centerCount} testID={`${side}-center-count`}>
+          {candidates.items.length === 1
+            ? `1 ${centerTypeLabel[side].replace("Centros", "Centro").replace("Receptores", "Receptor")} disponible`
+            : `${candidates.items.length} ${centerTypeLabel[side]} disponibles`}
+        </Text>
+        {selectedCandidate ? (
+          <View
+            style={[styles.candidate, styles.candidateSelected]}
+            testID={`${side}-selected-center`}
+          >
+            <View style={styles.candidateCopy}>
+              <Text style={styles.candidateName}>
+                {selectedCandidate.name}
+              </Text>
+              <Text style={styles.candidateMeta}>
+                {selectedCandidate.address}
+              </Text>
+              <Text style={styles.candidateMeta}>
+                {selectedCandidate.municipality},{" "}
+                {selectedCandidate.department}
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Cambiar el centro de ${side === "origin" ? "origen" : "destino"}`}
+              onPress={() => setPickerSide(side)}
+              style={styles.changeCenterButton}
+              testID={`${side}-change-center`}
+            >
+              <Text style={styles.changeCenterText}>CAMBIAR CENTRO</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Ver ${centerTypeLabel[side]} de la ciudad elegida`}
+            onPress={() => setPickerSide(side)}
+            style={styles.viewCentersButton}
+            testID={`${side}-view-centers`}
+          >
+            <Text style={styles.viewCentersText}>VER CENTROS</Text>
+          </Pressable>
+        )}
+      </View>
+    );
   };
 
   const sideSection = (
@@ -417,13 +533,24 @@ export function TransportForm({
         description={sideCopy.sectionDescription}
         onPosition={registerSection}
       >
-        <FormField
+        {citiesError && (
+          <Text style={styles.errorText} accessibilityRole="alert">
+            {citiesError}
+          </Text>
+        )}
+        <CityAutocompleteField
           label={sideCopy.cityLabel}
-          hint="Los centros disponibles dependen de la ciudad"
-          invalid={invalidFields.has(fields.municipality)}
+          hint="Elige una ciudad del catálogo"
+          cities={cities}
           value={draft[fields.municipality]}
-          maxLength={MAX_TRANSPORT_CITY_LENGTH}
-          onChangeText={(value) => setField(fields.municipality, value)}
+          invalid={invalidFields.has(fields.municipality)}
+          testIDPrefix={`${side}-city`}
+          onSelect={(city) => setField(fields.municipality, city.name)}
+          onClear={() => {
+            // §23: cambiar de ciudad elimina el centro incompatible.
+            setField(fields.municipality, "");
+            setField(fields.locationId, "");
+          }}
         />
         {sideSectionBody(side, candidates)}
         {invalidFields.has(fields.locationId) && (
@@ -497,8 +624,136 @@ export function TransportForm({
               {sideSection("01", "origin", originCandidates)}
               {sideSection("02", "destination", destinationCandidates)}
 
+              {/* CHG-171 §25-§30: datos del conductor, con la regla de
+                  que quien registra ES quien conduce (GPS). */}
               <FormSection
                 code="03"
+                title={transportDriverCopy[kind].sectionTitle}
+                description={transportDriverCopy[kind].sectionDescription}
+                onPosition={registerSection}
+              >
+                <View style={styles.gpsNotice} accessibilityRole="alert">
+                  <Text style={styles.gpsNoticeText}>
+                    {transportDriverCopy[kind].gpsNotice}
+                  </Text>
+                </View>
+                <FormField
+                  label="Nombre completo *"
+                  invalid={invalidFields.has("driverFullName")}
+                  value={draft.driverFullName}
+                  maxLength={MAX_DRIVER_NAME_LENGTH}
+                  onChangeText={(value) => setField("driverFullName", value)}
+                />
+                <View style={styles.field}>
+                  <Text
+                    style={[
+                      styles.fieldLabel,
+                      invalidFields.has("driverDocumentType") &&
+                        styles.fieldLabelInvalid,
+                    ]}
+                  >
+                    Tipo de documento *
+                  </Text>
+                  <View
+                    style={styles.documentTypeRow}
+                    accessibilityRole="radiogroup"
+                    accessibilityLabel="Tipo de documento de quien conduce"
+                  >
+                    {DRIVER_DOCUMENT_TYPES.map((option) => {
+                      const selected = draft.driverDocumentType === option;
+                      return (
+                        <Pressable
+                          key={option}
+                          accessibilityRole="radio"
+                          accessibilityLabel={option}
+                          accessibilityState={{ selected }}
+                          onPress={() =>
+                            setField("driverDocumentType", option)
+                          }
+                          style={[
+                            styles.documentTypeChip,
+                            selected && styles.documentTypeChipSelected,
+                          ]}
+                          testID={`driver-document-${option}`}
+                        >
+                          <Text
+                            style={[
+                              styles.documentTypeText,
+                              selected && styles.documentTypeTextSelected,
+                            ]}
+                          >
+                            {option}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+                <FormField
+                  label="Número de documento *"
+                  hint="Se guarda cifrado; no se publica"
+                  invalid={invalidFields.has("driverDocumentNumber")}
+                  value={draft.driverDocumentNumber}
+                  maxLength={MAX_DRIVER_DOCUMENT_LENGTH}
+                  onChangeText={(value) =>
+                    setField("driverDocumentNumber", value)
+                  }
+                />
+                <FormField
+                  label="Número de contacto *"
+                  hint="Se guarda cifrado; no se publica"
+                  invalid={invalidFields.has("driverPhone")}
+                  value={draft.driverPhone}
+                  maxLength={MAX_DRIVER_PHONE_LENGTH}
+                  onChangeText={(value) => setField("driverPhone", value)}
+                />
+              </FormSection>
+
+              {/* CHG-171 §31-§35: identificación del vehículo. */}
+              <FormSection
+                code="04"
+                title={transportVehicleCopy[kind].sectionTitle}
+                description={
+                  transportVehicleCopy[kind].sectionDescription
+                }
+                onPosition={registerSection}
+              >
+                <FormField
+                  label={transportVehicleCopy[kind].tractorPlateLabel}
+                  hint="Ejemplo: ABC123"
+                  invalid={invalidFields.has("tractorPlate")}
+                  value={draft.tractorPlate}
+                  maxLength={12}
+                  onChangeText={(value) =>
+                    setField("tractorPlate", value.toUpperCase())
+                  }
+                />
+                <FormField
+                  label={transportVehicleCopy[kind].trailerPlateLabel}
+                  hint="Distinta de la anterior"
+                  invalid={invalidFields.has("trailerPlate")}
+                  value={draft.trailerPlate}
+                  maxLength={12}
+                  onChangeText={(value) =>
+                    setField("trailerPlate", value.toUpperCase())
+                  }
+                />
+                <FormField
+                  label="Características visibles del vehículo *"
+                  hint={`Máximo ${MAX_VEHICLE_CHARACTERISTICS_LENGTH} caracteres`}
+                  multiline
+                  invalid={invalidFields.has("vehicleVisibleCharacteristics")}
+                  value={draft.vehicleVisibleCharacteristics}
+                  maxLength={MAX_VEHICLE_CHARACTERISTICS_LENGTH}
+                  onChangeText={(value) =>
+                    setField("vehicleVisibleCharacteristics", value)
+                  }
+                  placeholder="Tractocamión blanco, tráiler gris, franja azul lateral..."
+                />
+              </FormSection>
+
+              <FormSection
+                code="05"
                 title="Qué lleva"
                 description="Opcional: un resumen de los insumos que viajan, para la trazabilidad."
                 onPosition={registerSection}
@@ -515,7 +770,7 @@ export function TransportForm({
               </FormSection>
 
               <FormSection
-                code="04"
+                code="06"
                 title="Confirmación"
                 description="Lee y confirma antes de publicar."
                 onPosition={registerSection}
@@ -600,56 +855,42 @@ export function TransportForm({
             </SessionGate>
           </View>
         </ScrollView>
-      </SafeAreaView>
-    </LinearGradient>
-  );
-}
 
-function TransportConfirmation({
-  receipt,
-  onHome,
-}: {
-  receipt: TransportReceipt;
-  onHome: () => void;
-}) {
-  return (
-    <LinearGradient
-      colors={["#081210", colors.canvas]}
-      style={[styles.root, styles.confirmationRoot]}
-    >
-      <View style={styles.confirmationCard}>
-        <View style={styles.confirmationIcon}>
-          <Text style={styles.confirmationMark}>✓</Text>
-        </View>
-        <Text style={styles.overline}>CONSTANCIA / CUSOL</Text>
-        <Text style={styles.confirmationTitle} accessibilityRole="header">
-          Transporte registrado
-        </Text>
-        <Text style={styles.confirmationText}>
-          {transportKindLabel[receipt.kind]} quedó registrada con su origen
-          y su destino desde el{" "}
-          {createdFormatter.format(new Date(receipt.createdAt))}. Los
-          suministros que lleva ya son trazables.
-        </Text>
-        <View style={styles.receiptCode}>
-          <Text style={styles.receiptLabel}>TIPO DE TRANSPORTE</Text>
-          <Text style={styles.receiptValue}>
-            {transportKindLabel[receipt.kind]}
-          </Text>
-          <Text style={styles.reviewStatus}>
-            {transportStatusLabel[receipt.status] ??
-              receipt.status.toUpperCase()}
-          </Text>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Volver a la portada"
-          onPress={onHome}
-          style={styles.submitButton}
-        >
-          <Text style={styles.submitButtonText}>VOLVER A LA PORTADA</Text>
-        </Pressable>
-      </View>
+        {/* CHG-171 §12/§21/§54: popup reusable de selección de centro
+            (origen → acopios locales; destino → receptores). */}
+        {pickerSide !== null && (
+          <CenterPickerModal
+            visible
+            title={
+              pickerSide === "origin"
+                ? "SELECCIONAR CENTRO DE ACOPIO LOCAL"
+                : "SELECCIONAR CENTRO DE ACOPIO RECEPTOR"
+            }
+            candidates={
+              (pickerSide === "origin"
+                ? originCandidates
+                : destinationCandidates
+              ).status === "success"
+                ? (
+                    (pickerSide === "origin"
+                      ? originCandidates
+                      : destinationCandidates) as {
+                      status: "success";
+                      items: AidLocationParentCandidate[];
+                    }
+                  ).items
+                : []
+            }
+            selectedId={draft[SIDE_FIELDS[pickerSide].locationId]}
+            onSelect={(candidate) => {
+              setField(SIDE_FIELDS[pickerSide].locationId, candidate.id);
+              setPickerSide(null);
+            }}
+            onClose={() => setPickerSide(null)}
+            testIDPrefix={`${pickerSide}-picker`}
+          />
+        )}
+      </SafeAreaView>
     </LinearGradient>
   );
 }
@@ -913,6 +1154,72 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,181,71,0.07)",
   },
   missingCenterText: { color: "#e8c890", fontSize: 11, lineHeight: 18 },
+  // CHG-171: conteo + popup de centros y sección del conductor.
+  loadingRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  centerPickerBlock: { gap: 10 },
+  centerCount: {
+    color: colors.cyan,
+    fontFamily: fontFamilies.mono,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+  },
+  viewCentersButton: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "flex-start",
+    paddingHorizontal: 18,
+    borderWidth: 1,
+    borderColor: colors.cyan,
+    borderRadius: 8,
+  },
+  viewCentersText: {
+    color: colors.cyan,
+    fontFamily: fontFamilies.mono,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+  },
+  changeCenterButton: {
+    minHeight: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 7,
+  },
+  changeCenterText: {
+    color: colors.inkSoft,
+    fontFamily: fontFamilies.mono,
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 0.7,
+  },
+  gpsNotice: {
+    padding: 13,
+    borderWidth: 1,
+    borderColor: "rgba(81,229,255,0.35)",
+    borderRadius: 9,
+    backgroundColor: "rgba(81,229,255,0.06)",
+  },
+  gpsNoticeText: { color: colors.inkSoft, fontSize: 11, lineHeight: 18 },
+  documentTypeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  documentTypeChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 7,
+    backgroundColor: "rgba(5,9,17,0.55)",
+  },
+  documentTypeChipSelected: {
+    borderColor: colors.cyan,
+    backgroundColor: "rgba(81,229,255,0.10)",
+  },
+  documentTypeText: { color: colors.inkSoft, fontSize: 11 },
+  documentTypeTextSelected: { color: colors.cyan, fontWeight: "700" },
   consent: {
     flexDirection: "row",
     alignItems: "flex-start",

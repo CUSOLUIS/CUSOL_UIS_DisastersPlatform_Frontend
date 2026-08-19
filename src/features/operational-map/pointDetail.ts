@@ -1,5 +1,6 @@
 import type { ActiveHelpRequest } from "../help-requests/types";
 import type { ActiveFoodOffer } from "../food-offers/types";
+import type { ActiveTransport } from "../transports/types";
 import type { HumanMapPoint, OperationalMapPoint } from "./types";
 
 // CHG-164 — «Ver más» de un marcador: la vista completa recibe el
@@ -12,7 +13,9 @@ export type MapPointDetailPayload =
   | { kind: "operational"; point: OperationalMapPoint }
   | { kind: "help_request"; request: ActiveHelpRequest }
   | { kind: "food_offer"; offer: ActiveFoodOffer }
-  | { kind: "human"; feature: HumanMapPoint };
+  | { kind: "human"; feature: HumanMapPoint }
+  // CHG-171: viaje de La Mulera/La Lanchera.
+  | { kind: "transport"; transport: ActiveTransport };
 
 export function encodeMapPointDetail(payload: MapPointDetailPayload): string {
   return JSON.stringify(payload);
@@ -90,6 +93,26 @@ export function decodeMapPointDetail(
         hasStringFields(offer, ["id", "description", "address", "expiresAt"])
       ) {
         return { kind: "food_offer", offer: offer as unknown as ActiveFoodOffer };
+      }
+      return null;
+    }
+    case "transport": {
+      const transport = parsed.transport;
+      if (
+        isRecord(transport) &&
+        hasStringFields(transport, [
+          "id",
+          "kind",
+          "status",
+          "originName",
+          "destinationName",
+          "createdAt",
+        ])
+      ) {
+        return {
+          kind: "transport",
+          transport: transport as unknown as ActiveTransport,
+        };
       }
       return null;
     }

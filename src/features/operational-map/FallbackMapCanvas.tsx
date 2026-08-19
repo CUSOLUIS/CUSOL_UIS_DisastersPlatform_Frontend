@@ -50,6 +50,7 @@ function projectLocation(latitude: number, longitude: number, zoom: number) {
 
 export function FallbackMapCanvas({
   points,
+  trailDots,
   selectedId,
   onSelect,
   compact,
@@ -179,6 +180,22 @@ export function FallbackMapCanvas({
         locating={visitorLocating}
         error={visitorLocationError}
       />
+
+      {/* CHG-171: rastro del GPS de los viajes (no interactivo). */}
+      {(trailDots ?? []).map((dot) => {
+        const projected = projectLocation(dot.latitude, dot.longitude, zoom);
+        return (
+          <View
+            key={dot.id}
+            pointerEvents="none"
+            testID={`map-trail-${dot.id}`}
+            style={[
+              styles.trailDot,
+              { left: projected.left, top: projected.top },
+            ]}
+          />
+        );
+      })}
 
       {projectedPoints.map(({ point, left, top }) => {
         const meta = categoryMeta[point.category];
@@ -327,6 +344,15 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.mono,
     fontSize: 7,
     letterSpacing: 0.7,
+  },
+  trailDot: {
+    position: "absolute",
+    width: 6,
+    height: 6,
+    marginLeft: -3,
+    marginTop: -3,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,122,217,0.55)",
   },
   marker: {
     position: "absolute",

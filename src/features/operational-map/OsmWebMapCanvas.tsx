@@ -310,6 +310,27 @@ export function OsmWebMapCanvas(props: OperationalMapCanvasProps) {
           ayuda» se dibuja a escala real bajo su marcador. Fuera de un
           rango razonable de píxeles no se pinta: minúsculo no dice
           nada y gigante (zoom muy cercano) cubriría todo el lienzo. */}
+      {/* CHG-171: rastro no interactivo del GPS de los viajes. */}
+      {(props.trailDots ?? []).map((dot) => {
+        const worldSize = TILE_SIZE * 2 ** zoom;
+        const left =
+          size.width / 2 +
+          longitudeToWorldX(dot.longitude, worldSize) -
+          longitudeToWorldX(center.longitude, worldSize);
+        const top =
+          size.height / 2 +
+          latitudeToWorldY(dot.latitude, worldSize) -
+          latitudeToWorldY(center.latitude, worldSize);
+        return (
+          <View
+            key={dot.id}
+            pointerEvents="none"
+            testID={`map-trail-${dot.id}`}
+            style={[styles.trailDot, { left: left - 3, top: top - 3 }]}
+          />
+        );
+      })}
+
       {markers.map(({ point, left, top }) => {
         if (!point.alertRadiusKm) {
           return null;
@@ -512,6 +533,14 @@ const styles = StyleSheet.create({
   },
   providerDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.alive },
   providerText: { color: colors.inkSoft, fontFamily: fontFamilies.mono, fontSize: 7, letterSpacing: 0.7 },
+  trailDot: {
+    position: "absolute",
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,122,217,0.55)",
+    zIndex: 1,
+  },
   marker: {
     position: "absolute",
     width: 42,

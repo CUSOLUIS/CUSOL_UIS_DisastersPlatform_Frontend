@@ -15,11 +15,14 @@ import type {
   AidLocationKind,
   AidLocationParentCandidate,
 } from "../aid-locations/types";
-import type {
-  TransportDraft,
-  TransportKind,
-  TransportReceipt,
-  TransportSide,
+import {
+  normalizePlate,
+  type ActiveTransport,
+  type TransportDraft,
+  type TransportJourneyReceipt,
+  type TransportKind,
+  type TransportReceipt,
+  type TransportSide,
 } from "./types";
 
 // CHG-161 — Alta de un transporte humanitario. SOLO con sesión (la
@@ -47,6 +50,15 @@ export function buildTransportPayload(
     destinationMunicipality: draft.destinationMunicipality.trim(),
     originLocationId: draft.originLocationId.trim(),
     destinationLocationId: draft.destinationLocationId.trim(),
+    // CHG-171: conductor y tractocamión (validación espejo backend).
+    driverFullName: draft.driverFullName.trim(),
+    driverDocumentType: draft.driverDocumentType,
+    driverDocumentNumber: draft.driverDocumentNumber.trim(),
+    driverPhone: draft.driverPhone.trim(),
+    tractorPlate: normalizePlate(draft.tractorPlate),
+    trailerPlate: normalizePlate(draft.trailerPlate),
+    vehicleVisibleCharacteristics:
+      draft.vehicleVisibleCharacteristics.trim(),
   };
   const suppliesSummary = draft.suppliesSummary.trim();
   if (suppliesSummary) payload.suppliesSummary = suppliesSummary;
@@ -133,6 +145,97 @@ const SIDE_QUERY_KIND: Record<TransportSide, AidLocationKind> = {
   origin: "collection_point",
   destination: "distribution_point",
 };
+
+// CHG-171 (GPS) — Hitos y posiciones del viaje: siempre con la cuenta
+// del conductor (cookie). Los errores llegan como problem+json.
+async function journeyRequest(
+  path: string,
+  body?: Record<string, number>,
+  options: { requestBaseUrl?: string; signal?: AbortSignal } = {},
+): Promise<TransportJourneyReceipt> {
+  const requestBaseUrl = options.requestBaseUrl ?? apiBaseUrl;
+  if (requestBaseUrl === undefined) {
+    throw new Error(
+      "Configura EXPO_PUBLIC_API_BASE_URL para reportar el viaje.",
+    );
+  }
+  const response = await fetch(`${requestBaseUrl}${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+    signal: options.signal,
+  });
+  if (!response.ok) {
+    const problem = await extractProblem(response);
+    throw new ReportRejectedError(
+      problem.detail ??
+        `El reporte del viaje respondió con estado ${response.status}.`,
+      problem.fields,
+    );
+  }
+  return (await response.json()) as TransportJourneyReceipt;
+}
+
+export function startTransportJourney(
+  transportId: string,
+  options: { requestBaseUrl?: string; signal?: AbortSignal } = {},
+): Promise<TransportJourneyReceipt> {
+  return journeyRequest(
+    `/api/v1/me/transports/${transportId}/start`,
+    undefined,
+    options,
+  );
+}
+
+export function arriveTransportJourney(
+  transportId: string,
+  options: { requestBaseUrl?: string; signal?: AbortSignal } = {},
+): Promise<TransportJourneyReceipt> {
+  return journeyRequest(
+    `/api/v1/me/transports/${transportId}/arrive`,
+    undefined,
+    options,
+  );
+}
+
+export function sendTransportPosition(
+  transportId: string,
+  position: { latitude: number; longitude: number },
+  options: { requestBaseUrl?: string; signal?: AbortSignal } = {},
+): Promise<TransportJourneyReceipt> {
+  return journeyRequest(
+    `/api/v1/me/transports/${transportId}/positions`,
+    position,
+    options,
+  );
+}
+
+// CHG-171 — Feed público del mapa: viajes vivos con su rastro.
+export async function fetchActiveTransports(
+  options: { requestBaseUrl?: string; signal?: AbortSignal } = {},
+): Promise<ActiveTransport[]> {
+  const requestBaseUrl = options.requestBaseUrl ?? apiBaseUrl;
+  if (requestBaseUrl === undefined) {
+    throw new Error(
+      "Configura EXPO_PUBLIC_API_BASE_URL para consultar los viajes.",
+    );
+  }
+  const response = await fetch(
+    `${requestBaseUrl}/api/v1/transports/active`,
+    { headers: { Accept: "application/json" }, signal: options.signal },
+  );
+  if (!response.ok) {
+    throw new Error(
+      `Los viajes activos respondieron con estado ${response.status}.`,
+    );
+  }
+  const body = (await response.json()) as { items: ActiveTransport[] };
+  return body.items;
+}
 
 export async function fetchTransportCenterCandidates(
   side: TransportSide,

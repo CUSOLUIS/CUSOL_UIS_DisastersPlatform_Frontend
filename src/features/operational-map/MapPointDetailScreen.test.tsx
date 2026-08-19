@@ -318,3 +318,51 @@ it("si el backend rechaza la eliminación, la ficha muestra el motivo y no naveg
   );
   expect(onBack).not.toHaveBeenCalled();
 });
+
+// CHG-171 — La ficha del viaje muestra la ruta, los tiempos y la
+// identificación visible del vehículo; jamás datos del conductor.
+it("la ficha de un viaje muestra ruta, placas y estado sin datos del conductor", () => {
+  render(
+    <MapPointDetailScreen
+      payload={{
+        kind: "transport",
+        transport: {
+          id: "tt000000-0000-4000-8000-000000000001",
+          kind: "mule",
+          status: "in_transit",
+          originName: "Acopio La Feria",
+          originMunicipality: "Bucaramanga",
+          originLatitude: 7.11,
+          originLongitude: -73.12,
+          destinationName: "Receptor Santander",
+          destinationMunicipality: "El Playón",
+          destinationLatitude: 7.47,
+          destinationLongitude: -73.2,
+          suppliesSummary: "Agua y mercados",
+          tractorPlate: "ABC123",
+          trailerPlate: "R99881",
+          vehicleVisibleCharacteristics:
+            "Tractocamión blanco, franja azul",
+          departedAt: "2026-08-19T12:10:00Z",
+          arrivedAt: null,
+          lastLatitude: 7.2,
+          lastLongitude: -73.15,
+          lastPositionAt: "2026-08-19T13:00:00Z",
+          createdAt: "2026-08-19T11:00:00Z",
+          trail: [],
+        },
+      }}
+      onBack={jest.fn()}
+    />,
+  );
+
+  expect(screen.getByText("TRANSPORTE DE INSUMOS EN RUTA")).toBeTruthy();
+  expect(screen.getByText("La mulera en ruta")).toBeTruthy();
+  expect(screen.getByText("EN CAMINO")).toBeTruthy();
+  expect(screen.getByText(/Acopio La Feria/)).toBeTruthy();
+  expect(screen.getByText("ABC123")).toBeTruthy();
+  expect(screen.getByText("R99881")).toBeTruthy();
+  expect(screen.getByText(/Insumos que lleva: Agua y mercados/)).toBeTruthy();
+  // §30: nada del conductor en la vista pública.
+  expect(screen.queryByText(/conductor/i)).toBeNull();
+});

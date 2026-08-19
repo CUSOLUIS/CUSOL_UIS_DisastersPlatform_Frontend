@@ -36,6 +36,7 @@ import { HelpRequestProximityAlert } from "../help-requests/HelpRequestProximity
 import { useActiveHelpRequests } from "../help-requests/useActiveHelpRequests";
 import { FoodOfferProximityAlert } from "../food-offers/FoodOfferProximityAlert";
 import { useActiveFoodOffers } from "../food-offers/useActiveFoodOffers";
+import { useActiveTransports } from "../transports/useActiveTransports";
 import { pickVolunteerPhoto } from "../help-requests/pickVolunteerPhoto";
 import {
   useAccountNotifications,
@@ -320,6 +321,8 @@ export function HumanImpactDashboard({
     useActiveHelpRequests(helpRequestsDataSource);
   // CHG-163: ofertas de comida vigentes, con el mismo pulso.
   const { state: foodOffersState } = useActiveFoodOffers(foodOffersDataSource);
+  // CHG-171: viajes de La Mulera/La Lanchera en curso, para el mapa.
+  const transportsState = useActiveTransports();
   const helpRequestActions = useMemo(
     () => ({
       isAuthenticated: account !== null,
@@ -502,6 +505,7 @@ export function HumanImpactDashboard({
                 helpRequests={helpRequestsState.items}
                 helpRequestActions={helpRequestActions}
                 foodOffers={foodOffersState.items}
+                transports={transportsState.items}
                 onOpenPointDetail={onOpenMapPointDetail}
               />
             </View>

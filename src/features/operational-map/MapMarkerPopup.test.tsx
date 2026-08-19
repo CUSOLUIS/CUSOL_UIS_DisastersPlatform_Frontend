@@ -326,3 +326,61 @@ it("un acopio receptor con calificaciones muestra su promedio en el popup", asyn
     within(popup).getByText("★★★★☆ 3,5 · 2 calificaciones"),
   ).toBeTruthy();
 });
+
+// CHG-171 — El viaje de La Mulera se fusiona como marcador con rastro;
+// su popup resume estado, ruta y tiempos, y VER MÁS entrega el viaje.
+const activeTransport = {
+  id: "tt000000-0000-4000-8000-000000000001",
+  kind: "mule" as const,
+  status: "in_transit" as const,
+  originName: "Acopio La Feria",
+  originMunicipality: "Bucaramanga",
+  originLatitude: 7.11,
+  originLongitude: -73.12,
+  destinationName: "Receptor Santander",
+  destinationMunicipality: "El Playón",
+  destinationLatitude: 7.47,
+  destinationLongitude: -73.2,
+  suppliesSummary: "Agua y mercados",
+  tractorPlate: "ABC123",
+  trailerPlate: "R99881",
+  vehicleVisibleCharacteristics: "Tractocamión blanco, franja azul",
+  departedAt: "2026-08-19T12:10:00Z",
+  arrivedAt: null,
+  lastLatitude: 7.2,
+  lastLongitude: -73.15,
+  lastPositionAt: "2026-08-19T13:00:00Z",
+  createdAt: "2026-08-19T11:00:00Z",
+  trail: [
+    { latitude: 7.11, longitude: -73.12, recordedAt: "2026-08-19T12:10:00Z" },
+    { latitude: 7.2, longitude: -73.15, recordedAt: "2026-08-19T13:00:00Z" },
+  ],
+};
+
+it("un viaje en curso abre popup con estado y ruta, pinta su rastro y VER MÁS lo entrega", async () => {
+  const onOpenPointDetail = jest.fn();
+  renderPanel({ transports: [activeTransport], onOpenPointDetail });
+
+  fireEvent.press(
+    await screen.findByTestId(`map-marker-transport:${activeTransport.id}`),
+  );
+
+  const popup = screen.getByTestId("map-marker-popup");
+  expect(
+    within(popup).getByText(/TRANSPORTE DE INSUMOS · EN CAMINO/),
+  ).toBeTruthy();
+  expect(
+    within(popup).getByText(/Acopio La Feria \(Bucaramanga\)/),
+  ).toBeTruthy();
+  expect(within(popup).getByText(/Salió:/)).toBeTruthy();
+  // El rastro del GPS se dibuja como puntos no interactivos.
+  expect(
+    screen.getByTestId(`map-trail-trail:${activeTransport.id}:0`),
+  ).toBeTruthy();
+
+  fireEvent.press(screen.getByTestId("map-marker-popup-more"));
+  expect(onOpenPointDetail).toHaveBeenCalledWith({
+    kind: "transport",
+    transport: activeTransport,
+  });
+});

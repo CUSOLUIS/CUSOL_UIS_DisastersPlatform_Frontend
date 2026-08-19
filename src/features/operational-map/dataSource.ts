@@ -63,6 +63,7 @@ type LegacyOperationalMapOverview = Omit<OperationalMapOverview, "summary"> & {
     | "distributionPoint"
     | "damagedHome"
     | "helpRequests"
+    | "humanitarianTransports"
   > & {
     buildingPending?: number;
     collectionPoint?: number;
@@ -77,6 +78,8 @@ type LegacyOperationalMapOverview = Omit<OperationalMapOverview, "summary"> & {
     // CHG-125: el backend no envía esta cuenta; la fusión en cliente
     // la sobreescribe con las solicitudes vigentes.
     helpRequests?: number;
+    // CHG-171: igual que la anterior, para los viajes en curso.
+    humanitarianTransports?: number;
   };
 };
 
@@ -99,6 +102,7 @@ export function normalizeOperationalMapOverview(
     distributionPoint: 0,
     damagedHome: 0,
     helpRequests: 0,
+    humanitarianTransports: 0,
   };
 
   items.forEach((point) => {
@@ -141,6 +145,9 @@ export function normalizeOperationalMapOverview(
         break;
       case "help_request":
         summary.helpRequests += 1;
+        break;
+      case "humanitarian_transport":
+        summary.humanitarianTransports += 1;
         break;
     }
   });

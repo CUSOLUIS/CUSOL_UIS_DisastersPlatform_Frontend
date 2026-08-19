@@ -20,7 +20,8 @@ interface CategoryMeta {
     | "communityMeal"
     | "temporaryShelter"
     | "volunteersNeeded"
-    | "helpRequests";
+    | "helpRequests"
+    | "humanitarianTransports";
 }
 
 export const categoryMeta: Record<OperationalMapCategory, CategoryMeta> = {
@@ -135,5 +136,15 @@ export const categoryMeta: Record<OperationalMapCategory, CategoryMeta> = {
     color: colors.emergency,
     markerKind: "help",
     summaryKey: "helpRequests",
+  },
+  // CHG-171: viajes de La Mulera/La Lanchera en curso; el marcador se
+  // mueve con la última posición del GPS del conductor.
+  humanitarian_transport: {
+    label: "Transportes en ruta",
+    shortLabel: "Transporte de insumos",
+    glyph: "➤",
+    color: "#ff7ad9",
+    markerKind: "help",
+    summaryKey: "humanitarianTransports",
   },
 };

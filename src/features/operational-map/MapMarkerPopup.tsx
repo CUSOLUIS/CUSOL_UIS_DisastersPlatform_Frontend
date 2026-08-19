@@ -4,6 +4,11 @@ import { font } from "../../typography";
 import { CountdownLabel } from "../help-requests/CountdownLabel";
 import type { ActiveHelpRequest } from "../help-requests/types";
 import type { ActiveFoodOffer } from "../food-offers/types";
+import {
+  transportKindLabel,
+  transportStatusLabel,
+  type ActiveTransport,
+} from "../transports/types";
 import { hasAidLocationCommunity } from "../aid-locations/communityDataSource";
 import { ratingSummaryLine } from "../aid-locations/ratingStars";
 import { categoryMeta } from "./categoryMeta";
@@ -21,7 +26,9 @@ export type MapMarkerPopupTarget =
   | { kind: "operational"; point: OperationalMapPoint }
   | { kind: "help_request"; request: ActiveHelpRequest }
   | { kind: "food_offer"; offer: ActiveFoodOffer }
-  | { kind: "human"; feature: HumanMapFeature };
+  | { kind: "human"; feature: HumanMapFeature }
+  // CHG-171: viaje de La Mulera/La Lanchera en curso.
+  | { kind: "transport"; transport: ActiveTransport };
 
 const dateFormatter = new Intl.DateTimeFormat("es-CO", {
   day: "2-digit",
@@ -63,6 +70,8 @@ export function detailPayloadFromTarget(
       return target.feature.kind === "point"
         ? { kind: "human", feature: target.feature }
         : null;
+    case "transport":
+      return { kind: "transport", transport: target.transport };
   }
 }
 
@@ -125,6 +134,36 @@ function summarize(target: MapMarkerPopupTarget): PopupSummary {
         metaLines: [],
         expiresAt: target.offer.expiresAt,
       };
+    case "transport": {
+      const { transport } = target;
+      const journeyLines = [
+        `${transport.originName} (${transport.originMunicipality}) → ${transport.destinationName} (${transport.destinationMunicipality})`,
+      ];
+      if (transport.departedAt) {
+        journeyLines.push(
+          `Salió: ${dateFormatter.format(new Date(transport.departedAt))}`,
+        );
+      }
+      if (transport.arrivedAt) {
+        journeyLines.push(
+          `Llegó: ${dateFormatter.format(new Date(transport.arrivedAt))}`,
+        );
+      }
+      if (transport.lastPositionAt && !transport.arrivedAt) {
+        journeyLines.push(
+          `Última posición: ${dateFormatter.format(new Date(transport.lastPositionAt))}`,
+        );
+      }
+      return {
+        accentColor: categoryMeta.humanitarian_transport.color,
+        eyebrow: `TRANSPORTE DE INSUMOS · ${transportStatusLabel[transport.status] ?? transport.status.toUpperCase()}`,
+        ratingLine: null,
+        title: `${transportKindLabel[transport.kind]} en ruta`,
+        description: transport.suppliesSummary,
+        metaLines: journeyLines,
+        expiresAt: null,
+      };
+    }
     case "human": {
       if (target.feature.kind === "cluster") {
         const counts = target.feature.statusCounts;

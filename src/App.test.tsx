@@ -1187,6 +1187,7 @@ describe("App universal", () => {
           distributionPoint: 0,
           damagedHome: 0,
           helpRequests: 0,
+    humanitarianTransports: 0,
         },
         items: [],
         generatedAt: "2026-08-12T18:30:00.000Z",

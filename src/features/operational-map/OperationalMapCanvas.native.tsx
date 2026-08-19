@@ -155,6 +155,18 @@ export function OperationalMapCanvas({
               zIndex={1}
             />
           ))}
+        {/* CHG-171: rastro del GPS de los viajes (no interactivo). */}
+        {(props.trailDots ?? []).map((dot) => (
+          <Circle
+            key={dot.id}
+            center={{ latitude: dot.latitude, longitude: dot.longitude }}
+            radius={60}
+            strokeColor="rgba(255,122,217,0.5)"
+            strokeWidth={1}
+            fillColor="rgba(255,122,217,0.4)"
+            zIndex={1}
+          />
+        ))}
         {props.points.map((point) => {
           const meta = categoryMeta[point.category];
           const selected = props.selectedId === point.id;

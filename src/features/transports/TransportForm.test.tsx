@@ -13,6 +13,7 @@ import {
   initialTransportDraft,
 } from "./TransportForm";
 import { buildTransportPayload } from "./reportSubmission";
+import type { TransportCity } from "./cityCatalog";
 import type { TransportReceipt } from "./types";
 
 // El navbar consulta la sesión; en pruebas no hay red y el fallo debe
@@ -45,6 +46,15 @@ const authenticatedSession = {
   getCurrentAccount: () => Promise.resolve(ACCOUNT),
 };
 
+const CITIES: TransportCity[] = [
+  { name: "Aratoca", department: "Santander" },
+  { name: "Bucaramanga", department: "Santander" },
+  { name: "Medellín", department: "Antioquia" },
+  { name: "Mompós", department: "Bolívar" },
+];
+
+const loadCities = () => Promise.resolve(CITIES);
+
 const ORIGIN_CENTER: AidLocationParentCandidate = {
   id: "11111111-1111-4111-8111-111111111101",
   name: "Acopio Local Norte",
@@ -63,21 +73,30 @@ const DESTINATION_CENTER: AidLocationParentCandidate = {
   operationalStatus: "open",
 };
 
+// CHG-171: el borrador válido incluye conductor y vehículo.
 const validDraft = {
   ...initialTransportDraft,
   originMunicipality: "Bucaramanga",
   originLocationId: ORIGIN_CENTER.id,
   destinationMunicipality: "Mompós",
   destinationLocationId: DESTINATION_CENTER.id,
+  driverFullName: "Pedro Antonio Rojas",
+  driverDocumentType: "Cédula de ciudadanía" as const,
+  driverDocumentNumber: "1098765432",
+  driverPhone: "+57 300 123 4567",
+  tractorPlate: "abc 123",
+  trailerPlate: "R-99881",
+  vehicleVisibleCharacteristics:
+    "Tractocamión blanco con tráiler gris y franja azul.",
   truthConfirmed: true,
 };
 
-describe("collectTransportIssues (CHG-161)", () => {
+describe("collectTransportIssues (CHG-161/CHG-171)", () => {
   it("acepta un borrador completo", () => {
     expect(collectTransportIssues(validDraft)).toEqual([]);
   });
 
-  it("exige ciudades, centros de ambos lados y confirmación", () => {
+  it("exige ciudades, centros, conductor, vehículo y confirmación", () => {
     const fields = collectTransportIssues(initialTransportDraft).map(
       (issue) => issue.field,
     );
@@ -86,19 +105,44 @@ describe("collectTransportIssues (CHG-161)", () => {
       "originLocationId",
       "destinationMunicipality",
       "destinationLocationId",
+      "driverFullName",
+      "driverDocumentType",
+      "driverDocumentNumber",
+      "driverPhone",
+      "tractorPlate",
+      "trailerPlate",
+      "vehicleVisibleCharacteristics",
       "truthConfirmed",
     ]);
   });
+
+  it("rechaza teléfonos y placas inválidos", () => {
+    const fields = collectTransportIssues({
+      ...validDraft,
+      driverPhone: "abc",
+      trailerPlate: "1",
+    }).map((issue) => issue.field);
+    expect(fields).toEqual(["driverPhone", "trailerPlate"]);
+  });
 });
 
-describe("buildTransportPayload (CHG-161)", () => {
-  it("envía el contrato mínimo y omite el resumen vacío", () => {
+describe("buildTransportPayload (CHG-161/CHG-171)", () => {
+  it("envía el contrato completo con placas normalizadas", () => {
     expect(buildTransportPayload("mule", validDraft)).toEqual({
       kind: "mule",
       originMunicipality: "Bucaramanga",
       destinationMunicipality: "Mompós",
       originLocationId: ORIGIN_CENTER.id,
       destinationLocationId: DESTINATION_CENTER.id,
+      driverFullName: "Pedro Antonio Rojas",
+      driverDocumentType: "Cédula de ciudadanía",
+      driverDocumentNumber: "1098765432",
+      driverPhone: "+57 300 123 4567",
+      // §32-33: mayúsculas y sin espacios/guiones.
+      tractorPlate: "ABC123",
+      trailerPlate: "R99881",
+      vehicleVisibleCharacteristics:
+        "Tractocamión blanco con tráiler gris y franja azul.",
     });
   });
 
@@ -112,7 +156,20 @@ describe("buildTransportPayload (CHG-161)", () => {
   });
 });
 
-describe("TransportForm (CHG-161)", () => {
+// Elige una ciudad escribiendo en el autocomplete y tocando la opción.
+async function pickCity(
+  side: "origin" | "destination",
+  typed: string,
+  optionTestID: string,
+) {
+  fireEvent.changeText(
+    screen.getByTestId(`${side}-city-input`),
+    typed,
+  );
+  fireEvent.press(await screen.findByTestId(optionTestID));
+}
+
+describe("TransportForm (CHG-161/CHG-171)", () => {
   it("sin sesión explica, ofrece registrarse o iniciar sesión y nunca envía", async () => {
     const submitTransportReport = jest.fn();
     render(
@@ -124,6 +181,7 @@ describe("TransportForm (CHG-161)", () => {
         sessionSource={anonymousSession}
         submitTransportReport={submitTransportReport}
         loadCenterCandidates={jest.fn().mockResolvedValue([])}
+        loadCities={loadCities}
       />,
     );
 
@@ -139,7 +197,35 @@ describe("TransportForm (CHG-161)", () => {
     expect(submitTransportReport).not.toHaveBeenCalled();
   });
 
-  it("con sesión lista los centros de cada ciudad, exige elegir ambos y publica con constancia", async () => {
+  it("la búsqueda de ciudad funciona sin tildes y solo acepta el catálogo", async () => {
+    render(
+      <TransportForm
+        kind="mule"
+        onBack={jest.fn()}
+        sessionSource={authenticatedSession}
+        loadCenterCandidates={jest.fn().mockResolvedValue([])}
+        loadCities={loadCities}
+      />,
+    );
+    await screen.findByTestId("origin-city-input");
+
+    // TEST 2 del contrato: «mompos» encuentra «Mompós».
+    fireEvent.changeText(
+      screen.getByTestId("origin-city-input"),
+      "mompos",
+    );
+    expect(
+      await screen.findByTestId("origin-city-option-mompos-bolivar"),
+    ).toBeTruthy();
+    // Texto arbitrario: ninguna opción y ninguna ciudad seleccionada.
+    fireEvent.changeText(
+      screen.getByTestId("origin-city-input"),
+      "Bucara",
+    );
+    expect(screen.queryByTestId("origin-city-selected")).toBeNull();
+  });
+
+  it("con sesión: popup por lado, conductor, vehículo y constancia con viaje GPS", async () => {
     const loadCenterCandidates = jest.fn(
       (side: "origin" | "destination") =>
         Promise.resolve(
@@ -163,19 +249,20 @@ describe("TransportForm (CHG-161)", () => {
         sessionSource={authenticatedSession}
         submitTransportReport={submitTransportReport}
         loadCenterCandidates={loadCenterCandidates}
+        loadCities={loadCities}
       />,
     );
 
-    // La ciudad de cada lado dispara su propia consulta de centros.
-    fireEvent.changeText(
-      await screen.findByLabelText("Ciudad de origen *"),
-      "Bucaramanga",
+    // §10: la ciudad muestra el conteo y el botón, no la lista suelta.
+    await screen.findByTestId("origin-city-input");
+    await pickCity(
+      "origin",
+      "buc",
+      "origin-city-option-bucaramanga-santander",
     );
     await waitFor(
       () =>
-        expect(
-          screen.getByTestId(`origin-center-${ORIGIN_CENTER.id}`),
-        ).toBeTruthy(),
+        expect(screen.getByTestId("origin-center-count")).toBeTruthy(),
       { timeout: 3000 },
     );
     expect(loadCenterCandidates).toHaveBeenCalledWith(
@@ -183,42 +270,79 @@ describe("TransportForm (CHG-161)", () => {
       "Bucaramanga",
       expect.anything(),
     );
+    expect(
+      screen.queryByTestId(`origin-picker-item-${ORIGIN_CENTER.id}`),
+    ).toBeNull();
 
-    fireEvent.changeText(
-      screen.getByLabelText("Ciudad de destino *"),
-      "Mompós",
+    // §12-§15: el popup lista, busca y selecciona; al elegir se cierra
+    // y el formulario muestra el centro con CAMBIAR CENTRO.
+    fireEvent.press(screen.getByTestId("origin-view-centers"));
+    expect(
+      await screen.findByTestId(`origin-picker-item-${ORIGIN_CENTER.id}`),
+    ).toBeTruthy();
+    fireEvent.press(
+      screen.getByTestId(`origin-picker-select-${ORIGIN_CENTER.id}`),
+    );
+    expect(
+      await screen.findByTestId("origin-selected-center"),
+    ).toBeTruthy();
+    expect(screen.getByTestId("origin-change-center")).toBeTruthy();
+
+    await pickCity(
+      "destination",
+      "mompos",
+      "destination-city-option-mompos-bolivar",
     );
     await waitFor(
       () =>
         expect(
-          screen.getByTestId(`destination-center-${DESTINATION_CENTER.id}`),
+          screen.getByTestId("destination-view-centers"),
         ).toBeTruthy(),
       { timeout: 3000 },
     );
-    expect(loadCenterCandidates).toHaveBeenCalledWith(
-      "destination",
-      "Mompós",
-      expect.anything(),
+    fireEvent.press(screen.getByTestId("destination-view-centers"));
+    fireEvent.press(
+      await screen.findByTestId(
+        `destination-picker-select-${DESTINATION_CENTER.id}`,
+      ),
     );
 
-    // Sin elegir los centros el envío se bloquea con sus avisos.
+    // §25-§35: conductor (con el aviso del GPS) y vehículo.
+    expect(
+      screen.getByText(/DEBE ser la persona que conduce/i),
+    ).toBeTruthy();
+    fireEvent.changeText(
+      screen.getByLabelText("Nombre completo *"),
+      "Pedro Antonio Rojas",
+    );
+    fireEvent.press(screen.getByTestId("driver-document-Cédula de ciudadanía"));
+    fireEvent.changeText(
+      screen.getByLabelText("Número de documento *"),
+      "1098765432",
+    );
+    fireEvent.changeText(
+      screen.getByLabelText("Número de contacto *"),
+      "+57 300 123 4567",
+    );
+    fireEvent.changeText(
+      screen.getByLabelText("Placa del tractocamión *"),
+      "abc123",
+    );
+    fireEvent.changeText(
+      screen.getByLabelText("Placa del tráiler *"),
+      "R99881",
+    );
+    fireEvent.changeText(
+      screen.getByLabelText("Características visibles del vehículo *"),
+      "Tractocamión blanco con franja azul.",
+    );
+
     fireEvent.press(
       screen.getByLabelText("Confirmo que la mula y su viaje son reales."),
     );
     fireEvent.press(screen.getByLabelText("Registrar la mulera"));
-    expect(submitTransportReport).not.toHaveBeenCalled();
-    expect(
-      screen.getByText("Elige el centro de acopio local de origen."),
-    ).toBeTruthy();
-
-    // Con ambos centros elegidos, el registro viaja y deja constancia.
-    fireEvent.press(screen.getByTestId(`origin-center-${ORIGIN_CENTER.id}`));
-    fireEvent.press(
-      screen.getByTestId(`destination-center-${DESTINATION_CENTER.id}`),
-    );
-    fireEvent.press(screen.getByLabelText("Registrar la mulera"));
     await waitFor(() =>
-      expect(screen.getByText("Transporte registrado")).toBeTruthy(),
+      expect(screen.getByTestId("transport-journey-panel")).toBeTruthy(),
     );
     expect(submitTransportReport).toHaveBeenCalledWith(
       "mule",
@@ -227,11 +351,15 @@ describe("TransportForm (CHG-161)", () => {
         originLocationId: ORIGIN_CENTER.id,
         destinationMunicipality: "Mompós",
         destinationLocationId: DESTINATION_CENTER.id,
+        driverFullName: "Pedro Antonio Rojas",
+        tractorPlate: "ABC123",
       }),
       expect.objectContaining({ idempotencyKey: expect.any(String) }),
     );
-    expect(screen.getByText("La mulera")).toBeTruthy();
-    expect(screen.getByText("REGISTRADO")).toBeTruthy();
+    // CHG-171 (GPS): la constancia ES la pantalla del viaje.
+    expect(screen.getByText("Transporte registrado")).toBeTruthy();
+    expect(screen.getByTestId("journey-status")).toBeTruthy();
+    expect(screen.getByTestId("journey-start")).toBeTruthy();
   });
 
   it("avisa cuando la ciudad de origen no tiene acopio local disponible", async () => {
@@ -243,19 +371,20 @@ describe("TransportForm (CHG-161)", () => {
         onBack={jest.fn()}
         sessionSource={authenticatedSession}
         loadCenterCandidates={loadCenterCandidates}
+        loadCities={loadCities}
       />,
     );
 
-    fireEvent.changeText(
-      await screen.findByLabelText("Ciudad de origen *"),
-      "Aratoca",
+    await screen.findByTestId("origin-city-input");
+    await pickCity(
+      "origin",
+      "arat",
+      "origin-city-option-aratoca-santander",
     );
     await waitFor(
       () =>
         expect(
-          screen.getByText(
-            /todavía no tiene un centro de acopio local publicado/i,
-          ),
+          screen.getByText(/0 Centros de Acopio Local disponibles/i),
         ).toBeTruthy(),
       { timeout: 3000 },
     );

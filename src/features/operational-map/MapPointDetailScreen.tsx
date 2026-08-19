@@ -20,6 +20,10 @@ import {
 } from "../aid-locations/communityDataSource";
 import { ratingSummaryLine } from "../aid-locations/ratingStars";
 import {
+  transportKindLabel,
+  transportStatusLabel,
+} from "../transports/types";
+import {
   useSessionAccount,
   type SessionAccountSource,
 } from "../auth/useSessionAccount";
@@ -211,6 +215,70 @@ function buildContent(payload: MapPointDetailPayload): DetailContent {
         expiresAt: offer.expiresAt,
         photoUrl: null,
         note: null,
+      };
+    }
+    case "transport": {
+      const { transport } = payload;
+      const rows: DetailRow[] = [
+        {
+          label: "Estado",
+          value:
+            transportStatusLabel[transport.status] ??
+            transport.status.toUpperCase(),
+        },
+        {
+          label: "Sale de",
+          value: `${transport.originName} · ${transport.originMunicipality}`,
+        },
+        {
+          label: "Llega a",
+          value: `${transport.destinationName} · ${transport.destinationMunicipality}`,
+        },
+      ];
+      if (transport.departedAt) {
+        rows.push({
+          label: "Salió",
+          value: formatDate(transport.departedAt),
+        });
+      }
+      if (transport.arrivedAt) {
+        rows.push({
+          label: "Llegó",
+          value: formatDate(transport.arrivedAt),
+        });
+      }
+      if (transport.lastPositionAt) {
+        rows.push({
+          label: "Última posición",
+          value: formatDate(transport.lastPositionAt),
+        });
+      }
+      // §30: identificación VISIBLE del vehículo, jamás los datos del
+      // conductor.
+      if (transport.tractorPlate) {
+        rows.push({ label: "Placa", value: transport.tractorPlate });
+      }
+      if (transport.trailerPlate) {
+        rows.push({
+          label: "Placa del tráiler",
+          value: transport.trailerPlate,
+        });
+      }
+      rows.push({ label: "Registrado", value: formatDate(transport.createdAt) });
+      return {
+        accentColor: categoryMeta.humanitarian_transport.color,
+        eyebrow: "TRANSPORTE DE INSUMOS EN RUTA",
+        title: `${transportKindLabel[transport.kind]} en ruta`,
+        ratingLine: null,
+        description:
+          transport.vehicleVisibleCharacteristics ??
+          transport.suppliesSummary,
+        rows,
+        expiresAt: null,
+        photoUrl: null,
+        note: transport.suppliesSummary
+          ? `Insumos que lleva: ${transport.suppliesSummary}`
+          : null,
       };
     }
     case "human": {
