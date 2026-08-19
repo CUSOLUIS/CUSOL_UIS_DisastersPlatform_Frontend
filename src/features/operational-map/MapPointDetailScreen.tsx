@@ -19,6 +19,7 @@ import {
   type AidLocationCommunityDataSource,
 } from "../aid-locations/communityDataSource";
 import { ratingSummaryLine } from "../aid-locations/ratingStars";
+import { foodOfferCommunityDataSource } from "../food-offers/communityDataSource";
 import {
   transportKindLabel,
   transportStatusLabel,
@@ -209,7 +210,11 @@ function buildContent(payload: MapPointDetailPayload): DetailContent {
         accentColor: categoryMeta.community_meal.color,
         eyebrow: "COMIDA COMUNITARIA · OFERTA VIGENTE",
         title: offer.address,
-        ratingLine: null,
+        // CHG-176: la misma línea de estrellas que un centro de acopio.
+        ratingLine: ratingSummaryLine(
+          offer.commentRatingAverage ?? null,
+          offer.commentRatingCount ?? 0,
+        ),
         description: offer.description,
         rows,
         expiresAt: offer.expiresAt,
@@ -353,6 +358,13 @@ export function MapPointDetailScreen({
     hasAidLocationCommunity(payload.point.category)
       ? payload.point.id
       : null;
+  // CHG-176: la oferta de comida tiene la misma comunidad, con su
+  // propia fuente de datos (mismas reglas, otro objetivo).
+  const foodOfferId = payload?.kind === "food_offer" ? payload.offer.id : null;
+  const communityTargetId = collectionCenterId ?? foodOfferId;
+  const communityTargetLabel = foodOfferId
+    ? "esta oferta de comida"
+    : "este centro de acopio";
   // CHG-170: solo el super_admin ve ELIMINAR en la ficha del acopio
   // (ambos tipos); la barrera real es el backend. Dos pasos.
   const session = useSessionAccount(sessionSource);
@@ -362,10 +374,14 @@ export function MapPointDetailScreen({
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const dataSource = communityDataSource ?? aidLocationCommunityDataSource;
+  const dataSource =
+    communityDataSource ??
+    (foodOfferId
+      ? foodOfferCommunityDataSource
+      : aidLocationCommunityDataSource);
 
   const deleteCenter = async () => {
-    if (!collectionCenterId) return;
+    if (!communityTargetId) return;
     if (!deleteArmed) {
       setDeleteArmed(true);
       return;
@@ -373,7 +389,7 @@ export function MapPointDetailScreen({
     setDeleteBusy(true);
     setDeleteError(null);
     try {
-      await dataSource.adminDeleteAidLocation(collectionCenterId);
+      await dataSource.adminDeleteAidLocation(communityTargetId);
       // El punto ya no existe: la ficha vuelve al mapa.
       onBack();
     } catch (error: unknown) {
@@ -381,7 +397,7 @@ export function MapPointDetailScreen({
       setDeleteError(
         error instanceof Error
           ? error.message
-          : "No fue posible eliminar el centro de acopio.",
+          : `No fue posible eliminar ${communityTargetLabel}.`,
       );
     } finally {
       setDeleteBusy(false);
@@ -422,7 +438,7 @@ export function MapPointDetailScreen({
             )}
 
             {/* CHG-170: ELIMINAR el acopio, solo para super_admin. */}
-            {collectionCenterId && isAdmin && (
+            {communityTargetId && isAdmin && (
               <View style={styles.deleteBlock} testID="map-point-delete-block">
                 {deleteError && (
                   <Text
@@ -436,8 +452,8 @@ export function MapPointDetailScreen({
                   accessibilityRole="button"
                   accessibilityLabel={
                     deleteArmed
-                      ? "Confirmar la eliminación del centro de acopio"
-                      : "Eliminar este centro de acopio"
+                      ? `Confirmar la eliminación de ${communityTargetLabel}`
+                      : `Eliminar ${communityTargetLabel}`
                   }
                   disabled={deleteBusy}
                   onPress={() => void deleteCenter()}
@@ -457,17 +473,18 @@ export function MapPointDetailScreen({
                 </Pressable>
                 <Text style={styles.deleteHint}>
                   Solo la superadministración ve esta opción: elimina
-                  definitivamente este centro de acopio (el acto queda
+                  definitivamente {communityTargetLabel} (el acto queda
                   auditado).
                 </Text>
               </View>
             )}
 
-            {collectionCenterId && (
+            {communityTargetId && (
               <CollectionCenterCommunityPanel
-                locationId={collectionCenterId}
-                dataSource={communityDataSource}
+                locationId={communityTargetId}
+                dataSource={dataSource}
                 sessionSource={sessionSource}
+                targetLabel={communityTargetLabel}
               />
             )}
           </View>

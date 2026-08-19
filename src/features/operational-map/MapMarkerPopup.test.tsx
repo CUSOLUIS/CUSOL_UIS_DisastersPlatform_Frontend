@@ -387,3 +387,46 @@ it("un viaje en curso abre popup con estado y ruta, pinta su rastro y VER MÁS l
     transport: activeTransport,
   });
 });
+
+// CHG-176 — La oferta de comida se califica como un centro de acopio,
+// así que su tarjeta del mapa muestra la puntuación.
+it("el popup de una oferta calificada muestra su línea de estrellas", async () => {
+  renderPanel({
+    foodOffers: [
+      { ...offer, commentRatingAverage: 4.5, commentRatingCount: 8 },
+    ],
+  });
+
+  fireEvent.press(
+    await screen.findByTestId(`map-marker-food_offer:${offer.id}`),
+  );
+
+  expect(screen.getByTestId("map-marker-popup-rating")).toHaveTextContent(
+    /4,5 · 8 calificaciones/,
+  );
+});
+
+it("una oferta sin calificar lo dice, en vez de callar", async () => {
+  renderPanel({ foodOffers: [offer] });
+
+  fireEvent.press(
+    await screen.findByTestId(`map-marker-food_offer:${offer.id}`),
+  );
+
+  expect(screen.getByTestId("map-marker-popup-rating")).toHaveTextContent(
+    /Sin calificaciones/,
+  );
+});
+
+// CHG-177 — Tocar la oferta ya no abre además una banda bajo el
+// dashboard: todo se explica en el popup.
+it("tocar una oferta no inserta la banda inferior del dashboard", async () => {
+  renderPanel({ foodOffers: [offer] });
+
+  fireEvent.press(
+    await screen.findByTestId(`map-marker-food_offer:${offer.id}`),
+  );
+
+  expect(screen.getByTestId("map-marker-popup")).toBeTruthy();
+  expect(screen.queryByTestId("food-offer-map-detail")).toBeNull();
+});

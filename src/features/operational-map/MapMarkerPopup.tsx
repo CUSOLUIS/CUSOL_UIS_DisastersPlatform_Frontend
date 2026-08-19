@@ -128,7 +128,12 @@ function summarize(target: MapMarkerPopupTarget): PopupSummary {
       return {
         accentColor: categoryMeta.community_meal.color,
         eyebrow: "COMIDA COMUNITARIA · OFERTA VIGENTE",
-        ratingLine: null,
+        // CHG-176: la oferta también se califica, así que su tarjeta
+        // muestra la puntuación como la de un centro de acopio.
+        ratingLine: ratingSummaryLine(
+          target.offer.commentRatingAverage ?? null,
+          target.offer.commentRatingCount ?? 0,
+        ),
         title: target.offer.address,
         description: target.offer.description,
         metaLines: [],

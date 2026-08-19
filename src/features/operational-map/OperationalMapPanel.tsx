@@ -406,16 +406,6 @@ function MapContent({
       ? (helpRequests.find((request) => request.id === rawId) ?? null)
       : null;
   }, [helpRequests, selectedPoint]);
-  // CHG-163: la oferta de comida elegida en el mapa (ficha informativa;
-  // sin ventana de acción — no hay «atender» que ofrecer).
-  const selectedFoodOffer = useMemo(() => {
-    const rawId = selectedPoint
-      ? foodOfferIdFromPointId(selectedPoint.id)
-      : null;
-    return rawId
-      ? (foodOffers.find((offer) => offer.id === rawId) ?? null)
-      : null;
-  }, [foodOffers, selectedPoint]);
   // CHG-148: la solicitud cuya ventana de acción está abierta (solo al
   // tocar explícitamente su marcador; nunca por la selección inicial).
   const [actionRequestId, setActionRequestId] = useState<string | null>(null);
@@ -612,30 +602,10 @@ function MapContent({
         </View>
       )}
 
-      {/* CHG-163: los datos de la oferta de comida elegida en el mapa —
-          descripción, dirección y vigencia. */}
-      {selectedFoodOffer && (
-        <View style={styles.detail} testID="food-offer-map-detail">
-          <View
-            style={[styles.detailAccent, { backgroundColor: "#a3e635" }]}
-          />
-          <View style={styles.detailMain}>
-            <Text style={[styles.detailCategory, { color: "#a3e635" }]}>
-              COMIDA COMUNITARIA · OFERTA VIGENTE
-            </Text>
-            <Text style={styles.detailTitle}>{selectedFoodOffer.address}</Text>
-            <Text style={styles.detailDescription}>
-              {selectedFoodOffer.description}
-            </Text>
-          </View>
-          <View style={styles.detailMeta}>
-            <CountdownLabel
-              expiresAt={selectedFoodOffer.expiresAt}
-              style={[styles.detailMetaText, { color: "#a3e635" }]}
-            />
-          </View>
-        </View>
-      )}
+      {/* CHG-177: la oferta de comida ya no abre una banda informativa
+          bajo el dashboard. Al tocar su marcador se explica todo en el
+          popup, con su VER MÁS; repetirlo abajo solo alargaba la
+          portada. */}
 
       {/* CHG-148: ventana de acción al tocar la solicitud — con cuenta
           se atiende; sin cuenta se ofrece como voluntario. */}

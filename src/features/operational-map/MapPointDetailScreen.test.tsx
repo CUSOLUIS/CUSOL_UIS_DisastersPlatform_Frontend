@@ -369,3 +369,77 @@ it("la ficha de un viaje muestra ruta, placas y estado sin datos del conductor",
   // §30: nada del conductor en la vista pública.
   expect(screen.queryByText(/conductor/i)).toBeNull();
 });
+
+// CHG-176 — La ficha de una oferta de comida gana lo mismo que la de un
+// acopio: estrellas, panel comunitario y ELIMINAR para el super_admin.
+const foodOffer = {
+  id: "f1000000-0000-4000-8000-000000000176",
+  description: "Olla comunitaria de almuerzo para 80 personas.",
+  address: "Cancha del barrio La Feria",
+  latitude: 7.11,
+  longitude: -73.13,
+  notificationRadiusKm: 3,
+  createdAt: "2026-08-19T00:00:00Z",
+  expiresAt: "2099-08-19T18:00:00Z",
+  commentRatingAverage: 4.5,
+  commentRatingCount: 8,
+};
+
+it("la ficha de una oferta de comida muestra su puntuación y su comunidad", async () => {
+  render(
+    <MapPointDetailScreen
+      payload={{ kind: "food_offer", offer: foodOffer }}
+      onBack={jest.fn()}
+      communityDataSource={fakeCommunitySource()}
+    />,
+  );
+
+  expect(await screen.findByTestId("map-point-detail-rating")).toHaveTextContent(
+    /4,5 · 8 calificaciones/,
+  );
+  // Mismo panel que los acopios: comentar, denunciar y la lista.
+  expect(
+    await screen.findByTestId("collection-center-community-panel"),
+  ).toBeTruthy();
+  expect(screen.getByTestId("center-comment-button")).toBeTruthy();
+  expect(screen.getByTestId("center-report-button")).toBeTruthy();
+});
+
+it("el super_admin elimina una oferta de comida en dos pasos", async () => {
+  const onBack = jest.fn();
+  const dataSource = fakeCommunitySource();
+  render(
+    <MapPointDetailScreen
+      payload={{ kind: "food_offer", offer: foodOffer }}
+      onBack={onBack}
+      communityDataSource={dataSource}
+      sessionSource={adminSessionSource()}
+    />,
+  );
+  const button = await screen.findByTestId("map-point-delete-center");
+
+  fireEvent.press(button);
+  expect(dataSource.adminDeleteAidLocation).not.toHaveBeenCalled();
+
+  fireEvent.press(screen.getByTestId("map-point-delete-center"));
+  await waitFor(() =>
+    // El borrado apunta a la oferta, no a un acopio.
+    expect(dataSource.adminDeleteAidLocation).toHaveBeenCalledWith(
+      foodOffer.id,
+    ),
+  );
+  await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
+});
+
+it("sin super_admin la oferta no ofrece ELIMINAR", async () => {
+  render(
+    <MapPointDetailScreen
+      payload={{ kind: "food_offer", offer: foodOffer }}
+      onBack={jest.fn()}
+      communityDataSource={fakeCommunitySource()}
+    />,
+  );
+  await screen.findByTestId("center-comments-average");
+
+  expect(screen.queryByTestId("map-point-delete-block")).toBeNull();
+});

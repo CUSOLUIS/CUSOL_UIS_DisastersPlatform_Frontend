@@ -65,6 +65,10 @@ export interface ActiveFoodOffer {
   notificationRadiusKm: number | null;
   createdAt: string;
   expiresAt: string;
+  // CHG-176: promedio de estrellas y cuántos comentarios calificaron;
+  // viajan con la oferta porque el mapa la fusiona en cliente.
+  commentRatingAverage?: number | null;
+  commentRatingCount?: number;
 }
 
 export interface FoodOfferPage {

@@ -65,11 +65,15 @@ export function CollectionCenterCommunityPanel({
   locationId,
   dataSource = aidLocationCommunityDataSource,
   sessionSource,
+  // CHG-176: el panel sirve para cualquier cosa comentable; solo cambia
+  // cómo se la nombra al lector de pantalla.
+  targetLabel = "este centro de acopio",
 }: {
   locationId: string;
   dataSource?: AidLocationCommunityDataSource;
   // CHG-167: inyectable en pruebas; por defecto consulta /auth/me.
   sessionSource?: SessionAccountSource;
+  targetLabel?: string;
 }) {
   const [listState, setListState] = useState<ListState>({
     status: "loading",
@@ -225,7 +229,7 @@ export function CollectionCenterCommunityPanel({
       <View style={styles.actionsRow}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Comentar este centro de acopio"
+          accessibilityLabel={`Comentar ${targetLabel}`}
           onPress={() => switchForm("comment")}
           style={styles.commentButton}
           testID="center-comment-button"
@@ -234,7 +238,7 @@ export function CollectionCenterCommunityPanel({
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Denunciar este centro de acopio"
+          accessibilityLabel={`Denunciar ${targetLabel}`}
           onPress={() => switchForm("report")}
           style={styles.reportButton}
           testID="center-report-button"

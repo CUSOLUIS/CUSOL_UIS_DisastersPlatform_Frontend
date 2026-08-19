@@ -42,6 +42,10 @@ export function foodOffersToMapPoints(
         url: null,
       },
       updatedAt: offer.createdAt,
+      // CHG-176: la puntuación viaja con la oferta, así el popup pinta
+      // la línea de estrellas igual que en un centro de acopio.
+      commentRatingAverage: offer.commentRatingAverage ?? null,
+      commentRatingCount: offer.commentRatingCount ?? 0,
     }));
 }
 
