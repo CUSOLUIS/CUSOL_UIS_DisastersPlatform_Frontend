@@ -9,6 +9,10 @@ import {
 } from "react-native";
 import { colors, fontFamilies } from "../../theme";
 import { font } from "../../typography";
+import {
+  useSessionAccount,
+  type SessionAccountSource,
+} from "../auth/useSessionAccount";
 import { communityTextIssue } from "../humanitarian-directory/textQuality";
 import {
   aidLocationCommunityDataSource,
@@ -60,9 +64,12 @@ type OpenForm = "none" | "comment" | "report";
 export function CollectionCenterCommunityPanel({
   locationId,
   dataSource = aidLocationCommunityDataSource,
+  sessionSource,
 }: {
   locationId: string;
   dataSource?: AidLocationCommunityDataSource;
+  // CHG-167: inyectable en pruebas; por defecto consulta /auth/me.
+  sessionSource?: SessionAccountSource;
 }) {
   const [listState, setListState] = useState<ListState>({
     status: "loading",
@@ -76,6 +83,13 @@ export function CollectionCenterCommunityPanel({
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // CHG-167: sesión para mostrar el borrado solo a super_admin (la
+  // barrera real es el backend); el borrado confirma en dos pasos.
+  const session = useSessionAccount(sessionSource);
+  const isAdmin =
+    session.status === "authenticated" &&
+    session.account.assignedRole === "super_admin";
+  const [armedDeleteId, setArmedDeleteId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setListState({ status: "loading" });
@@ -139,6 +153,29 @@ export function CollectionCenterCommunityPanel({
         error instanceof Error
           ? error.message
           : "No fue posible publicar el comentario.",
+      ]);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // CHG-167: primer toque arma la confirmación; el segundo borra.
+  const deleteComment = async (commentId: string) => {
+    if (armedDeleteId !== commentId) {
+      setArmedDeleteId(commentId);
+      return;
+    }
+    setArmedDeleteId(null);
+    setBusy(true);
+    try {
+      await dataSource.adminDeleteComment(locationId, commentId);
+      setNotice("El comentario fue borrado.");
+      await load();
+    } catch (error: unknown) {
+      setFormErrors([
+        error instanceof Error
+          ? error.message
+          : "No fue posible borrar el comentario.",
       ]);
     } finally {
       setBusy(false);
@@ -417,24 +454,52 @@ export function CollectionCenterCommunityPanel({
               style={styles.comment}
               testID={`center-comment-${comment.id}`}
             >
-              <Text style={styles.commentAuthor}>
-                {comment.authorDisplayName ?? "Anónimo"}
-              </Text>
-              {/* CHG-166: comentarios previos a la mejora no tienen
-                  estrellas y no muestran nada. */}
-              {comment.rating !== null && (
-                <Text
-                  style={styles.commentStars}
-                  accessibilityLabel={`Calificación: ${comment.rating} de 5 estrellas`}
-                  testID={`center-comment-rating-${comment.id}`}
-                >
-                  {starGlyphs(comment.rating)}
+              <View style={styles.commentBody}>
+                <Text style={styles.commentAuthor}>
+                  {comment.authorDisplayName ?? "Anónimo"}
                 </Text>
+                {/* CHG-166: comentarios previos a la mejora no tienen
+                    estrellas y no muestran nada. */}
+                {comment.rating !== null && (
+                  <Text
+                    style={styles.commentStars}
+                    accessibilityLabel={`Calificación: ${comment.rating} de 5 estrellas`}
+                    testID={`center-comment-rating-${comment.id}`}
+                  >
+                    {starGlyphs(comment.rating)}
+                  </Text>
+                )}
+                <Text style={styles.commentDate}>
+                  {formatStamp(comment.createdAt)}
+                </Text>
+                <Text style={styles.commentContent}>{comment.content}</Text>
+              </View>
+              {/* CHG-167: solo super_admin ve el borrado, a la derecha
+                  del comentario y con confirmación en dos pasos. */}
+              {isAdmin && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    armedDeleteId === comment.id
+                      ? "Confirmar el borrado del comentario"
+                      : "Borrar este comentario"
+                  }
+                  disabled={busy}
+                  onPress={() => void deleteComment(comment.id)}
+                  style={[
+                    styles.deleteButton,
+                    armedDeleteId === comment.id &&
+                      styles.deleteButtonArmed,
+                  ]}
+                  testID={`center-comment-delete-${comment.id}`}
+                >
+                  <Text style={styles.deleteText}>
+                    {armedDeleteId === comment.id
+                      ? "¿CONFIRMAR?"
+                      : "BORRAR"}
+                  </Text>
+                </Pressable>
               )}
-              <Text style={styles.commentDate}>
-                {formatStamp(comment.createdAt)}
-              </Text>
-              <Text style={styles.commentContent}>{comment.content}</Text>
             </View>
           ))}
         </>
@@ -621,10 +686,30 @@ const styles = StyleSheet.create({
   loadingText: { color: colors.inkSoft, fontSize: font(12) },
   empty: { color: colors.inkDim, fontSize: font(12), lineHeight: 18 },
   comment: {
-    gap: 2,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: colors.line,
+  },
+  commentBody: { flex: 1, gap: 2 },
+  deleteButton: {
+    minHeight: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: colors.emergency,
+    borderRadius: 7,
+  },
+  deleteButtonArmed: { backgroundColor: "rgba(255,77,94,0.14)" },
+  deleteText: {
+    color: colors.emergency,
+    fontFamily: fontFamilies.mono,
+    fontSize: font(10),
+    fontWeight: "900",
+    letterSpacing: 0.6,
   },
   commentAuthor: { color: colors.ink, fontSize: font(13), fontWeight: "800" },
   commentDate: {

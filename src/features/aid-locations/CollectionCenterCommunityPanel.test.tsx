@@ -57,7 +57,35 @@ function fakeDataSource(
       underObservation: false,
       disabled: false,
     }),
+    adminDeleteComment: jest.fn().mockResolvedValue(undefined),
     ...overrides,
+  };
+}
+
+// CHG-167: sesión super_admin inyectada; la real consulta /auth/me.
+function adminSessionSource() {
+  return {
+    getCurrentAccount: jest.fn().mockResolvedValue({
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+      displayName: "Admin CUSOL",
+      email: "admin@cusol.local",
+      assignedRole: "super_admin",
+      status: "active",
+      sessionExpiresAt: "2099-01-01T00:00:00Z",
+    }),
+  };
+}
+
+function userSessionSource() {
+  return {
+    getCurrentAccount: jest.fn().mockResolvedValue({
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+      displayName: "Usuaria Normal",
+      email: "user@cusol.local",
+      assignedRole: "user",
+      status: "active",
+      sessionExpiresAt: "2099-01-01T00:00:00Z",
+    }),
   };
 }
 
@@ -258,4 +286,65 @@ it("cuando la denuncia deshabilita el centro lo explica", async () => {
   await waitFor(() =>
     expect(screen.getByText(/quedó deshabilitado/i)).toBeTruthy(),
   );
+});
+
+// CHG-167 — Solo super_admin ve la opción de borrar, a la derecha de
+// cada comentario, y el borrado confirma en dos pasos.
+it("un super_admin borra un comentario con confirmación en dos pasos", async () => {
+  const dataSource = fakeDataSource();
+  render(
+    <CollectionCenterCommunityPanel
+      locationId={LOCATION_ID}
+      dataSource={dataSource}
+      sessionSource={adminSessionSource()}
+    />,
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId("center-comment-delete-c-2")).toBeTruthy(),
+  );
+
+  // Primer toque: arma la confirmación sin llamar a la API.
+  fireEvent.press(screen.getByTestId("center-comment-delete-c-2"));
+  expect(screen.getByText("¿CONFIRMAR?")).toBeTruthy();
+  expect(dataSource.adminDeleteComment).not.toHaveBeenCalled();
+
+  // Segundo toque: borra y recarga la lista.
+  fireEvent.press(screen.getByTestId("center-comment-delete-c-2"));
+  await waitFor(() =>
+    expect(dataSource.adminDeleteComment).toHaveBeenCalledWith(
+      LOCATION_ID,
+      "c-2",
+    ),
+  );
+  await waitFor(() =>
+    expect(screen.getByText("El comentario fue borrado.")).toBeTruthy(),
+  );
+  expect(dataSource.listComments).toHaveBeenCalledTimes(2);
+});
+
+it("los anónimos no ven la opción de borrar", async () => {
+  render(
+    <CollectionCenterCommunityPanel
+      locationId={LOCATION_ID}
+      dataSource={fakeDataSource()}
+    />,
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId("center-comment-c-2")).toBeTruthy(),
+  );
+  expect(screen.queryByTestId("center-comment-delete-c-2")).toBeNull();
+});
+
+it("una cuenta sin rol administrativo tampoco ve la opción de borrar", async () => {
+  render(
+    <CollectionCenterCommunityPanel
+      locationId={LOCATION_ID}
+      dataSource={fakeDataSource()}
+      sessionSource={userSessionSource()}
+    />,
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId("center-comment-c-2")).toBeTruthy(),
+  );
+  expect(screen.queryByTestId("center-comment-delete-c-2")).toBeNull();
 });
