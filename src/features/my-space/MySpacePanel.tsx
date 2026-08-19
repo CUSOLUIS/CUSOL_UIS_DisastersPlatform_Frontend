@@ -28,6 +28,12 @@ import type {
   HelpRequestPage,
   HelpRequestsDataSource,
 } from "../help-requests/types";
+import { foodOffersDataSource } from "../food-offers/dataSource";
+import { FoodOffersSection } from "../food-offers/FoodOffersSection";
+import type {
+  FoodOfferPage,
+  FoodOffersDataSource,
+} from "../food-offers/types";
 import { mySpaceDataSource } from "./dataSource";
 import type {
   MySpaceDataSource,
@@ -82,6 +88,7 @@ export function MySpacePanel({
   onClose,
   dataSource = mySpaceDataSource,
   helpRequests = helpRequestsDataSource,
+  foodOffers = foodOffersDataSource,
   geocode = searchAddressCandidates,
   locate = requestVisitorLocation,
   isSuperAdmin = false,
@@ -96,15 +103,18 @@ export function MySpacePanel({
   // CHG-125 / DEC-125-09 y DEC-125-11: las solicitudes activas se
   // notifican dentro del espacio personal con su acción de atender.
   helpRequests?: HelpRequestsDataSource;
+  // CHG-163: las ofertas de comida activas se notifican igual.
+  foodOffers?: FoodOffersDataSource;
   geocode?: (query: string) => Promise<AddressCandidate[]>;
   locate?: () => Promise<{ latitude: number; longitude: number }>;
 }) {
-  const [section, setSection] = useState<"reports" | "volunteers" | "help">(
-    "reports",
-  );
+  const [section, setSection] = useState<
+    "reports" | "volunteers" | "help" | "food"
+  >("reports");
   const [reports, setReports] = useState<MyReportsPage | null>(null);
   const [alerts, setAlerts] = useState<VolunteerAlertPage | null>(null);
   const [helpPage, setHelpPage] = useState<HelpRequestPage | null>(null);
+  const [foodPage, setFoodPage] = useState<FoodOfferPage | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -112,14 +122,17 @@ export function MySpacePanel({
     setLoading(true);
     setError(null);
     try {
-      const [reportsPage, alertsPage, helpRequestsPage] = await Promise.all([
-        dataSource.getMyReports(),
-        dataSource.listVolunteerAlerts(),
-        helpRequests.listActive(),
-      ]);
+      const [reportsPage, alertsPage, helpRequestsPage, foodOffersPage] =
+        await Promise.all([
+          dataSource.getMyReports(),
+          dataSource.listVolunteerAlerts(),
+          helpRequests.listActive(),
+          foodOffers.listActive(),
+        ]);
       setReports(reportsPage);
       setAlerts(alertsPage);
       setHelpPage(helpRequestsPage);
+      setFoodPage(foodOffersPage);
     } catch (caught: unknown) {
       setError(messageOf(caught));
     } finally {
@@ -221,6 +234,22 @@ export function MySpacePanel({
                 AYUDA
               </Text>
             </Pressable>
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityState={{ selected: section === "food" }}
+              accessibilityLabel="Ofertas de comida"
+              onPress={() => setSection("food")}
+              style={[styles.tab, section === "food" && styles.tabActive]}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  section === "food" && styles.tabTextActive,
+                ]}
+              >
+                COMIDA
+              </Text>
+            </Pressable>
           </View>
 
           <ScrollView
@@ -272,6 +301,16 @@ export function MySpacePanel({
                 onAttended={() => void load()}
                 embedded
                 title="Solicitudes de ayuda vigentes"
+              />
+            )}
+            {/* CHG-163: ofertas «Ofrecer comida» vigentes — el canal de
+                notificación a las cuentas (patrón DEC-125-11). */}
+            {section === "food" && (
+              <FoodOffersSection
+                items={foodPage?.items ?? []}
+                loading={loading && foodPage === null}
+                errorMessage={null}
+                embedded
               />
             )}
           </ScrollView>

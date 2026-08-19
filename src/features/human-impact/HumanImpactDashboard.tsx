@@ -34,12 +34,15 @@ import type {
 } from "../humanitarian-directory/types";
 import { HelpRequestProximityAlert } from "../help-requests/HelpRequestProximityAlert";
 import { useActiveHelpRequests } from "../help-requests/useActiveHelpRequests";
+import { FoodOfferProximityAlert } from "../food-offers/FoodOfferProximityAlert";
+import { useActiveFoodOffers } from "../food-offers/useActiveFoodOffers";
 import { pickVolunteerPhoto } from "../help-requests/pickVolunteerPhoto";
 import {
   useAccountNotifications,
   type AccountNotifications,
 } from "../notifications/useAccountNotifications";
 import type { HelpRequestsDataSource } from "../help-requests/types";
+import type { FoodOffersDataSource } from "../food-offers/types";
 import { ReportActions } from "../missing-persons/MissingPersonCommandCenter";
 import { OperationalMapPanel } from "../operational-map/OperationalMapPanel";
 import {
@@ -69,6 +72,8 @@ interface HumanImpactDashboardProps {
   communityContributionDataSource: CommunityContributionDataSource;
   // CHG-125: solicitudes «Necesitamos ayuda» vigentes.
   helpRequestsDataSource: HelpRequestsDataSource;
+  // CHG-163: ofertas «Ofrecer comida» vigentes.
+  foodOffersDataSource: FoodOffersDataSource;
   onReportMissingPerson: () => void;
   onReportUnverifiedBuilding: () => void;
   onRegisterCollectionCenter: () => void;
@@ -201,6 +206,7 @@ export function HumanImpactDashboard({
   humanitarianDirectoryDataSource,
   communityContributionDataSource,
   helpRequestsDataSource,
+  foodOffersDataSource,
   initialDirectorySearch,
   onReportMissingPerson,
   onReportUnverifiedBuilding,
@@ -308,6 +314,8 @@ export function HumanImpactDashboard({
   // se atiende, sin cuenta se ofrece como voluntario.
   const { state: helpRequestsState, refresh: refreshHelpRequests } =
     useActiveHelpRequests(helpRequestsDataSource);
+  // CHG-163: ofertas de comida vigentes, con el mismo pulso.
+  const { state: foodOffersState } = useActiveFoodOffers(foodOffersDataSource);
   const helpRequestActions = useMemo(
     () => ({
       isAuthenticated: account !== null,
@@ -377,6 +385,8 @@ export function HumanImpactDashboard({
           onClose={() => setMySpaceOpen(false)}
           isSuperAdmin={account?.assignedRole === "super_admin"}
           onOpenAdmin={onOpenAdmin}
+          helpRequests={helpRequestsDataSource}
+          foodOffers={foodOffersDataSource}
         />
 
         <ScrollView
@@ -468,6 +478,13 @@ export function HumanImpactDashboard({
               style={styles.fullWidth}
             />
 
+            {/* CHG-163: mismo aviso de proximidad para las ofertas de
+                comida con radio, con el acento de su categoría. */}
+            <FoodOfferProximityAlert
+              items={foodOffersState.items}
+              style={styles.fullWidth}
+            />
+
             <View
               ref={mapRef}
               onLayout={registerSectionTop("map")}
@@ -480,6 +497,7 @@ export function HumanImpactDashboard({
                 compact={compact}
                 helpRequests={helpRequestsState.items}
                 helpRequestActions={helpRequestActions}
+                foodOffers={foodOffersState.items}
               />
             </View>
 

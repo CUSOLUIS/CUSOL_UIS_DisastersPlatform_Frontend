@@ -116,13 +116,15 @@ export const reportActionCatalog: Record<ReportActionId, ReportActionCopy> = {
       "Genera un informe sobre un hogar que quedó en muy malas condiciones; también aparecerá en el mapa.",
     hint: "Genera un informe sobre un hogar que quedó en muy malas condiciones; también aparecerá en el mapa",
   },
+  // CHG-163: la oferta es pública, admite anónimos, sale en el mapa y
+  // expira sola (reglas de «Necesitamos ayuda»).
   "community-meals": {
     id: "community-meals",
     category: "AYUDA · ALIMENTACIÓN SOLIDARIA",
     title: "Ofrecer comida comunitaria",
     purpose:
-      "Informa que preparas alimentos y deseas compartirlos con personas afectadas durante la emergencia.",
-    hint: "Informa que preparas alimentos y deseas compartirlos con personas afectadas durante la emergencia",
+      "Publica que preparas alimentos y deseas compartirlos con personas afectadas; la oferta aparece de inmediato en el mapa mientras esté vigente.",
+    hint: "Publica que preparas alimentos y deseas compartirlos con personas afectadas; la oferta aparece de inmediato en el mapa mientras esté vigente",
   },
   "temporary-shelter": {
     id: "temporary-shelter",

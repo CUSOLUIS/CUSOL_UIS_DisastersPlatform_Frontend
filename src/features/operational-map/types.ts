@@ -82,9 +82,10 @@ export interface OperationalMapPoint {
   latitude: number;
   longitude: number;
   coordinatePrecision: CoordinatePrecision;
-  // CHG-134: radio de aviso (km) de una solicitud «Necesitamos ayuda»;
-  // los lienzos lo dibujan como círculo a escala. Solo lo traen los
-  // puntos de la categoría help_request (no viene del overview).
+  // CHG-134: radio de aviso (km) de una solicitud «Necesitamos ayuda»
+  // o de una oferta «Ofrecer comida» (CHG-163); los lienzos lo dibujan
+  // como círculo a escala. Solo lo traen los puntos fusionados en
+  // cliente (help_request y community_meal; no viene del overview).
   alertRadiusKm?: number;
   verificationStatus: VerificationStatus;
   relatedDisasterId: string | null;

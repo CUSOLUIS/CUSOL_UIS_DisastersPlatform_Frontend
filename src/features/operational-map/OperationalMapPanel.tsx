@@ -20,6 +20,11 @@ import type {
   ActiveHelpRequest,
   HelpRequestAttendReceipt,
 } from "../help-requests/types";
+import {
+  foodOfferIdFromPointId,
+  foodOffersToMapPoints,
+} from "../food-offers/mapPoints";
+import type { ActiveFoodOffer } from "../food-offers/types";
 import type { SelectedPhoto } from "../missing-persons/reportTypes";
 import type { HumanStatus } from "../human-impact/types";
 import { categoryMeta } from "./categoryMeta";
@@ -112,6 +117,9 @@ interface OperationalMapPanelProps {
   // cliente como marcadores `help_request`; nunca vienen del overview.
   helpRequests?: ActiveHelpRequest[];
   helpRequestActions?: HelpRequestMapActions;
+  // CHG-163: ofertas de comida vigentes fusionadas en cliente como
+  // marcadores `community_meal`; misma regla de expiración server-side.
+  foodOffers?: ActiveFoodOffer[];
 }
 
 const INITIAL_HUMAN_VIEWPORT: HumanMapViewport = {
@@ -142,6 +150,7 @@ export function OperationalMapPanel({
   compact,
   helpRequests = [],
   helpRequestActions,
+  foodOffers = [],
 }: OperationalMapPanelProps) {
   const [loadState, setLoadState] = useState<MapLoadState>(() =>
     dataSource.initialOverview
@@ -268,6 +277,7 @@ export function OperationalMapPanel({
       compact={compact}
       helpRequests={helpRequests}
       helpRequestActions={helpRequestActions}
+      foodOffers={foodOffers}
       activeCategories={activeCategories}
       setActiveCategories={setActiveCategories}
       selectedId={selectedId}
@@ -291,6 +301,7 @@ function MapContent({
   compact,
   helpRequests,
   helpRequestActions,
+  foodOffers,
   activeCategories,
   setActiveCategories,
   selectedId,
@@ -310,6 +321,7 @@ function MapContent({
   compact: boolean;
   helpRequests: ActiveHelpRequest[];
   helpRequestActions?: HelpRequestMapActions;
+  foodOffers: ActiveFoodOffer[];
   activeCategories: OperationalMapCategory[];
   setActiveCategories: React.Dispatch<React.SetStateAction<OperationalMapCategory[]>>;
   selectedId: string | null;
@@ -328,12 +340,24 @@ function MapContent({
   // expirar, el backend deja de devolver la solicitud y el marcador
   // desaparece en el siguiente refresco sin lógica adicional.
   const mergedItems = useMemo(
-    () => [...data.items, ...helpRequestsToMapPoints(helpRequests)],
-    [data.items, helpRequests],
+    () => [
+      ...data.items,
+      ...helpRequestsToMapPoints(helpRequests),
+      // CHG-163: las ofertas de comida se fusionan igual; comparten la
+      // categoría `community_meal` que existía sin datos desde CHG-044.
+      ...foodOffersToMapPoints(foodOffers),
+    ],
+    [data.items, helpRequests, foodOffers],
   );
   const displaySummary = useMemo(
-    () => ({ ...data.summary, helpRequests: helpRequests.length }),
-    [data.summary, helpRequests.length],
+    () => ({
+      ...data.summary,
+      helpRequests: helpRequests.length,
+      // Se SUMA al conteo del overview (hoy 0: la publicación de
+      // aid-offers sigue bloqueada por DEC-021) en vez de sustituirlo.
+      communityMeal: data.summary.communityMeal + foodOffers.length,
+    }),
+    [data.summary, helpRequests.length, foodOffers.length],
   );
   const visiblePoints = useMemo(
     () => mergedItems.filter((point) => activeCategories.includes(point.category)),
@@ -351,6 +375,16 @@ function MapContent({
       ? (helpRequests.find((request) => request.id === rawId) ?? null)
       : null;
   }, [helpRequests, selectedPoint]);
+  // CHG-163: la oferta de comida elegida en el mapa (ficha informativa;
+  // sin ventana de acción — no hay «atender» que ofrecer).
+  const selectedFoodOffer = useMemo(() => {
+    const rawId = selectedPoint
+      ? foodOfferIdFromPointId(selectedPoint.id)
+      : null;
+    return rawId
+      ? (foodOffers.find((offer) => offer.id === rawId) ?? null)
+      : null;
+  }, [foodOffers, selectedPoint]);
   // CHG-148: la solicitud cuya ventana de acción está abierta (solo al
   // tocar explícitamente su marcador; nunca por la selección inicial).
   const [actionRequestId, setActionRequestId] = useState<string | null>(null);
@@ -464,6 +498,31 @@ function MapContent({
                 ? "1 PERSONA ATENDIENDO"
                 : `${mapNumberFormatter.format(selectedHelpRequest.attendersCount)} PERSONAS ATENDIENDO`}
             </Text>
+          </View>
+        </View>
+      )}
+
+      {/* CHG-163: los datos de la oferta de comida elegida en el mapa —
+          descripción, dirección y vigencia. */}
+      {selectedFoodOffer && (
+        <View style={styles.detail} testID="food-offer-map-detail">
+          <View
+            style={[styles.detailAccent, { backgroundColor: "#a3e635" }]}
+          />
+          <View style={styles.detailMain}>
+            <Text style={[styles.detailCategory, { color: "#a3e635" }]}>
+              COMIDA COMUNITARIA · OFERTA VIGENTE
+            </Text>
+            <Text style={styles.detailTitle}>{selectedFoodOffer.address}</Text>
+            <Text style={styles.detailDescription}>
+              {selectedFoodOffer.description}
+            </Text>
+          </View>
+          <View style={styles.detailMeta}>
+            <CountdownLabel
+              expiresAt={selectedFoodOffer.expiresAt}
+              style={[styles.detailMetaText, { color: "#a3e635" }]}
+            />
           </View>
         </View>
       )}

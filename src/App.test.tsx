@@ -1040,9 +1040,10 @@ describe("App universal", () => {
     render(<App dataSource={demoDataSource} mapDataSource={demoMapDataSource} />);
 
     // CHG-125: a los 8 puntos operativos demo se suman los 2 marcadores
-    // de solicitudes «Necesitamos ayuda» (categoría propia del mapa).
+    // de solicitudes «Necesitamos ayuda» (categoría propia del mapa) y
+    // CHG-163: los 2 de ofertas de comida (categoría community_meal).
     await waitFor(() =>
-      expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(10),
+      expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(12),
     );
     // CHG-049: el bloque "UBICACIONES OPERATIVAS" y el detalle inferior
     // se retiraron; el mapa y sus filtros son la única superficie.
@@ -1055,9 +1056,10 @@ describe("App universal", () => {
       screen.getByRole("button", { name: "Filtrar mapa por Centros de acopio local" }),
     );
 
-    // Quedan 6 puntos operativos + 2 solicitudes de ayuda (CHG-125),
-    // que no se apagan con los filtros de otras categorías.
-    expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(8);
+    // Quedan 6 puntos operativos + 2 solicitudes de ayuda (CHG-125) +
+    // 2 ofertas de comida (CHG-163), que no se apagan con los filtros
+    // de otras categorías.
+    expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(10);
   });
 
   it("expone las categorías comunitarias nuevas como filtros del mapa", async () => {
@@ -1085,8 +1087,9 @@ describe("App universal", () => {
       name: "Filtrar mapa por Edificios sin revisar",
     });
     fireEvent.press(buildingFilter);
-    // 6 puntos operativos visibles + 2 solicitudes de ayuda (CHG-125).
-    expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(8);
+    // 6 puntos operativos visibles + 2 solicitudes de ayuda (CHG-125)
+    // + 2 ofertas de comida (CHG-163).
+    expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(10);
 
     fireEvent.press(buildingFilter);
     const buildingMarker = screen.getByRole("button", {
@@ -1148,8 +1151,9 @@ describe("App universal", () => {
 
     render(<App dataSource={demoDataSource} mapDataSource={updatingMapSource} />);
     await act(async () => Promise.resolve());
-    // 8 puntos operativos demo + 2 solicitudes de ayuda (CHG-125).
-    expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(10);
+    // 8 puntos operativos demo + 2 solicitudes de ayuda (CHG-125) +
+    // 2 ofertas de comida (CHG-163).
+    expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(12);
 
     await act(async () => {
       jest.advanceTimersByTime(30_000);
@@ -1157,7 +1161,7 @@ describe("App universal", () => {
     });
 
     expect(screen.getByText("DESACTUALIZADO")).toBeTruthy();
-    expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(10);
+    expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(12);
   });
 
   it("no inventa puntos operativos aunque la capa humana sí tenga clusters", async () => {
@@ -1191,12 +1195,14 @@ describe("App universal", () => {
       expect(screen.getAllByTestId(/^human-map-feature-/)).toHaveLength(14),
     );
     // Sin puntos operativos no se inventa ninguno; los únicos marcadores
-    // admisibles son las solicitudes de ayuda demo (CHG-125), que tienen
-    // su propio origen de datos.
+    // admisibles son las solicitudes de ayuda demo (CHG-125) y las
+    // ofertas de comida demo (CHG-163), que tienen su propio origen de
+    // datos.
     expect(
-      screen.queryAllByTestId(/^map-marker-(?!help_request:)/),
+      screen.queryAllByTestId(/^map-marker-(?!help_request:|food_offer:)/),
     ).toHaveLength(0);
     expect(screen.queryAllByTestId(/^map-marker-help_request:/)).toHaveLength(2);
+    expect(screen.queryAllByTestId(/^map-marker-food_offer:/)).toHaveLength(2);
     expect(screen.queryByText("SIN PUNTOS VISIBLES")).toBeNull();
   });
 

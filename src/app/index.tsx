@@ -33,6 +33,7 @@ export default function HomeRoute() {
       onRegisterBoatTransport={() => router.push("/registrar-lanchera")}
       onReportDamagedHome={() => router.push("/reportar-casita-partida")}
       onRequestHelp={() => router.push("/necesitamos-ayuda")}
+      onOfferCommunityMeals={() => router.push("/ofrecer-comida")}
       initialDirectorySearch={typeof buscar === "string" ? buscar : undefined}
     />
   );

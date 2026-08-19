@@ -27,6 +27,8 @@ import type {
 } from "./features/humanitarian-directory/types";
 import { helpRequestsDataSource } from "./features/help-requests/dataSource";
 import type { HelpRequestsDataSource } from "./features/help-requests/types";
+import { foodOffersDataSource } from "./features/food-offers/dataSource";
+import type { FoodOffersDataSource } from "./features/food-offers/types";
 import { operationalMapDataSource } from "./features/operational-map/dataSource";
 import { humanMapDataSource } from "./features/operational-map/humanMapDataSource";
 import type {
@@ -58,6 +60,8 @@ interface AppProps {
   communityContributionDataSource?: CommunityContributionDataSource;
   // CHG-125: solicitudes «Necesitamos ayuda» (inyectable en pruebas).
   helpRequestsDataSource?: HelpRequestsDataSource;
+  // CHG-163: ofertas «Ofrecer comida» (inyectable en pruebas).
+  foodOffersDataSource?: FoodOffersDataSource;
   onReportMissingPerson?: () => void;
   onReportUnverifiedBuilding?: () => void;
   onRegisterCollectionCenter?: () => void;
@@ -93,6 +97,7 @@ export function App({
   humanitarianDirectoryDataSource: directoryDataSource = humanitarianDirectoryDataSource,
   communityContributionDataSource: contributionDataSource = communityContributionDataSource,
   helpRequestsDataSource: helpRequestsSource = helpRequestsDataSource,
+  foodOffersDataSource: foodOffersSource = foodOffersDataSource,
   onReportMissingPerson = () => undefined,
   onReportUnverifiedBuilding = () => undefined,
   onRegisterCollectionCenter = () => undefined,
@@ -183,6 +188,7 @@ export function App({
         humanitarianDirectoryDataSource={directoryDataSource}
         communityContributionDataSource={contributionDataSource}
         helpRequestsDataSource={helpRequestsSource}
+        foodOffersDataSource={foodOffersSource}
         onReportMissingPerson={onReportMissingPerson}
         onReportUnverifiedBuilding={onReportUnverifiedBuilding}
         onRegisterCollectionCenter={onRegisterCollectionCenter}
@@ -218,6 +224,7 @@ function DashboardLoader({
   humanitarianDirectoryDataSource,
   communityContributionDataSource,
   helpRequestsDataSource: helpRequestsSource,
+  foodOffersDataSource: foodOffersSource,
   onReportMissingPerson,
   onReportUnverifiedBuilding,
   onRegisterCollectionCenter,
@@ -245,6 +252,7 @@ function DashboardLoader({
   humanitarianDirectoryDataSource: HumanitarianDirectoryDataSource;
   communityContributionDataSource: CommunityContributionDataSource;
   helpRequestsDataSource: HelpRequestsDataSource;
+  foodOffersDataSource: FoodOffersDataSource;
   onReportMissingPerson: () => void;
   onReportUnverifiedBuilding: () => void;
   onRegisterCollectionCenter: () => void;
@@ -368,6 +376,7 @@ function DashboardLoader({
       humanitarianDirectoryDataSource={humanitarianDirectoryDataSource}
       communityContributionDataSource={communityContributionDataSource}
       helpRequestsDataSource={helpRequestsSource}
+      foodOffersDataSource={foodOffersSource}
       initialDirectorySearch={initialDirectorySearch}
       onReportMissingPerson={onReportMissingPerson}
       onReportUnverifiedBuilding={onReportUnverifiedBuilding}

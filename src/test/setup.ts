@@ -17,6 +17,8 @@ process.env.EXPO_PUBLIC_COMMUNITY_CONTRIBUTION_DATA_MODE = "demo";
 process.env.EXPO_PUBLIC_MY_SPACE_DATA_MODE = "demo";
 // CHG-125: solicitudes «Necesitamos ayuda» sin red en pruebas.
 process.env.EXPO_PUBLIC_HELP_REQUESTS_DATA_MODE = "demo";
+// CHG-163: ofertas «Ofrecer comida» sin red en pruebas.
+process.env.EXPO_PUBLIC_FOOD_OFFERS_DATA_MODE = "demo";
 
 jest.mock("react-native-safe-area-context", () => ({
   SafeAreaProvider: ({ children }: PropsWithChildren) => children,
