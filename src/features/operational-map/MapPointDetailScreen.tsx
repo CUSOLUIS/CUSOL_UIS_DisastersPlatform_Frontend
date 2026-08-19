@@ -12,6 +12,7 @@ import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { font } from "../../typography";
 import { CollectionCenterCommunityPanel } from "../aid-locations/CollectionCenterCommunityPanel";
 import type { AidLocationCommunityDataSource } from "../aid-locations/communityDataSource";
+import { ratingSummaryLine } from "../aid-locations/ratingStars";
 import { CountdownLabel } from "../help-requests/CountdownLabel";
 import { resolvePublicMediaUrl } from "../media/publicMediaUrl";
 import { categoryMeta } from "./categoryMeta";
@@ -72,6 +73,9 @@ interface DetailContent {
   accentColor: string;
   eyebrow: string;
   title: string;
+  // CHG-166: la misma línea de estrellas del popup, solo para acopios
+  // locales; null en el resto.
+  ratingLine: string | null;
   description: string | null;
   rows: DetailRow[];
   expiresAt: string | null;
@@ -123,6 +127,13 @@ function buildContent(payload: MapPointDetailPayload): DetailContent {
         accentColor: meta.color,
         eyebrow: meta.shortLabel.toUpperCase(),
         title: point.title,
+        ratingLine:
+          point.category === "collection_center"
+            ? ratingSummaryLine(
+                point.commentRatingAverage,
+                point.commentRatingCount,
+              )
+            : null,
         description: point.description,
         rows,
         expiresAt: null,
@@ -155,6 +166,7 @@ function buildContent(payload: MapPointDetailPayload): DetailContent {
         accentColor: colors.emergency,
         eyebrow: "NECESITAMOS AYUDA · SOLICITUD VIGENTE",
         title: request.address,
+        ratingLine: null,
         description: request.description,
         rows,
         expiresAt: request.expiresAt,
@@ -183,6 +195,7 @@ function buildContent(payload: MapPointDetailPayload): DetailContent {
         accentColor: categoryMeta.community_meal.color,
         eyebrow: "COMIDA COMUNITARIA · OFERTA VIGENTE",
         title: offer.address,
+        ratingLine: null,
         description: offer.description,
         rows,
         expiresAt: offer.expiresAt,
@@ -217,6 +230,7 @@ function buildContent(payload: MapPointDetailPayload): DetailContent {
         accentColor: meta.color,
         eyebrow: "PUNTO PÚBLICO ANÓNIMO",
         title: meta.singular,
+        ratingLine: null,
         description: null,
         rows,
         expiresAt: null,
@@ -303,6 +317,12 @@ function DetailCard({ content }: { content: DetailContent }) {
       <Text style={styles.title} accessibilityRole="header">
         {content.title}
       </Text>
+      {/* CHG-166: la misma línea de estrellas del popup del mapa. */}
+      {content.ratingLine && (
+        <Text style={styles.ratingLine} testID="map-point-detail-rating">
+          {content.ratingLine}
+        </Text>
+      )}
       {content.expiresAt && (
         <CountdownLabel
           expiresAt={content.expiresAt}
@@ -401,6 +421,11 @@ const styles = StyleSheet.create({
     fontSize: font(20),
     fontWeight: "800",
     letterSpacing: -0.4,
+  },
+  ratingLine: {
+    color: colors.missing,
+    fontFamily: fontFamilies.mono,
+    fontSize: font(13),
   },
   countdown: {
     fontFamily: fontFamilies.mono,

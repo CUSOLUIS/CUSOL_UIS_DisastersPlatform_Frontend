@@ -96,6 +96,10 @@ export interface OperationalMapPoint {
     url: string | null;
   };
   updatedAt: string;
+  // CHG-166: promedio de estrellas de los comentarios del punto
+  // (solo lo traen los puntos logísticos; backend viejo no lo envía).
+  commentRatingAverage?: number | null;
+  commentRatingCount?: number;
 }
 
 export interface OperationalMapSummary {

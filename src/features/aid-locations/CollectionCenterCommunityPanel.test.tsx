@@ -25,13 +25,16 @@ const comments: AidLocationComment[] = [
     authorDisplayName: "María Gómez",
     actorKind: "authenticated",
     content: "Hay disponibilidad para recibir ropa y alimentos.",
+    rating: 5,
     createdAt: "2026-08-19T01:14:00Z",
   },
   {
+    // CHG-166: comentario anterior a las estrellas, sin calificación.
     id: "c-1",
     authorDisplayName: null,
     actorKind: "anonymous",
     content: "El punto continúa abierto.",
+    rating: null,
     createdAt: "2026-08-19T00:52:00Z",
   },
 ];
@@ -44,6 +47,8 @@ function fakeDataSource(
     listComments: jest.fn().mockResolvedValue({
       items: comments,
       total: comments.length,
+      ratingAverage: 5,
+      ratingCount: 1,
     }),
     createComment: jest.fn().mockResolvedValue(comments[0]),
     reportCenter: jest.fn().mockResolvedValue({
@@ -70,6 +75,41 @@ it("muestra los comentarios del más reciente al más antiguo, con Anónimo", as
   expect(screen.getByText("María Gómez")).toBeTruthy();
   expect(screen.getByText("Anónimo")).toBeTruthy();
   expect(screen.getByText("COMENTARIOS")).toBeTruthy();
+  // CHG-166: promedio junto al título y estrellas por comentario; los
+  // comentarios previos a la mejora no muestran estrellas.
+  expect(
+    screen.getByTestId("center-comments-average").props.children,
+  ).toBe("★★★★★ 5,0 · 1 calificación");
+  expect(screen.getByTestId("center-comment-rating-c-2")).toBeTruthy();
+  expect(screen.queryByTestId("center-comment-rating-c-1")).toBeNull();
+});
+
+// CHG-166 — Publicar exige elegir una calificación de 1 a 5 estrellas.
+it("no publica sin calificación y avisa en local", async () => {
+  const dataSource = fakeDataSource();
+  render(
+    <CollectionCenterCommunityPanel
+      locationId={LOCATION_ID}
+      dataSource={dataSource}
+    />,
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId("center-comment-c-2")).toBeTruthy(),
+  );
+
+  fireEvent.press(screen.getByTestId("center-comment-button"));
+  fireEvent.changeText(
+    screen.getByLabelText("Texto del comentario"),
+    "El punto atiende con normalidad.",
+  );
+  fireEvent.press(screen.getByTestId("center-comment-publish"));
+
+  await waitFor(() =>
+    expect(
+      screen.getByText("Elige una calificación de 1 a 5 estrellas."),
+    ).toBeTruthy(),
+  );
+  expect(dataSource.createComment).not.toHaveBeenCalled();
 });
 
 it("COMENTAR publica el texto y recarga la lista", async () => {
@@ -85,6 +125,8 @@ it("COMENTAR publica el texto y recarga la lista", async () => {
   );
 
   fireEvent.press(screen.getByTestId("center-comment-button"));
+  // CHG-166: la calificación por estrellas acompaña al texto.
+  fireEvent.press(screen.getByTestId("center-comment-star-4"));
   fireEvent.changeText(
     screen.getByLabelText("Texto del comentario"),
     "Acabo de entregar varias cajas en este punto.",
@@ -95,6 +137,7 @@ it("COMENTAR publica el texto y recarga la lista", async () => {
     expect(dataSource.createComment).toHaveBeenCalledWith(
       LOCATION_ID,
       "Acabo de entregar varias cajas en este punto.",
+      4,
     ),
   );
   await waitFor(() =>

@@ -238,6 +238,50 @@ it("un punto humano abre popup anónimo y VER MÁS entrega el punto", async () =
   });
 });
 
+// CHG-166 — El popup de un Centro de Acopio Local muestra el promedio
+// de estrellas de sus comentarios encima del resumen.
+it("un acopio local con calificaciones muestra su promedio en el popup", async () => {
+  const center = overview.items.find(
+    (item) => item.category === "collection_center",
+  )!;
+  const ratedOverview = {
+    ...overview,
+    items: overview.items.map((item) =>
+      item.id === center.id
+        ? { ...item, commentRatingAverage: 4.2, commentRatingCount: 8 }
+        : item,
+    ),
+  };
+  renderPanel({
+    dataSource: {
+      transport: "fixture",
+      initialOverview: ratedOverview,
+      getOverview: async () => ratedOverview,
+    },
+  });
+
+  fireEvent.press(await screen.findByTestId(`map-marker-${center.id}`));
+
+  const popup = screen.getByTestId("map-marker-popup");
+  expect(
+    within(popup).getByText("★★★★☆ 4,2 · 8 calificaciones"),
+  ).toBeTruthy();
+});
+
+it("un acopio sin calificaciones lo dice; otras categorías no llevan la línea", async () => {
+  const center = overview.items.find(
+    (item) => item.category === "collection_center",
+  )!;
+  renderPanel();
+
+  fireEvent.press(await screen.findByTestId(`map-marker-${center.id}`));
+  expect(screen.getByText("Sin calificaciones aún")).toBeTruthy();
+  fireEvent.press(screen.getByTestId("map-marker-popup-close"));
+
+  fireEvent.press(await screen.findByTestId(`map-marker-${firstPoint.id}`));
+  expect(screen.queryByTestId("map-marker-popup-rating")).toBeNull();
+});
+
 it("un clúster humano abre popup con el desglose pero sin VER MÁS", async () => {
   const onOpenPointDetail = jest.fn();
   renderPanel({ onOpenPointDetail });

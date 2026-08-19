@@ -4,6 +4,7 @@ import { font } from "../../typography";
 import { CountdownLabel } from "../help-requests/CountdownLabel";
 import type { ActiveHelpRequest } from "../help-requests/types";
 import type { ActiveFoodOffer } from "../food-offers/types";
+import { ratingSummaryLine } from "../aid-locations/ratingStars";
 import { categoryMeta } from "./categoryMeta";
 import { humanStatusMeta } from "./humanStatusMeta";
 import type { MapPointDetailPayload } from "./pointDetail";
@@ -68,6 +69,9 @@ interface PopupSummary {
   accentColor: string;
   eyebrow: string;
   title: string;
+  // CHG-166: promedio de estrellas de un acopio local, encima del
+  // resumen; null en las demás categorías.
+  ratingLine: string | null;
   description: string | null;
   metaLines: string[];
   expiresAt: string | null;
@@ -81,6 +85,13 @@ function summarize(target: MapMarkerPopupTarget): PopupSummary {
         accentColor: meta.color,
         eyebrow: meta.shortLabel.toUpperCase(),
         title: target.point.title,
+        ratingLine:
+          target.point.category === "collection_center"
+            ? ratingSummaryLine(
+                target.point.commentRatingAverage,
+                target.point.commentRatingCount,
+              )
+            : null,
         description: target.point.description,
         metaLines: [
           target.point.locationLabel,
@@ -93,6 +104,7 @@ function summarize(target: MapMarkerPopupTarget): PopupSummary {
       return {
         accentColor: colors.emergency,
         eyebrow: "NECESITAMOS AYUDA · SOLICITUD VIGENTE",
+        ratingLine: null,
         title: target.request.address,
         description: target.request.description,
         metaLines: [
@@ -106,6 +118,7 @@ function summarize(target: MapMarkerPopupTarget): PopupSummary {
       return {
         accentColor: categoryMeta.community_meal.color,
         eyebrow: "COMIDA COMUNITARIA · OFERTA VIGENTE",
+        ratingLine: null,
         title: target.offer.address,
         description: target.offer.description,
         metaLines: [],
@@ -117,6 +130,7 @@ function summarize(target: MapMarkerPopupTarget): PopupSummary {
         return {
           accentColor: colors.cyan,
           eyebrow: "GRUPO ANÓNIMO DE PERSONAS",
+          ratingLine: null,
           title: `${countFormatter.format(target.feature.count)} personas`,
           description:
             "El mapa se acerca para dividir el grupo en sus puntos.",
@@ -130,6 +144,7 @@ function summarize(target: MapMarkerPopupTarget): PopupSummary {
       return {
         accentColor: meta.color,
         eyebrow: "PUNTO PÚBLICO ANÓNIMO",
+        ratingLine: null,
         title: meta.singular,
         description: null,
         metaLines: [
@@ -181,6 +196,12 @@ export function MapMarkerPopup({
       <Text style={styles.title} numberOfLines={2}>
         {summary.title}
       </Text>
+      {/* CHG-166: promedio de estrellas del acopio, encima del resumen. */}
+      {summary.ratingLine && (
+        <Text style={styles.ratingLine} testID="map-marker-popup-rating">
+          {summary.ratingLine}
+        </Text>
+      )}
       {summary.description && (
         <Text style={styles.description} numberOfLines={3}>
           {summary.description}
@@ -259,6 +280,11 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   title: { color: colors.ink, fontSize: font(14), fontWeight: "800" },
+  ratingLine: {
+    color: colors.missing,
+    fontFamily: fontFamilies.mono,
+    fontSize: font(11),
+  },
   description: {
     color: colors.inkSoft,
     fontSize: font(11),

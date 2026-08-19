@@ -20,12 +20,19 @@ export interface AidLocationComment {
   authorDisplayName: string | null;
   actorKind: "anonymous" | "authenticated";
   content: string;
+  // CHG-166: 1-5; null en comentarios anteriores a la mejora.
+  rating: number | null;
   createdAt: string;
 }
 
 export interface AidLocationCommentsPage {
   items: AidLocationComment[];
   total: number;
+  // CHG-166: promedio (1 decimal) sobre los que calificaron; un
+  // backend viejo no envía los campos (quedan undefined) y se muestra
+  // «Sin calificaciones aún».
+  ratingAverage?: number | null;
+  ratingCount?: number;
 }
 
 export type AidLocationReportCategory =
@@ -77,6 +84,8 @@ export interface AidLocationCommunityDataSource {
   createComment(
     locationId: string,
     content: string,
+    // CHG-166: calificación 1-5 obligatoria en comentarios nuevos.
+    rating: number,
   ): Promise<AidLocationComment>;
   reportCenter(
     locationId: string,
@@ -160,13 +169,13 @@ const apiCommunityDataSource: AidLocationCommunityDataSource = {
       `/api/v1/aid-locations/${locationId}/comments`,
       { signal },
     ),
-  createComment: (locationId, content) =>
+  createComment: (locationId, content, rating) =>
     apiRequest<AidLocationComment>(
       `/api/v1/aid-locations/${locationId}/comments`,
       {
         method: "POST",
         headers: { "Idempotency-Key": createIdempotencyKey() },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, rating }),
       },
     ),
   reportCenter: async (locationId, draft) => {
@@ -194,6 +203,7 @@ function buildDemoComments(): AidLocationComment[] {
       authorDisplayName: "María Gómez",
       actorKind: "authenticated",
       content: "Hay disponibilidad para recibir ropa y alimentos.",
+      rating: 5,
       createdAt: "2026-08-19T01:14:00Z",
     },
     {
@@ -201,6 +211,7 @@ function buildDemoComments(): AidLocationComment[] {
       authorDisplayName: null,
       actorKind: "anonymous",
       content: "El punto continúa abierto.",
+      rating: 4,
       createdAt: "2026-08-19T00:52:00Z",
     },
   ];
@@ -223,15 +234,31 @@ const demoCommunityDataSource: AidLocationCommunityDataSource = {
     const items = [...demoCommentsFor(locationId)].sort((a, b) =>
       b.createdAt.localeCompare(a.createdAt),
     );
-    return { items, total: items.length };
+    // CHG-166: mismo promedio server-side que calcula el backend.
+    const rated = items.filter((comment) => comment.rating !== null);
+    const ratingAverage =
+      rated.length === 0
+        ? null
+        : Math.round(
+            (rated.reduce((sum, comment) => sum + (comment.rating ?? 0), 0) /
+              rated.length) *
+              10,
+          ) / 10;
+    return {
+      items,
+      total: items.length,
+      ratingAverage,
+      ratingCount: rated.length,
+    };
   },
-  async createComment(locationId, content) {
+  async createComment(locationId, content, rating) {
     const items = demoCommentsFor(locationId);
     const comment: AidLocationComment = {
       id: `demo-comment-${items.length + 1}-${locationId.slice(0, 4)}`,
       authorDisplayName: null,
       actorKind: "anonymous",
       content,
+      rating,
       // Posterior a los sembrados para conservar el orden DESC.
       createdAt: new Date(
         Date.parse("2026-08-19T02:00:00Z") + items.length * 60_000,

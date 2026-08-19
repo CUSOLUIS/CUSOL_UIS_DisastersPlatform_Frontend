@@ -21,6 +21,7 @@ import {
   type AidLocationCommunityDataSource,
   type AidLocationReportCategory,
 } from "./communityDataSource";
+import { ratingSummaryLine, starGlyphs } from "./ratingStars";
 
 // CHG-165 — En la vista completa de un Centro de Acopio Local
 // (/detalle-punto, CHG-164): COMENTAR y DENUNCIAR para cualquiera
@@ -42,7 +43,17 @@ function formatStamp(iso: string): string {
 type ListState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; items: AidLocationComment[]; total: number };
+  | {
+      status: "ready";
+      items: AidLocationComment[];
+      total: number;
+      // CHG-166: promedio de estrellas junto al título COMENTARIOS.
+      ratingAverage: number | null;
+      ratingCount: number;
+    };
+
+// CHG-166: valores del selector de estrellas del formulario.
+const ratingChoices = [1, 2, 3, 4, 5] as const;
 
 type OpenForm = "none" | "comment" | "report";
 
@@ -58,6 +69,7 @@ export function CollectionCenterCommunityPanel({
   });
   const [openForm, setOpenForm] = useState<OpenForm>("none");
   const [commentDraft, setCommentDraft] = useState("");
+  const [commentRating, setCommentRating] = useState<number | null>(null);
   const [reportCategory, setReportCategory] =
     useState<AidLocationReportCategory | null>(null);
   const [reportReason, setReportReason] = useState("");
@@ -73,6 +85,8 @@ export function CollectionCenterCommunityPanel({
         status: "ready",
         items: page.items,
         total: page.total,
+        ratingAverage: page.ratingAverage ?? null,
+        ratingCount: page.ratingCount ?? 0,
       });
     } catch (error: unknown) {
       setListState({
@@ -98,6 +112,10 @@ export function CollectionCenterCommunityPanel({
   const publishComment = async () => {
     const trimmed = commentDraft.trim();
     const issues: string[] = [];
+    // CHG-166: la calificación es obligatoria, como en el backend.
+    if (commentRating === null) {
+      issues.push("Elige una calificación de 1 a 5 estrellas.");
+    }
     if (trimmed.length < COMMENT_MIN_LENGTH) {
       issues.push(
         `El comentario necesita al menos ${COMMENT_MIN_LENGTH} caracteres.`,
@@ -107,11 +125,12 @@ export function CollectionCenterCommunityPanel({
       if (quality) issues.push(quality);
     }
     setFormErrors(issues);
-    if (issues.length > 0) return;
+    if (issues.length > 0 || commentRating === null) return;
     setBusy(true);
     try {
-      await dataSource.createComment(locationId, trimmed);
+      await dataSource.createComment(locationId, trimmed, commentRating);
       setCommentDraft("");
+      setCommentRating(null);
       setOpenForm("none");
       setNotice("Tu comentario quedó publicado.");
       await load();
@@ -209,6 +228,34 @@ export function CollectionCenterCommunityPanel({
 
       {openForm === "comment" && (
         <View style={styles.form} testID="center-comment-form">
+          {/* CHG-166: calificación 1-5 obligatoria antes de publicar. */}
+          <Text style={styles.formLabel}>Calificación</Text>
+          <View
+            accessibilityRole="radiogroup"
+            accessibilityLabel="Calificación del centro de 1 a 5 estrellas"
+            style={styles.starsRow}
+          >
+            {ratingChoices.map((value) => {
+              const selected = commentRating !== null && value <= commentRating;
+              return (
+                <Pressable
+                  key={value}
+                  accessibilityRole="radio"
+                  accessibilityLabel={`${value} de 5 estrellas`}
+                  accessibilityState={{ selected: commentRating === value }}
+                  onPress={() => setCommentRating(value)}
+                  style={styles.starButton}
+                  testID={`center-comment-star-${value}`}
+                >
+                  <Text
+                    style={[styles.starGlyph, selected && styles.starSelected]}
+                  >
+                    {selected ? "★" : "☆"}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
           <Text style={styles.formLabel}>Comentario</Text>
           <TextInput
             accessibilityLabel="Texto del comentario"
@@ -320,9 +367,20 @@ export function CollectionCenterCommunityPanel({
         </View>
       )}
 
-      <Text style={styles.sectionTitle} accessibilityRole="header">
-        COMENTARIOS
-      </Text>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle} accessibilityRole="header">
+          COMENTARIOS
+        </Text>
+        {/* CHG-166: promedio de estrellas de los comentarios. */}
+        {listState.status === "ready" && (
+          <Text
+            style={styles.ratingSummary}
+            testID="center-comments-average"
+          >
+            {ratingSummaryLine(listState.ratingAverage, listState.ratingCount)}
+          </Text>
+        )}
+      </View>
 
       {listState.status === "loading" && (
         <View style={styles.loadingRow} testID="center-comments-loading">
@@ -362,6 +420,17 @@ export function CollectionCenterCommunityPanel({
               <Text style={styles.commentAuthor}>
                 {comment.authorDisplayName ?? "Anónimo"}
               </Text>
+              {/* CHG-166: comentarios previos a la mejora no tienen
+                  estrellas y no muestran nada. */}
+              {comment.rating !== null && (
+                <Text
+                  style={styles.commentStars}
+                  accessibilityLabel={`Calificación: ${comment.rating} de 5 estrellas`}
+                  testID={`center-comment-rating-${comment.id}`}
+                >
+                  {starGlyphs(comment.rating)}
+                </Text>
+              )}
               <Text style={styles.commentDate}>
                 {formatStamp(comment.createdAt)}
               </Text>
@@ -513,12 +582,39 @@ const styles = StyleSheet.create({
   },
   categoryText: { color: colors.inkSoft, fontSize: font(12) },
   categoryTextSelected: { color: colors.emergency, fontWeight: "700" },
-  sectionTitle: {
+  sectionHeader: {
     marginTop: 6,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: 12,
+    rowGap: 2,
+  },
+  sectionTitle: {
     color: colors.ink,
     fontFamily: fontFamilies.mono,
     fontSize: font(12),
     fontWeight: "800",
+    letterSpacing: 1,
+  },
+  ratingSummary: {
+    color: colors.missing,
+    fontFamily: fontFamilies.mono,
+    fontSize: font(12),
+  },
+  starsRow: { flexDirection: "row", gap: 4 },
+  starButton: {
+    minWidth: 40,
+    minHeight: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 7,
+  },
+  starGlyph: { color: colors.inkDim, fontSize: font(22) },
+  starSelected: { color: colors.missing },
+  commentStars: {
+    color: colors.missing,
+    fontSize: font(12),
     letterSpacing: 1,
   },
   loadingRow: { flexDirection: "row", alignItems: "center", gap: 8 },

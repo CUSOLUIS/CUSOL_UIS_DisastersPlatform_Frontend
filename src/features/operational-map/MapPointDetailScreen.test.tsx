@@ -107,6 +107,48 @@ it("un centro de acopio local ofrece COMENTAR, DENUNCIAR y COMENTARIOS", async (
   expect(screen.getByTestId("center-report-button")).toBeTruthy();
 });
 
+// CHG-166 — La vista completa de un acopio local muestra la misma
+// línea de estrellas del popup; sin calificaciones lo dice en
+// palabras y las demás categorías no llevan la línea.
+it("un acopio local muestra el promedio de estrellas de sus comentarios", async () => {
+  render(
+    <MapPointDetailScreen
+      payload={{
+        kind: "operational",
+        point: {
+          ...point,
+          category: "collection_center",
+          commentRatingAverage: 4.2,
+          commentRatingCount: 8,
+        },
+      }}
+      onBack={jest.fn()}
+    />,
+  );
+  await screen.findByTestId("center-comments-average");
+
+  expect(screen.getByTestId("map-point-detail-rating")).toBeTruthy();
+  expect(screen.getByText("★★★★☆ 4,2 · 8 calificaciones")).toBeTruthy();
+});
+
+it("un acopio sin calificaciones dice que aún no tiene", async () => {
+  render(
+    <MapPointDetailScreen
+      payload={{
+        kind: "operational",
+        // Sin campos de calificación: caso de backend viejo (CHG-137).
+        point: { ...point, category: "collection_center" },
+      }}
+      onBack={jest.fn()}
+    />,
+  );
+  await screen.findByTestId("center-comments-average");
+
+  expect(
+    screen.getByTestId("map-point-detail-rating").props.children,
+  ).toBe("Sin calificaciones aún");
+});
+
 it("otros tipos de punto no llevan la sección comunitaria", () => {
   render(
     <MapPointDetailScreen
@@ -121,6 +163,7 @@ it("otros tipos de punto no llevan la sección comunitaria", () => {
   expect(
     screen.queryByTestId("collection-center-community-panel"),
   ).toBeNull();
+  expect(screen.queryByTestId("map-point-detail-rating")).toBeNull();
 });
 
 it("sin datos válidos explica la situación y VOLVER responde", () => {
