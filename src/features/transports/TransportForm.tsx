@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -43,6 +43,8 @@ import {
   MAX_SUPPLIES_LENGTH,
   MAX_VEHICLE_CHARACTERISTICS_LENGTH,
   PLATE_PATTERN,
+  VESSEL_REGISTRATION_PATTERN,
+  VESSEL_TYPES,
   normalizePlate,
   transportDriverCopy,
   transportFormCopy,
@@ -74,6 +76,10 @@ export const initialTransportDraft: TransportDraft = {
   driverPhone: "",
   tractorPlate: "",
   trailerPlate: "",
+  // CHG-173: identidad de la embarcación (lanchera).
+  vesselRegistration: "",
+  vesselName: "",
+  vesselType: "",
   vehicleVisibleCharacteristics: "",
 };
 
@@ -88,8 +94,12 @@ export interface TransportIssue {
 // reglas que aplicará el backend, avisadas antes del viaje.
 export function collectTransportIssues(
   draft: TransportDraft,
+  // CHG-173: el contrato del vehículo es condicional por tipo, así que
+  // la validación espejo también lo es.
+  kind: TransportKind = "mule",
 ): TransportIssue[] {
   const issues: TransportIssue[] = [];
+  const driverNoun = transportDriverCopy[kind].driverNoun;
   const push = (field: TransportIssueField, message: string) =>
     issues.push({ field, message });
 
@@ -118,38 +128,64 @@ export function collectTransportIssues(
   if (draft.driverFullName.trim().length < 3) {
     push(
       "driverFullName",
-      "Escribe el nombre completo de la persona que conduce.",
+      `Escribe el nombre completo de la persona que ${
+        kind === "boat" ? "pilota" : "conduce"
+      }.`,
     );
   }
   if (!draft.driverDocumentType) {
     push(
       "driverDocumentType",
-      "Elige el tipo de documento de quien conduce.",
+      `Elige el tipo de documento de ${driverNoun}.`,
     );
   }
   if (draft.driverDocumentNumber.trim().length < 3) {
     push(
       "driverDocumentNumber",
-      "Escribe el número de documento de quien conduce.",
+      `Escribe el número de documento de ${driverNoun}.`,
     );
   }
   if (!DRIVER_PHONE_PATTERN.test(draft.driverPhone.trim())) {
     push(
       "driverPhone",
-      "Escribe un número de contacto válido para quien conduce.",
+      `Escribe un número de contacto válido para ${driverNoun}.`,
     );
   }
-  if (!PLATE_PATTERN.test(normalizePlate(draft.tractorPlate))) {
-    push(
-      "tractorPlate",
-      "La placa debe tener entre 5 y 10 letras o números.",
-    );
-  }
-  if (!PLATE_PATTERN.test(normalizePlate(draft.trailerPlate))) {
-    push(
-      "trailerPlate",
-      "La placa del tráiler debe tener entre 5 y 10 letras o números.",
-    );
+  // CHG-173: la lanchera se identifica con matrícula, nombre y tipo de
+  // embarcación; la mulera, con sus dos placas.
+  if (kind === "boat") {
+    if (
+      !VESSEL_REGISTRATION_PATTERN.test(
+        normalizePlate(draft.vesselRegistration),
+      )
+    ) {
+      push(
+        "vesselRegistration",
+        "La matrícula de la embarcación debe tener entre 4 y 15 letras o números.",
+      );
+    }
+    if (draft.vesselName.trim().length < 3) {
+      push(
+        "vesselName",
+        "Escribe el nombre con el que se reconoce la embarcación.",
+      );
+    }
+    if (!draft.vesselType) {
+      push("vesselType", "Elige el tipo de embarcación.");
+    }
+  } else {
+    if (!PLATE_PATTERN.test(normalizePlate(draft.tractorPlate))) {
+      push(
+        "tractorPlate",
+        "La placa debe tener entre 5 y 10 letras o números.",
+      );
+    }
+    if (!PLATE_PATTERN.test(normalizePlate(draft.trailerPlate))) {
+      push(
+        "trailerPlate",
+        "La placa del tráiler debe tener entre 5 y 10 letras o números.",
+      );
+    }
   }
   const characteristics = draft.vehicleVisibleCharacteristics.trim();
   if (
@@ -158,7 +194,9 @@ export function collectTransportIssues(
   ) {
     push(
       "vehicleVisibleCharacteristics",
-      `Describe las características visibles del vehículo (5 a ${MAX_VEHICLE_CHARACTERISTICS_LENGTH} caracteres).`,
+      `Describe las características visibles de ${
+        kind === "boat" ? "la embarcación" : "el vehículo"
+      } (5 a ${MAX_VEHICLE_CHARACTERISTICS_LENGTH} caracteres).`,
     );
   }
   if (draft.suppliesSummary.trim().length > MAX_SUPPLIES_LENGTH) {
@@ -187,6 +225,9 @@ const FIELD_SECTIONS: Record<string, string> = {
   driverPhone: "03",
   tractorPlate: "04",
   trailerPlate: "04",
+  vesselRegistration: "04",
+  vesselName: "04",
+  vesselType: "04",
   vehicleVisibleCharacteristics: "04",
   suppliesSummary: "05",
   truthConfirmed: "06",
@@ -366,7 +407,7 @@ export function TransportForm({
   };
 
   const submit = async () => {
-    const issues = collectTransportIssues(draft);
+    const issues = collectTransportIssues(draft, kind);
     setFormErrors(issues.map((issue) => issue.message));
     setInvalidFields(new Set(issues.map((issue) => issue.field)));
     if (issues.length > 0) {
@@ -639,12 +680,15 @@ export function TransportForm({
                 </View>
                 <FormField
                   label="Nombre completo *"
+                  testID="field-driver-name"
                   invalid={invalidFields.has("driverFullName")}
                   value={draft.driverFullName}
                   maxLength={MAX_DRIVER_NAME_LENGTH}
                   onChangeText={(value) => setField("driverFullName", value)}
                 />
-                <View style={styles.field}>
+                {/* CHG-172: suelto en la columna para que los cuatro
+                    chips quepan en una línea sin quebrarse. */}
+                <View style={styles.fieldStandalone}>
                   <Text
                     style={[
                       styles.fieldLabel,
@@ -657,7 +701,7 @@ export function TransportForm({
                   <View
                     style={styles.documentTypeRow}
                     accessibilityRole="radiogroup"
-                    accessibilityLabel="Tipo de documento de quien conduce"
+                    accessibilityLabel={`Tipo de documento de ${transportDriverCopy[kind].driverNoun}`}
                   >
                     {DRIVER_DOCUMENT_TYPES.map((option) => {
                       const selected = draft.driverDocumentType === option;
@@ -689,24 +733,29 @@ export function TransportForm({
                     })}
                   </View>
                 </View>
-                <FormField
-                  label="Número de documento *"
-                  hint="Se guarda cifrado; no se publica"
-                  invalid={invalidFields.has("driverDocumentNumber")}
-                  value={draft.driverDocumentNumber}
-                  maxLength={MAX_DRIVER_DOCUMENT_LENGTH}
-                  onChangeText={(value) =>
-                    setField("driverDocumentNumber", value)
-                  }
-                />
-                <FormField
-                  label="Número de contacto *"
-                  hint="Se guarda cifrado; no se publica"
-                  invalid={invalidFields.has("driverPhone")}
-                  value={draft.driverPhone}
-                  maxLength={MAX_DRIVER_PHONE_LENGTH}
-                  onChangeText={(value) => setField("driverPhone", value)}
-                />
+                {/* CHG-172: dos campos cortos comparten línea cuando la
+                    pantalla da el ancho; en móvil la rejilla apila. */}
+                <FieldGrid>
+                  <FormField
+                    label="Número de documento *"
+                    testID="field-driver-document"
+                    hint="Se guarda cifrado; no se publica"
+                    invalid={invalidFields.has("driverDocumentNumber")}
+                    value={draft.driverDocumentNumber}
+                    maxLength={MAX_DRIVER_DOCUMENT_LENGTH}
+                    onChangeText={(value) =>
+                      setField("driverDocumentNumber", value)
+                    }
+                  />
+                  <FormField
+                    label="Número de contacto *"
+                    hint="Se guarda cifrado; no se publica"
+                    invalid={invalidFields.has("driverPhone")}
+                    value={draft.driverPhone}
+                    maxLength={MAX_DRIVER_PHONE_LENGTH}
+                    onChangeText={(value) => setField("driverPhone", value)}
+                  />
+                </FieldGrid>
               </FormSection>
 
               {/* CHG-171 §31-§35: identificación del vehículo. */}
@@ -718,28 +767,114 @@ export function TransportForm({
                 }
                 onPosition={registerSection}
               >
+                {/* CHG-173: la lanchera se identifica con la matrícula
+                    y el nombre del casco; la mulera, con sus dos
+                    placas (CHG-172: pareja corta en rejilla). */}
+                {kind === "boat" ? (
+                  <>
+                    <FieldGrid>
+                      <FormField
+                        label={
+                          transportVehicleCopy[kind].vesselRegistrationLabel ??
+                          ""
+                        }
+                        testID="field-vessel-registration"
+                        hint="La del registro fluvial"
+                        invalid={invalidFields.has("vesselRegistration")}
+                        value={draft.vesselRegistration}
+                        maxLength={20}
+                        onChangeText={(value) =>
+                          setField("vesselRegistration", value.toUpperCase())
+                        }
+                      />
+                      <FormField
+                        label={
+                          transportVehicleCopy[kind].vesselNameLabel ?? ""
+                        }
+                        testID="field-vessel-name"
+                        hint="El pintado en el casco"
+                        invalid={invalidFields.has("vesselName")}
+                        value={draft.vesselName}
+                        maxLength={120}
+                        onChangeText={(value) => setField("vesselName", value)}
+                      />
+                    </FieldGrid>
+                    <View style={styles.fieldStandalone}>
+                      <Text
+                        style={[
+                          styles.fieldLabel,
+                          invalidFields.has("vesselType") &&
+                            styles.fieldLabelInvalid,
+                        ]}
+                      >
+                        {transportVehicleCopy[kind].vesselTypeLabel}
+                      </Text>
+                      <View
+                        style={styles.documentTypeRow}
+                        accessibilityRole="radiogroup"
+                        accessibilityLabel="Tipo de embarcación"
+                      >
+                        {VESSEL_TYPES.map((option) => {
+                          const selected = draft.vesselType === option;
+                          return (
+                            <Pressable
+                              key={option}
+                              accessibilityRole="radio"
+                              accessibilityLabel={option}
+                              accessibilityState={{ selected }}
+                              onPress={() => setField("vesselType", option)}
+                              style={[
+                                styles.documentTypeChip,
+                                selected && styles.documentTypeChipSelected,
+                              ]}
+                              testID={`vessel-type-${option}`}
+                            >
+                              <Text
+                                style={[
+                                  styles.documentTypeText,
+                                  selected && styles.documentTypeTextSelected,
+                                ]}
+                              >
+                                {option}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  </>
+                ) : (
+                  <FieldGrid>
+                    <FormField
+                      label={
+                        transportVehicleCopy[kind].tractorPlateLabel ?? ""
+                      }
+                      testID="field-tractor-plate"
+                      hint="Ejemplo: ABC123"
+                      invalid={invalidFields.has("tractorPlate")}
+                      value={draft.tractorPlate}
+                      maxLength={12}
+                      onChangeText={(value) =>
+                        setField("tractorPlate", value.toUpperCase())
+                      }
+                    />
+                    <FormField
+                      label={
+                        transportVehicleCopy[kind].trailerPlateLabel ?? ""
+                      }
+                      hint="Distinta de la anterior"
+                      invalid={invalidFields.has("trailerPlate")}
+                      value={draft.trailerPlate}
+                      maxLength={12}
+                      onChangeText={(value) =>
+                        setField("trailerPlate", value.toUpperCase())
+                      }
+                    />
+                  </FieldGrid>
+                )}
                 <FormField
-                  label={transportVehicleCopy[kind].tractorPlateLabel}
-                  hint="Ejemplo: ABC123"
-                  invalid={invalidFields.has("tractorPlate")}
-                  value={draft.tractorPlate}
-                  maxLength={12}
-                  onChangeText={(value) =>
-                    setField("tractorPlate", value.toUpperCase())
-                  }
-                />
-                <FormField
-                  label={transportVehicleCopy[kind].trailerPlateLabel}
-                  hint="Distinta de la anterior"
-                  invalid={invalidFields.has("trailerPlate")}
-                  value={draft.trailerPlate}
-                  maxLength={12}
-                  onChangeText={(value) =>
-                    setField("trailerPlate", value.toUpperCase())
-                  }
-                />
-                <FormField
-                  label="Características visibles del vehículo *"
+                  label={transportVehicleCopy[kind].characteristicsLabel}
+                  testID="field-vehicle-characteristics"
                   hint={`Máximo ${MAX_VEHICLE_CHARACTERISTICS_LENGTH} caracteres`}
                   multiline
                   invalid={invalidFields.has("vehicleVisibleCharacteristics")}
@@ -748,7 +883,9 @@ export function TransportForm({
                   onChangeText={(value) =>
                     setField("vehicleVisibleCharacteristics", value)
                   }
-                  placeholder="Tractocamión blanco, tráiler gris, franja azul lateral..."
+                  placeholder={
+                    transportVehicleCopy[kind].characteristicsPlaceholder
+                  }
                 />
               </FormSection>
 
@@ -927,12 +1064,26 @@ function FormSection({
   );
 }
 
+// CHG-172: marca si un campo vive dentro de la rejilla (fila) o suelto
+// en la columna de la sección. El `flexBasis` de la rejilla solo es
+// correcto en fila; en columna reserva altura vacía bajo el input.
+const FieldGridContext = createContext(false);
+
+function FieldGrid({ children }: { children: React.ReactNode }) {
+  return (
+    <FieldGridContext.Provider value={true}>
+      <View style={styles.fieldGrid}>{children}</View>
+    </FieldGridContext.Provider>
+  );
+}
+
 function FormField({
   label,
   hint,
   multiline = false,
   invalid = false,
   placeholder = "Escribe aquí",
+  testID,
   ...inputProps
 }: {
   label: string;
@@ -943,9 +1094,16 @@ function FormField({
   maxLength?: number;
   invalid?: boolean;
   placeholder?: string;
+  testID?: string;
 }) {
+  const insideGrid = useContext(FieldGridContext);
+  // CHG-172: en rejilla, base horizontal; suelto, ancho completo y
+  // alto de contenido (la separación la da el `gap` de la sección).
+  const containerStyle = insideGrid
+    ? [styles.field, multiline && styles.fieldWide]
+    : styles.fieldStandalone;
   return (
-    <View style={[styles.field, multiline && styles.fieldWide]}>
+    <View style={containerStyle} testID={testID}>
       <View style={styles.fieldLabelRow}>
         <Text style={[styles.fieldLabel, invalid && styles.fieldLabelInvalid]}>
           {label}
@@ -1087,8 +1245,10 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   sectionBody: { gap: 24, padding: 20 },
+  fieldGrid: fieldGridLayout.grid,
   field: fieldGridLayout.field,
   fieldWide: fieldGridLayout.fieldWide,
+  fieldStandalone: fieldGridLayout.fieldStandalone,
   fieldLabelRow: {
     flexDirection: "row",
     alignItems: "center",

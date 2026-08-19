@@ -29,6 +29,7 @@ export const fieldGridLayout: {
   grid: ViewStyle;
   field: ViewStyle;
   fieldWide: ViewStyle;
+  fieldStandalone: ViewStyle;
 } = {
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   field: {
@@ -41,4 +42,16 @@ export const fieldGridLayout: {
   },
   // Campos que ocupan la línea entera (textos largos, mapas).
   fieldWide: { flexBasis: "100%" },
+  /**
+   * CHG-145 / CHG-172 — Campo suelto en la columna de la sección.
+   *
+   * Los estilos de arriba solo valen dentro de la rejilla, que es un
+   * contenedor en fila: allí `flexBasis` es el ancho al que aspira el
+   * campo. Como hijo directo de una columna, ese mismo `flexBasis` se
+   * mide en el eje vertical y reserva altura vacía bajo el input
+   * (`flexGrow` la estira todavía más). El campo autónomo ocupa el
+   * ancho completo con el alto de su contenido, y la separación entre
+   * bloques la da el `gap` de la sección.
+   */
+  fieldStandalone: { alignSelf: "stretch", gap: 7 },
 };

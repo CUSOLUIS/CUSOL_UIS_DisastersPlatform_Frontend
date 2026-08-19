@@ -50,16 +50,24 @@ export function buildTransportPayload(
     destinationMunicipality: draft.destinationMunicipality.trim(),
     originLocationId: draft.originLocationId.trim(),
     destinationLocationId: draft.destinationLocationId.trim(),
-    // CHG-171: conductor y tractocamión (validación espejo backend).
+    // CHG-171: conductor (validación espejo backend).
     driverFullName: draft.driverFullName.trim(),
     driverDocumentType: draft.driverDocumentType,
     driverDocumentNumber: draft.driverDocumentNumber.trim(),
     driverPhone: draft.driverPhone.trim(),
-    tractorPlate: normalizePlate(draft.tractorPlate),
-    trailerPlate: normalizePlate(draft.trailerPlate),
     vehicleVisibleCharacteristics:
       draft.vehicleVisibleCharacteristics.trim(),
   };
+  // CHG-173: cada medio manda lo suyo y nada del otro — el backend
+  // rechaza con 422 cualquier mezcla.
+  if (kind === "boat") {
+    payload.vesselRegistration = normalizePlate(draft.vesselRegistration);
+    payload.vesselName = draft.vesselName.trim();
+    payload.vesselType = draft.vesselType;
+  } else {
+    payload.tractorPlate = normalizePlate(draft.tractorPlate);
+    payload.trailerPlate = normalizePlate(draft.trailerPlate);
+  }
   const suppliesSummary = draft.suppliesSummary.trim();
   if (suppliesSummary) payload.suppliesSummary = suppliesSummary;
   return payload;

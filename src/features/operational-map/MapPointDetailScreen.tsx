@@ -255,6 +255,8 @@ function buildContent(payload: MapPointDetailPayload): DetailContent {
       }
       // §30: identificación VISIBLE del vehículo, jamás los datos del
       // conductor.
+      // CHG-173: cada medio se identifica con lo suyo — la mulera con
+      // sus placas, la lanchera con la matrícula y el nombre del casco.
       if (transport.tractorPlate) {
         rows.push({ label: "Placa", value: transport.tractorPlate });
       }
@@ -262,6 +264,18 @@ function buildContent(payload: MapPointDetailPayload): DetailContent {
         rows.push({
           label: "Placa del tráiler",
           value: transport.trailerPlate,
+        });
+      }
+      if (transport.vesselName) {
+        rows.push({ label: "Embarcación", value: transport.vesselName });
+      }
+      if (transport.vesselType) {
+        rows.push({ label: "Tipo", value: transport.vesselType });
+      }
+      if (transport.vesselRegistration) {
+        rows.push({
+          label: "Matrícula",
+          value: transport.vesselRegistration,
         });
       }
       rows.push({ label: "Registrado", value: formatDate(transport.createdAt) });

@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 import type { AuthenticatedAccount } from "../auth/types";
 import type { AidLocationParentCandidate } from "../aid-locations/types";
 import {
@@ -388,5 +389,150 @@ describe("TransportForm (CHG-161/CHG-171)", () => {
         ).toBeTruthy(),
       { timeout: 3000 },
     );
+  });
+});
+
+// CHG-172: los campos del conductor y del vehículo colgaban directos de
+// la columna de la sección llevando el `flexBasis` de la rejilla, que en
+// el eje vertical reserva altura vacía bajo cada input.
+describe("Campos sin altura fantasma (CHG-172)", () => {
+  const renderForm = async () => {
+    render(
+      <TransportForm
+        kind="mule"
+        onBack={jest.fn()}
+        sessionSource={authenticatedSession}
+        loadCenterCandidates={jest.fn().mockResolvedValue([])}
+        loadCities={loadCities}
+      />,
+    );
+    await screen.findByTestId("origin-city-input");
+  };
+
+  it.each([
+    ["field-driver-name"],
+    ["field-vehicle-characteristics"],
+  ])("el campo suelto %s ocupa el ancho sin flexBasis", async (testID) => {
+    await renderForm();
+
+    const style = StyleSheet.flatten(screen.getByTestId(testID).props.style);
+
+    expect(style.flexBasis).toBeUndefined();
+    expect(style.flexGrow).toBeUndefined();
+    expect(style.alignSelf).toBe("stretch");
+  });
+
+  it.each([
+    ["field-driver-document"],
+    ["field-tractor-plate"],
+  ])("el campo %s de la rejilla conserva su base horizontal", async (testID) => {
+    await renderForm();
+
+    const style = StyleSheet.flatten(screen.getByTestId(testID).props.style);
+
+    expect(style.flexBasis).toBe(250);
+  });
+});
+
+// CHG-173: la lanchera se identifica con matrícula, nombre y tipo de
+// embarcación, no con placas prestadas del tractocamión.
+const validBoatDraft = {
+  ...initialTransportDraft,
+  originMunicipality: "Bucaramanga",
+  originLocationId: ORIGIN_CENTER.id,
+  destinationMunicipality: "Mompós",
+  destinationLocationId: DESTINATION_CENTER.id,
+  driverFullName: "Rosa Elena Payares",
+  driverDocumentType: "Cédula de ciudadanía" as const,
+  driverDocumentNumber: "1098765432",
+  driverPhone: "+57 300 123 4567",
+  vesselRegistration: "cp-05-1234",
+  vesselName: "La Golondrina",
+  vesselType: "Chalupa" as const,
+  vehicleVisibleCharacteristics:
+    "Chalupa blanca con techo azul y franja amarilla.",
+  truthConfirmed: true,
+};
+
+describe("La lanchera con identidad propia (CHG-173)", () => {
+  it("acepta un borrador de lanchera sin placas de camión", () => {
+    expect(collectTransportIssues(validBoatDraft, "boat")).toEqual([]);
+  });
+
+  it("exige matrícula, nombre y tipo de embarcación, nunca placas", () => {
+    const fields = collectTransportIssues(initialTransportDraft, "boat").map(
+      (issue) => issue.field,
+    );
+
+    expect(fields).toEqual([
+      "originMunicipality",
+      "originLocationId",
+      "destinationMunicipality",
+      "destinationLocationId",
+      "driverFullName",
+      "driverDocumentType",
+      "driverDocumentNumber",
+      "driverPhone",
+      "vesselRegistration",
+      "vesselName",
+      "vesselType",
+      "vehicleVisibleCharacteristics",
+      "truthConfirmed",
+    ]);
+    expect(fields).not.toContain("tractorPlate");
+    expect(fields).not.toContain("trailerPlate");
+  });
+
+  it("habla de quien pilota y de la embarcación en los errores", () => {
+    const messages = collectTransportIssues(initialTransportDraft, "boat").map(
+      (issue) => issue.message,
+    );
+
+    expect(messages.join(" ")).toContain("quien pilota");
+    expect(messages.join(" ")).toContain("de la embarcación");
+    expect(messages.join(" ")).not.toContain("conduce");
+  });
+
+  it("envía la identidad de la embarcación y ninguna placa", () => {
+    const payload = buildTransportPayload("boat", validBoatDraft);
+
+    // La matrícula se normaliza como una placa, con el rango fluvial.
+    expect(payload.vesselRegistration).toBe("CP051234");
+    expect(payload.vesselName).toBe("La Golondrina");
+    expect(payload.vesselType).toBe("Chalupa");
+    expect(payload.tractorPlate).toBeUndefined();
+    expect(payload.trailerPlate).toBeUndefined();
+  });
+
+  it("la mulera sigue enviando sus dos placas y nada de embarcación", () => {
+    const payload = buildTransportPayload("mule", validDraft);
+
+    expect(payload.tractorPlate).toBe("ABC123");
+    expect(payload.trailerPlate).toBe("R99881");
+    expect(payload.vesselRegistration).toBeUndefined();
+    expect(payload.vesselName).toBeUndefined();
+    expect(payload.vesselType).toBeUndefined();
+  });
+
+  it("en pantalla pide los campos de la lancha y el resto del flujo de la mulera", async () => {
+    render(
+      <TransportForm
+        kind="boat"
+        onBack={jest.fn()}
+        sessionSource={authenticatedSession}
+        loadCenterCandidates={jest.fn().mockResolvedValue([])}
+        loadCities={loadCities}
+      />,
+    );
+    await screen.findByTestId("origin-city-input");
+
+    expect(screen.getByTestId("field-vessel-registration")).toBeTruthy();
+    expect(screen.getByTestId("field-vessel-name")).toBeTruthy();
+    expect(screen.getByTestId("vessel-type-Chalupa")).toBeTruthy();
+    expect(screen.queryByTestId("field-tractor-plate")).toBeNull();
+    // Lo demás de la mulera sigue ahí, adaptado: quien pilota y el
+    // aviso del GPS.
+    expect(screen.getByText("Datos de quien pilota")).toBeTruthy();
+    expect(screen.getByText(/el GPS de este teléfono se activará/i)).toBeTruthy();
   });
 });

@@ -1138,7 +1138,7 @@ const styles = StyleSheet.create({
   // y alto de contenido, sin el `flexBasis` de la rejilla (que en el
   // eje vertical reservaba/solapaba altura). La separación entre
   // bloques la da el `gap` de `sectionBody`.
-  fieldStandalone: { alignSelf: "stretch", gap: 7 },
+  fieldStandalone: fieldGridLayout.fieldStandalone,
   fieldLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   fieldLabel: { color: colors.inkSoft, fontSize: 10, fontWeight: "700" },
   fieldHint: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: 8 },

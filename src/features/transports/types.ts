@@ -42,6 +42,25 @@ export function normalizePlate(value: string): string {
   return value.trim().toUpperCase().replace(/[\s-]+/g, "");
 }
 
+// CHG-173 — Catálogo cerrado de embarcaciones fluviales, espejo del
+// backend (`TransportVesselType`).
+export const VESSEL_TYPES = [
+  "Lancha",
+  "Chalupa",
+  "Bongo",
+  "Planchón",
+  "Ferri",
+] as const;
+
+export type VesselType = (typeof VESSEL_TYPES)[number];
+
+/**
+ * La matrícula fluvial se normaliza como una placa (mayúsculas, sin
+ * espacios ni guiones) pero admite de 4 a 15 alfanuméricos: los
+ * registros de río no siguen el formato de placa terrestre.
+ */
+export const VESSEL_REGISTRATION_PATTERN = /^[A-Z0-9]{4,15}$/;
+
 export interface TransportDraft {
   originMunicipality: string;
   originLocationId: string;
@@ -54,8 +73,14 @@ export interface TransportDraft {
   driverDocumentType: DriverDocumentType | "";
   driverDocumentNumber: string;
   driverPhone: string;
+  // Identificación del vehículo terrestre: solo la mulera.
   tractorPlate: string;
   trailerPlate: string;
+  // CHG-173: identidad propia de la embarcación: solo la lanchera.
+  vesselRegistration: string;
+  vesselName: string;
+  vesselType: VesselType | "";
+  // Compartido por los dos medios, con etiqueta propia en cada uno.
   vehicleVisibleCharacteristics: string;
 }
 
@@ -99,6 +124,10 @@ export interface ActiveTransport {
   suppliesSummary: string | null;
   tractorPlate: string | null;
   trailerPlate: string | null;
+  // CHG-173: identificación visible de la embarcación.
+  vesselRegistration: string | null;
+  vesselName: string | null;
+  vesselType: string | null;
   vehicleVisibleCharacteristics: string | null;
   departedAt: string | null;
   arrivedAt: string | null;
@@ -153,8 +182,15 @@ export const transportFormCopy: Record<TransportKind, TransportFormCopy> = {
 export interface TransportVehicleCopy {
   sectionTitle: string;
   sectionDescription: string;
-  tractorPlateLabel: string;
-  trailerPlateLabel: string;
+  characteristicsLabel: string;
+  characteristicsPlaceholder: string;
+  // CHG-173: cada medio identifica lo suyo. La mulera trae las dos
+  // placas; la lanchera, matrícula, nombre y tipo de embarcación.
+  tractorPlateLabel?: string;
+  trailerPlateLabel?: string;
+  vesselRegistrationLabel?: string;
+  vesselNameLabel?: string;
+  vesselTypeLabel?: string;
 }
 
 export const transportVehicleCopy: Record<
@@ -165,15 +201,22 @@ export const transportVehicleCopy: Record<
     sectionTitle: "Datos del tractocamión",
     sectionDescription:
       "Información que permite identificar visual y administrativamente el vehículo que transporta los suministros.",
+    characteristicsLabel: "Características visibles del vehículo *",
+    characteristicsPlaceholder:
+      "Tractocamión blanco, tráiler gris, franja azul lateral...",
     tractorPlateLabel: "Placa del tractocamión *",
     trailerPlateLabel: "Placa del tráiler *",
   },
   boat: {
     sectionTitle: "Datos de la embarcación",
     sectionDescription:
-      "Información que permite identificar visual y administrativamente la embarcación que transporta los suministros.",
-    tractorPlateLabel: "Matrícula de la lancha *",
-    trailerPlateLabel: "Matrícula del remolque o planchón *",
+      "Información que permite identificar visual y administrativamente la embarcación que transporta los suministros por el río.",
+    characteristicsLabel: "Características visibles de la embarcación *",
+    characteristicsPlaceholder:
+      "Chalupa blanca, techo azul, franja amarilla, motor fuera de borda...",
+    vesselRegistrationLabel: "Matrícula de la embarcación *",
+    vesselNameLabel: "Nombre de la embarcación *",
+    vesselTypeLabel: "Tipo de embarcación *",
   },
 };
 
@@ -182,9 +225,16 @@ export const transportVehicleCopy: Record<
 // pedido del usuario).
 export const transportDriverCopy: Record<
   TransportKind,
-  { sectionTitle: string; sectionDescription: string; gpsNotice: string }
+  {
+    sectionTitle: string;
+    sectionDescription: string;
+    gpsNotice: string;
+    // CHG-173: cómo se nombra a esa persona en avisos y errores.
+    driverNoun: string;
+  }
 > = {
   mule: {
+    driverNoun: "quien conduce",
     sectionTitle: "Datos del conductor",
     sectionDescription:
       "Información de la persona responsable de conducir el vehículo durante este traslado.",
@@ -192,6 +242,7 @@ export const transportDriverCopy: Record<
       "Importante: quien registra la mulera DEBE ser la persona que conduce, y debe hacerlo desde el celular del conductor. Al registrar, el GPS de este teléfono se activará para mostrar en el mapa la trayectoria de la mula, su salida y su llegada.",
   },
   boat: {
+    driverNoun: "quien pilota",
     sectionTitle: "Datos de quien pilota",
     sectionDescription:
       "Información de la persona responsable de pilotar la embarcación durante este traslado.",
