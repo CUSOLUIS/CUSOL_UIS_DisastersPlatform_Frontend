@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { App } from "../App";
+import { encodeMapPointDetail } from "../features/operational-map/pointDetail";
 
 export default function HomeRoute() {
   const router = useRouter();
@@ -34,6 +35,13 @@ export default function HomeRoute() {
       onReportDamagedHome={() => router.push("/reportar-casita-partida")}
       onRequestHelp={() => router.push("/necesitamos-ayuda")}
       onOfferCommunityMeals={() => router.push("/ofrecer-comida")}
+      // CHG-164: «VER MÁS» del popup de un marcador → vista completa.
+      onOpenMapPointDetail={(payload) =>
+        router.push({
+          pathname: "/detalle-punto",
+          params: { datos: encodeMapPointDetail(payload) },
+        })
+      }
       initialDirectorySearch={typeof buscar === "string" ? buscar : undefined}
     />
   );

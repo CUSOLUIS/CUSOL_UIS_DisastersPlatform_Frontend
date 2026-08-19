@@ -991,8 +991,13 @@ describe("App universal", () => {
         name: /Grupo de 650 personas.*seleccionar para acercar/,
       }),
     );
-    expect(await screen.findByText("650 personas")).toBeTruthy();
+    // CHG-164: el texto aparece en el detalle inline y también en el
+    // popup de resumen del marcador.
+    expect((await screen.findAllByText("650 personas")).length).toBeGreaterThan(
+      0,
+    );
     expect(screen.getByTestId("human-map-cluster-detail")).toBeTruthy();
+    expect(screen.getByTestId("map-marker-popup")).toBeTruthy();
     await act(async () => Promise.resolve());
   });
 

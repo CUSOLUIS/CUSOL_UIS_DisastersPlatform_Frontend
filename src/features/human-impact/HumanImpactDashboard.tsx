@@ -45,6 +45,7 @@ import type { HelpRequestsDataSource } from "../help-requests/types";
 import type { FoodOffersDataSource } from "../food-offers/types";
 import { ReportActions } from "../missing-persons/MissingPersonCommandCenter";
 import { OperationalMapPanel } from "../operational-map/OperationalMapPanel";
+import type { MapPointDetailPayload } from "../operational-map/pointDetail";
 import {
   MapScrollLockProvider,
   useMapScrollLockController,
@@ -98,6 +99,8 @@ interface HumanImpactDashboardProps {
   // CHG-051: sesión activa visible en el encabezado, con cierre.
   account?: AuthenticatedAccount | null;
   onLogout?: () => void;
+  // CHG-164: «VER MÁS» del popup de un marcador del mapa.
+  onOpenMapPointDetail?: (payload: MapPointDetailPayload) => void;
 }
 
 const numberFormatter = new Intl.NumberFormat("es-CO");
@@ -226,6 +229,7 @@ export function HumanImpactDashboard({
   onOpenAdmin,
   account = null,
   onLogout = () => undefined,
+  onOpenMapPointDetail,
 }: HumanImpactDashboardProps) {
   const { height, width } = useWindowDimensions();
   const tablet = shouldStackPriorityLayout(width);
@@ -498,6 +502,7 @@ export function HumanImpactDashboard({
                 helpRequests={helpRequestsState.items}
                 helpRequestActions={helpRequestActions}
                 foodOffers={foodOffersState.items}
+                onOpenPointDetail={onOpenMapPointDetail}
               />
             </View>
 

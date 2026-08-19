@@ -30,6 +30,8 @@ import type { HumanStatus } from "../human-impact/types";
 import { categoryMeta } from "./categoryMeta";
 import { CategoryMarkerIcon } from "./CategoryMarkerIcon";
 import { humanStatusMeta } from "./humanStatusMeta";
+import { MapMarkerPopup, type MapMarkerPopupTarget } from "./MapMarkerPopup";
+import type { MapPointDetailPayload } from "./pointDetail";
 import { OperationalMapCanvas } from "./OperationalMapCanvas";
 import type {
   HumanMapDataSource,
@@ -120,6 +122,10 @@ interface OperationalMapPanelProps {
   // CHG-163: ofertas de comida vigentes fusionadas en cliente como
   // marcadores `community_meal`; misma regla de expiración server-side.
   foodOffers?: ActiveFoodOffer[];
+  // CHG-164: «VER MÁS» del popup de un marcador abre la vista de
+  // información completa (/detalle-punto); sin el callback, el popup
+  // solo resume y cierra.
+  onOpenPointDetail?: (payload: MapPointDetailPayload) => void;
 }
 
 const INITIAL_HUMAN_VIEWPORT: HumanMapViewport = {
@@ -151,6 +157,7 @@ export function OperationalMapPanel({
   helpRequests = [],
   helpRequestActions,
   foodOffers = [],
+  onOpenPointDetail,
 }: OperationalMapPanelProps) {
   const [loadState, setLoadState] = useState<MapLoadState>(() =>
     dataSource.initialOverview
@@ -278,6 +285,7 @@ export function OperationalMapPanel({
       helpRequests={helpRequests}
       helpRequestActions={helpRequestActions}
       foodOffers={foodOffers}
+      onOpenPointDetail={onOpenPointDetail}
       activeCategories={activeCategories}
       setActiveCategories={setActiveCategories}
       selectedId={selectedId}
@@ -302,6 +310,7 @@ function MapContent({
   helpRequests,
   helpRequestActions,
   foodOffers,
+  onOpenPointDetail,
   activeCategories,
   setActiveCategories,
   selectedId,
@@ -322,6 +331,7 @@ function MapContent({
   helpRequests: ActiveHelpRequest[];
   helpRequestActions?: HelpRequestMapActions;
   foodOffers: ActiveFoodOffer[];
+  onOpenPointDetail?: (payload: MapPointDetailPayload) => void;
   activeCategories: OperationalMapCategory[];
   setActiveCategories: React.Dispatch<React.SetStateAction<OperationalMapCategory[]>>;
   selectedId: string | null;
@@ -388,19 +398,44 @@ function MapContent({
   // CHG-148: la solicitud cuya ventana de acción está abierta (solo al
   // tocar explícitamente su marcador; nunca por la selección inicial).
   const [actionRequestId, setActionRequestId] = useState<string | null>(null);
+  // CHG-164: el popup de resumen del marcador tocado. Guarda el
+  // registro (no el id): sigue legible aunque el punto salga del
+  // overview o el clúster se reparta en el siguiente refresco.
+  const [popupTarget, setPopupTarget] = useState<MapMarkerPopupTarget | null>(
+    null,
+  );
   const handleSelect = useCallback(
     (pointId: string) => {
       setSelectedId(pointId);
-      const rawId = helpRequestIdFromPointId(pointId);
-      if (
-        helpRequestActions &&
-        rawId &&
-        helpRequests.some((request) => request.id === rawId)
-      ) {
-        setActionRequestId(rawId);
+      const point = mergedItems.find((item) => item.id === pointId);
+      if (!point) {
+        return;
       }
+      const rawHelpId = helpRequestIdFromPointId(pointId);
+      const request = rawHelpId
+        ? (helpRequests.find((item) => item.id === rawHelpId) ?? null)
+        : null;
+      if (request && helpRequestActions) {
+        // CHG-148: con acciones disponibles, la solicitud conserva su
+        // ventana de acción (ya es un popup con info, VER MÁS y
+        // cierre); no se le superpone el popup genérico.
+        setPopupTarget(null);
+        setActionRequestId(request.id);
+        return;
+      }
+      if (request) {
+        setPopupTarget({ kind: "help_request", request });
+        return;
+      }
+      const rawFoodId = foodOfferIdFromPointId(pointId);
+      const offer = rawFoodId
+        ? (foodOffers.find((item) => item.id === rawFoodId) ?? null)
+        : null;
+      setPopupTarget(
+        offer ? { kind: "food_offer", offer } : { kind: "operational", point },
+      );
     },
-    [setSelectedId, helpRequestActions, helpRequests],
+    [setSelectedId, helpRequestActions, helpRequests, foodOffers, mergedItems],
   );
   const actionRequest = useMemo(
     () =>
@@ -419,6 +454,25 @@ function MapContent({
   const selectedHumanFeature =
     humanFeatures.find((feature) => feature.id === selectedHumanFeatureId) ??
     null;
+  // CHG-164: tocar un punto o clúster de la capa humana también abre
+  // su popup de resumen (los clústeres, sin «VER MÁS»: son anónimos).
+  const handleSelectHumanFeature = useCallback(
+    (featureId: string) => {
+      setSelectedHumanFeatureId(featureId);
+      const feature = humanFeatures.find((item) => item.id === featureId);
+      if (feature) {
+        setPopupTarget({ kind: "human", feature });
+      }
+    },
+    [setSelectedHumanFeatureId, humanFeatures],
+  );
+  const handleViewMore = useCallback(
+    (payload: MapPointDetailPayload) => {
+      setPopupTarget(null);
+      onOpenPointDetail?.(payload);
+    },
+    [onOpenPointDetail],
+  );
 
   const toggleCategory = (category: OperationalMapCategory) => {
     setActiveCategories((current) =>
@@ -442,17 +496,28 @@ function MapContent({
             : "OPERATIVO"
       }
     >
-      <OperationalMapCanvas
-        points={visiblePoints}
-        selectedId={selectedPoint?.id ?? null}
-        onSelect={handleSelect}
-        compact={compact}
-        canvasMinHeight={canvasMinHeight}
-        humanFeatures={humanFeatures}
-        selectedHumanFeatureId={selectedHumanFeature?.id ?? null}
-        onSelectHumanFeature={setSelectedHumanFeatureId}
-        onViewportChange={onViewportChange}
-      />
+      {/* CHG-164: el popup de resumen vive sobre el lienzo, para que
+          el «VER MÁS» y la «X» queden junto al marcador tocado. */}
+      <View style={styles.canvasWrap}>
+        <OperationalMapCanvas
+          points={visiblePoints}
+          selectedId={selectedPoint?.id ?? null}
+          onSelect={handleSelect}
+          compact={compact}
+          canvasMinHeight={canvasMinHeight}
+          humanFeatures={humanFeatures}
+          selectedHumanFeatureId={selectedHumanFeature?.id ?? null}
+          onSelectHumanFeature={handleSelectHumanFeature}
+          onViewportChange={onViewportChange}
+        />
+        {popupTarget && (
+          <MapMarkerPopup
+            target={popupTarget}
+            onClose={() => setPopupTarget(null)}
+            onViewMore={onOpenPointDetail ? handleViewMore : undefined}
+          />
+        )}
+      </View>
 
       <HumanMapControls
         activeStatuses={activeHumanStatuses}
@@ -540,6 +605,19 @@ function MapContent({
           onLogin={helpRequestActions.onLogin}
           onRegister={helpRequestActions.onRegister}
           pickPhoto={helpRequestActions.pickPhoto}
+          // CHG-164: también la ventana de acción ofrece la vista de
+          // información completa de la solicitud.
+          onViewMore={
+            onOpenPointDetail
+              ? () => {
+                  setActionRequestId(null);
+                  onOpenPointDetail({
+                    kind: "help_request",
+                    request: actionRequest,
+                  });
+                }
+              : undefined
+          }
         />
       )}
 
@@ -857,6 +935,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(7, 12, 22, 0.94)",
   },
   panelCompact: { width: "100%", padding: 10 },
+  // CHG-164: contenedor del lienzo para anclar el popup del marcador.
+  canvasWrap: { position: "relative", width: "100%" },
   heading: {
     flexDirection: "row",
     alignItems: "center",

@@ -48,6 +48,8 @@ export interface HelpRequestActionSheetProps {
   // Selector de foto opcional del voluntario (inyectable en pruebas).
   pickPhoto?: () => Promise<SelectedPhoto[]>;
   submitVolunteer?: typeof submitHelpRequestVolunteer;
+  // CHG-164: abre la vista de información completa de la solicitud.
+  onViewMore?: () => void;
 }
 
 const initialDraft: HelpRequestVolunteerDraft = {
@@ -67,6 +69,7 @@ export function HelpRequestActionSheet({
   onRegister,
   pickPhoto,
   submitVolunteer = submitHelpRequestVolunteer,
+  onViewMore,
 }: HelpRequestActionSheetProps) {
   const [count, setCount] = useState(request.attendersCount);
   const [busy, setBusy] = useState(false);
@@ -186,6 +189,20 @@ export function HelpRequestActionSheet({
                 {attendersLabel(count)}
               </Text>
             </View>
+
+            {/* CHG-164: información completa de la solicitud, para
+                cualquier visitante (anónimo o con cuenta). */}
+            {onViewMore && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Ver más información de la solicitud"
+                onPress={onViewMore}
+                style={styles.viewMoreButton}
+                testID="action-sheet-view-more"
+              >
+                <Text style={styles.viewMoreText}>VER MÁS</Text>
+              </Pressable>
+            )}
 
             {done ? (
               <View style={styles.confirmation} accessibilityRole="alert">
@@ -430,6 +447,22 @@ const styles = StyleSheet.create({
   fieldInputInvalid: {
     borderColor: colors.reported,
     backgroundColor: "rgba(255,103,136,0.06)",
+  },
+  // CHG-164: acceso a la vista de información completa.
+  viewMoreButton: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: colors.cyan,
+    borderRadius: 6,
+  },
+  viewMoreText: {
+    color: colors.cyan,
+    fontFamily: fontFamilies.mono,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.8,
   },
   photoButton: {
     minHeight: 46,

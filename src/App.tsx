@@ -35,6 +35,7 @@ import type {
   HumanMapDataSource,
   OperationalMapDataSource,
 } from "./features/operational-map/types";
+import type { MapPointDetailPayload } from "./features/operational-map/pointDetail";
 import {
   CHANGE_SIGNAL_INTERVAL_MS,
   changeSignalSource,
@@ -81,6 +82,9 @@ interface AppProps {
   onAbout?: () => void;
   // CHG-139: abre /administracion desde Mi espacio (super_admin).
   onOpenAdmin?: () => void;
+  // CHG-164: «VER MÁS» del popup de un marcador del mapa abre
+  // /detalle-punto con el registro serializado.
+  onOpenMapPointDetail?: (payload: MapPointDetailPayload) => void;
   // CHG-091: deep link ?buscar= hacia el buscador del directorio.
   initialDirectorySearch?: string;
   // CHG-051: origen de la sesión (inyectable en pruebas).
@@ -114,6 +118,7 @@ export function App({
   onRegister = () => undefined,
   onAbout = () => undefined,
   onOpenAdmin,
+  onOpenMapPointDetail = () => undefined,
   initialDirectorySearch,
   authSource = authDataSource,
   changeSignal = changeSignalSource,
@@ -205,6 +210,7 @@ export function App({
         onRegister={onRegister}
         onAbout={onAbout}
         onOpenAdmin={onOpenAdmin}
+        onOpenMapPointDetail={onOpenMapPointDetail}
         initialDirectorySearch={initialDirectorySearch}
         sessionAccount={sessionAccount}
         onLogout={logout}
@@ -241,6 +247,7 @@ function DashboardLoader({
   onRegister,
   onAbout,
   onOpenAdmin,
+  onOpenMapPointDetail,
   sessionAccount,
   initialDirectorySearch,
   onLogout,
@@ -270,6 +277,8 @@ function DashboardLoader({
   onAbout: () => void;
   // CHG-139: abre /administracion desde Mi espacio (super_admin).
   onOpenAdmin?: () => void;
+  // CHG-164: «VER MÁS» de un marcador del mapa.
+  onOpenMapPointDetail: (payload: MapPointDetailPayload) => void;
   initialDirectorySearch?: string;
   sessionAccount: AuthenticatedAccount | null;
   onLogout: () => void;
@@ -394,6 +403,7 @@ function DashboardLoader({
       onRegister={onRegister}
       onAbout={onAbout}
       onOpenAdmin={onOpenAdmin}
+      onOpenMapPointDetail={onOpenMapPointDetail}
       account={sessionAccount}
       onLogout={onLogout}
     />
