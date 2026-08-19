@@ -14,6 +14,21 @@ const configuredApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.replace(
 const apiBaseUrl =
   configuredApiBaseUrl ?? (Platform.OS === "web" ? "" : undefined);
 
+// CHG-168 — Alcance de la comunidad de acopios: las reglas del Centro
+// de Acopio Local (comentar con estrellas, denunciar, promedio en el
+// mapa, borrado admin) valen igual para el Centro de acopio receptor.
+// Recolección y distribución quedan fuera.
+export const communityAidLocationCategories = [
+  "collection_center",
+  "receiver_center",
+] as const;
+
+export function hasAidLocationCommunity(category: string): boolean {
+  return (communityAidLocationCategories as readonly string[]).includes(
+    category,
+  );
+}
+
 export interface AidLocationComment {
   id: string;
   // null → se muestra «Anónimo» (§5-B); nunca datos privados.

@@ -160,3 +160,34 @@ it("REACTIVAR CENTRO confirma anunciando el reinicio del ciclo", async () => {
     expect(screen.getByText(/fue reactivado/)).toBeTruthy(),
   );
 });
+
+// CHG-168 — La bandeja también trae acopios receptores y cada ficha
+// nombra su tipo real.
+it("una ficha de acopio receptor nombra su tipo", async () => {
+  const receiver: AdminCenterVerification = {
+    ...PENDING,
+    id: "cc000000-0000-4000-8000-000000000003",
+    kind: "receiver_center",
+    name: "Acopio Receptor Santander",
+  };
+  render(
+    <CenterVerificationsSection
+      dataSource={fakeDataSource({
+        listCenterVerifications: jest.fn().mockResolvedValue({
+          pending: [PENDING, receiver],
+          disabled: [],
+        }),
+      })}
+    />,
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId(`admin-center-${receiver.id}`)).toBeTruthy(),
+  );
+
+  expect(
+    screen.getByText(/Centro de acopio receptor · Bucaramanga/),
+  ).toBeTruthy();
+  expect(
+    screen.getByText(/Centro de Acopio Local · Bucaramanga/),
+  ).toBeTruthy();
+});

@@ -174,3 +174,30 @@ it("sin datos válidos explica la situación y VOLVER responde", () => {
   fireEvent.press(screen.getByLabelText("Volver al mapa"));
   expect(onBack).toHaveBeenCalledTimes(1);
 });
+
+// CHG-168 — El acopio receptor comparte las reglas del local: misma
+// línea de estrellas y misma sección comunitaria en su vista completa.
+it("un acopio receptor muestra promedio, COMENTAR y DENUNCIAR", async () => {
+  render(
+    <MapPointDetailScreen
+      payload={{
+        kind: "operational",
+        point: {
+          ...point,
+          category: "receiver_center",
+          commentRatingAverage: 3.5,
+          commentRatingCount: 2,
+        },
+      }}
+      onBack={jest.fn()}
+    />,
+  );
+  await screen.findByTestId("center-comments-average");
+
+  expect(screen.getByText("★★★★☆ 3,5 · 2 calificaciones")).toBeTruthy();
+  expect(
+    screen.getByTestId("collection-center-community-panel"),
+  ).toBeTruthy();
+  expect(screen.getByTestId("center-comment-button")).toBeTruthy();
+  expect(screen.getByTestId("center-report-button")).toBeTruthy();
+});

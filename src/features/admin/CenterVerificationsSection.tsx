@@ -42,6 +42,17 @@ const operationalLabels: Record<
   inactive: "DESHABILITADO",
 };
 
+// CHG-168: la bandeja trae locales y receptores; cada ficha nombra su
+// tipo real (un kind desconocido cae al genérico sin romper la vista).
+const centerKindLabels: Record<string, string> = {
+  collection_center: "Centro de Acopio Local",
+  receiver_center: "Centro de acopio receptor",
+};
+
+function centerKindLabel(kind: string): string {
+  return centerKindLabels[kind] ?? "Centro de acopio";
+}
+
 function formatStamp(iso: string): string {
   const value = new Date(iso);
   if (Number.isNaN(value.getTime())) {
@@ -137,8 +148,9 @@ export function CenterVerificationsSection({
     <View style={styles.section} testID="admin-center-verifications-section">
       <View>
         <Text style={styles.overline}>06 · VERIFICACIONES</Text>
+        {/* CHG-168: la bandeja cubre acopios locales y receptores. */}
         <Text style={styles.title} accessibilityRole="header">
-          Centros de Acopio Local
+          Centros de acopio (local y receptor)
         </Text>
         <Text style={styles.description}>
           La creación de un centro no implica aprobación: nace «Sin
@@ -282,10 +294,10 @@ export function CenterVerificationsSection({
               confirming.action === "reactivate" ? (
                 <View style={styles.confirmBox}>
                   <Text style={styles.confirmText}>
-                    ¿Desea reactivar este Centro de Acopio Local? Al
-                    reactivarlo, el contador de denuncias correspondiente
-                    al ciclo actual será reiniciado (el histórico se
-                    conserva) y el centro volverá al mapa.
+                    ¿Desea reactivar este {centerKindLabel(center.kind)}?
+                    Al reactivarlo, el contador de denuncias
+                    correspondiente al ciclo actual será reiniciado (el
+                    histórico se conserva) y el centro volverá al mapa.
                   </Text>
                   <View style={styles.actionsRow}>
                     <Pressable
@@ -345,7 +357,8 @@ function CenterCard({
     <View style={styles.card} testID={`admin-center-${center.id}`}>
       <Text style={styles.cardTitle}>{center.name}</Text>
       <Text style={styles.cardMeta}>
-        Centro de Acopio Local · {center.municipality}, {center.department}
+        {centerKindLabel(center.kind)} · {center.municipality},{" "}
+        {center.department}
       </Text>
       <Text style={styles.cardMeta}>{center.locationLabel}</Text>
       {center.latitude !== null && center.longitude !== null && (

@@ -4,6 +4,7 @@ import { font } from "../../typography";
 import { CountdownLabel } from "../help-requests/CountdownLabel";
 import type { ActiveHelpRequest } from "../help-requests/types";
 import type { ActiveFoodOffer } from "../food-offers/types";
+import { hasAidLocationCommunity } from "../aid-locations/communityDataSource";
 import { ratingSummaryLine } from "../aid-locations/ratingStars";
 import { categoryMeta } from "./categoryMeta";
 import { humanStatusMeta } from "./humanStatusMeta";
@@ -85,13 +86,13 @@ function summarize(target: MapMarkerPopupTarget): PopupSummary {
         accentColor: meta.color,
         eyebrow: meta.shortLabel.toUpperCase(),
         title: target.point.title,
-        ratingLine:
-          target.point.category === "collection_center"
-            ? ratingSummaryLine(
-                target.point.commentRatingAverage,
-                target.point.commentRatingCount,
-              )
-            : null,
+        // CHG-168: local y receptor comparten las reglas comunitarias.
+        ratingLine: hasAidLocationCommunity(target.point.category)
+          ? ratingSummaryLine(
+              target.point.commentRatingAverage,
+              target.point.commentRatingCount,
+            )
+          : null,
         description: target.point.description,
         metaLines: [
           target.point.locationLabel,

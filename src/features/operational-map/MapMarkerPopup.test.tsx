@@ -292,3 +292,37 @@ it("un clúster humano abre popup con el desglose pero sin VER MÁS", async () =
   expect(within(popup).getByText("12 personas")).toBeTruthy();
   expect(screen.queryByTestId("map-marker-popup-more")).toBeNull();
 });
+
+// CHG-168 — El acopio receptor comparte las reglas del local: su popup
+// también muestra el promedio de estrellas.
+it("un acopio receptor con calificaciones muestra su promedio en el popup", async () => {
+  const ratedOverview = {
+    ...overview,
+    items: overview.items.map((item, index) =>
+      index === 0
+        ? {
+            ...item,
+            category: "receiver_center" as const,
+            commentRatingAverage: 3.5,
+            commentRatingCount: 2,
+          }
+        : item,
+    ),
+  };
+  renderPanel({
+    dataSource: {
+      transport: "fixture",
+      initialOverview: ratedOverview,
+      getOverview: async () => ratedOverview,
+    },
+  });
+
+  fireEvent.press(
+    await screen.findByTestId(`map-marker-${overview.items[0].id}`),
+  );
+
+  const popup = screen.getByTestId("map-marker-popup");
+  expect(
+    within(popup).getByText("★★★★☆ 3,5 · 2 calificaciones"),
+  ).toBeTruthy();
+});

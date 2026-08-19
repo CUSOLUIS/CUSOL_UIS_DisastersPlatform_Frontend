@@ -11,7 +11,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { font } from "../../typography";
 import { CollectionCenterCommunityPanel } from "../aid-locations/CollectionCenterCommunityPanel";
-import type { AidLocationCommunityDataSource } from "../aid-locations/communityDataSource";
+import {
+  hasAidLocationCommunity,
+  type AidLocationCommunityDataSource,
+} from "../aid-locations/communityDataSource";
 import { ratingSummaryLine } from "../aid-locations/ratingStars";
 import { CountdownLabel } from "../help-requests/CountdownLabel";
 import { resolvePublicMediaUrl } from "../media/publicMediaUrl";
@@ -127,13 +130,13 @@ function buildContent(payload: MapPointDetailPayload): DetailContent {
         accentColor: meta.color,
         eyebrow: meta.shortLabel.toUpperCase(),
         title: point.title,
-        ratingLine:
-          point.category === "collection_center"
-            ? ratingSummaryLine(
-                point.commentRatingAverage,
-                point.commentRatingCount,
-              )
-            : null,
+        // CHG-168: local y receptor comparten las reglas comunitarias.
+        ratingLine: hasAidLocationCommunity(point.category)
+          ? ratingSummaryLine(
+              point.commentRatingAverage,
+              point.commentRatingCount,
+            )
+          : null,
         description: point.description,
         rows,
         expiresAt: null,
@@ -251,11 +254,11 @@ export function MapPointDetailScreen({
   // CHG-165: inyectable en pruebas; por defecto usa el data source real.
   communityDataSource?: AidLocationCommunityDataSource;
 }) {
-  // CHG-165: solo los Centros de Acopio Local llevan comentarios y
-  // denuncias en su vista completa (alcance del contrato).
+  // CHG-165: los acopios llevan comentarios y denuncias en su vista
+  // completa; CHG-168 extiende el alcance del local al receptor.
   const collectionCenterId =
     payload?.kind === "operational" &&
-    payload.point.category === "collection_center"
+    hasAidLocationCommunity(payload.point.category)
       ? payload.point.id
       : null;
   return (
