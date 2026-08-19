@@ -1,11 +1,12 @@
 // CHG-174 — Sección «12 · Aceptación de ruta»: resumen transaccional por
 // transporte. Muestra el estado de los DOS centros, habilita ACEPTAR
 // RUTA solo cuando ambos aceptaron y, tras pulsarlo, enseña el código
-// que el Centro Local entrega a la Mulera.
+// que el Centro Local entrega a quien conduce o pilota (CHG-179: el
+// acuerdo vale igual para la Mulera y para la Lanchera).
 //
-// Ojo con el alcance: esto completa ÚNICAMENTE la relación
-// Centro Local ↔ Mulera. La aceptación con el Centro Receptor es otro
-// contrato y aquí no se insinúa como hecha.
+// Ojo con el alcance: la etapa 1 completa ÚNICAMENTE la relación
+// Centro Local ↔ transporte. La aceptación con el Centro Receptor es
+// otro contrato y aquí no se insinúa como hecha.
 
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -27,10 +28,15 @@ import {
   type TransportRequestStatus,
   type TransportRouteState,
 } from "../transports/routeAcceptance";
+import {
+  transportDriverCopy,
+  transportKindInline,
+  transportKindLabel,
+  transportKindShout,
+} from "../transports/types";
 
 type SectionStatus = "loading" | "error" | "ready";
 
-const kindLabels = { mule: "La mulera", boat: "La lanchera" } as const;
 
 // §21: el estado de cada centro se dice con palabras, no solo color.
 function statusLine(status: TransportRequestStatus | null): string {
@@ -109,7 +115,8 @@ export function RouteAcceptanceSection({
         <Text style={styles.description}>
           Cuando los dos centros aceptan la solicitud, el Centro de Acopio
           Local acepta la ruta y el sistema emite un código. Ese código se
-          le entrega a quien conduce, que lo introduce desde su panel para
+          le entrega a quien conduce o pilota, que lo introduce desde su
+          panel para
           confirmar. Aquí se completa la relación con el Centro Local; la
           del Centro Receptor se definirá aparte.
         </Text>
@@ -141,7 +148,8 @@ export function RouteAcceptanceSection({
           testID={`route-state-${state.transportId}`}
         >
           <Text style={styles.cardTitle}>
-            {kindLabels[state.transportKind]} · {state.originMunicipality} →{" "}
+            {transportKindLabel[state.transportKind]} ·{" "}
+            {state.originMunicipality} →{" "}
             {state.destinationMunicipality}
           </Text>
           <Text style={styles.cardMeta}>
@@ -168,14 +176,14 @@ export function RouteAcceptanceSection({
           {/* CHG-175 §16: las dos etapas, siempre distinguibles. */}
           <View style={styles.stageBlock}>
             <Text style={styles.stageTitle}>
-              01 · CENTRO LOCAL ↔ MULERA
+              {`01 · CENTRO LOCAL ↔ ${transportKindShout[state.transportKind]}`}
             </Text>
             <Text style={styles.message}>{routeStateMessage(state)}</Text>
 
             {state.routeStatus === null && state.isLocalSteward && (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Aceptar la ruta con la mulera y generar el código"
+                accessibilityLabel={`Aceptar la ruta con ${transportKindInline[state.transportKind]} y generar el código`}
                 disabled={
                   !canStartRouteAcceptance(state) ||
                   working === state.transportId
@@ -204,7 +212,7 @@ export function RouteAcceptanceSection({
                   {state.confirmationCode}
                 </Text>
                 <Text style={styles.codeHint}>
-                  Entrégaselo a quien conduce. Es de un solo uso.
+                  {`Entrégaselo a ${transportDriverCopy[state.transportKind].driverNoun}. Es de un solo uso.`}
                 </Text>
               </View>
             )}
@@ -218,7 +226,7 @@ export function RouteAcceptanceSection({
 
           <View style={styles.stageBlock}>
             <Text style={styles.stageTitle}>
-              02 · MULERA ↔ CENTRO RECEPTOR
+              {`02 · ${transportKindShout[state.transportKind]} ↔ CENTRO RECEPTOR`}
             </Text>
             <Text style={styles.message}>{receptionStageMessage(state)}</Text>
 
@@ -263,8 +271,7 @@ export function RouteAcceptanceSection({
                     {state.receptionConfirmationCode}
                   </Text>
                   <Text style={styles.codeHint}>
-                    Compártalo con la Mulera de este transporte. Es
-                    distinto del código del Centro Local y de un solo uso.
+                    {`Compártalo con ${transportKindInline[state.transportKind]} de este transporte. Es distinto del código del Centro Local y de un solo uso.`}
                   </Text>
                 </View>
               )}

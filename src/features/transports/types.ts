@@ -257,6 +257,20 @@ export const transportKindLabel: Record<TransportKind, string> = {
   boat: "La lanchera",
 };
 
+// CHG-179 — El acuerdo de ruta con los centros es el mismo para los dos
+// medios (se construyó sobre el transporte, no sobre el vehículo); lo
+// único que cambia es cómo se les nombra dentro de una frase o de un
+// rótulo. Sin esto la interfaz llamaba «Mulera» también a la lancha.
+export const transportKindInline: Record<TransportKind, string> = {
+  mule: "la mulera",
+  boat: "la lanchera",
+};
+
+export const transportKindShout: Record<TransportKind, string> = {
+  mule: "MULERA",
+  boat: "LANCHERA",
+};
+
 export const transportStatusLabel: Record<TransportStatus, string> = {
   registered: "REGISTRADO",
   in_transit: "EN CAMINO",

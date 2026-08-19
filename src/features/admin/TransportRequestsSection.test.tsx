@@ -329,3 +329,70 @@ describe("Etapa 2 · Mulera ↔ Centro Receptor (CHG-175)", () => {
     );
   });
 });
+
+// CHG-179 — El acuerdo de ruta vale igual para La Lanchera; lo que
+// cambia es cómo se nombra el medio y a quien lo conduce o pilota.
+
+const BOAT_REQUEST: CenterTransportRequest = {
+  ...REQUEST,
+  id: "req-boat",
+  transportId: "tr-boat",
+  transportKind: "boat",
+  driverFullName: "Marina Ospina",
+  tractorPlate: null,
+  trailerPlate: null,
+  vesselRegistration: "FLU-2026-01",
+  vesselName: "La Golondrina",
+  vesselType: "Lancha",
+  vehicleVisibleCharacteristics: "Casco blanco con franja azul",
+};
+
+const BOAT_STATE: TransportRouteState = {
+  ...BASE_STATE,
+  transportId: "tr-boat",
+  transportKind: "boat",
+  receptionStatus: "accepted",
+  routeStatus: "code_issued",
+  confirmationCode: "RT-2026-5E248F9B",
+};
+
+describe("La Lanchera hereda el acuerdo de ruta (CHG-179)", () => {
+  it("la bandeja nombra la lanchera y muestra su embarcación", async () => {
+    const source = dataSource({
+      listRequests: jest.fn().mockResolvedValue([BOAT_REQUEST]),
+    });
+    render(<TransportRequestsSection dataSource={source} />);
+
+    await screen.findByTestId("transport-request-req-boat");
+    expect(screen.getByText(/La lanchera · Acopio La Feria/)).toBeTruthy();
+    expect(screen.getByText(/Embarcación La Golondrina/)).toBeTruthy();
+
+    fireEvent.press(
+      screen.getByLabelText("Ver más de la solicitud de Acopio La Feria"),
+    );
+    await screen.findByTestId("transport-request-detail");
+    // El bloque de la persona se nombra según el medio, y el vehículo
+    // muestra la embarcación en vez de placas inexistentes.
+    expect(screen.getByText("QUIEN PILOTA")).toBeTruthy();
+    expect(screen.getByText("La Golondrina")).toBeTruthy();
+  });
+
+  it("la sección 12 habla de la lanchera en sus dos etapas", async () => {
+    const source = dataSource({
+      listRouteStates: jest.fn().mockResolvedValue([BOAT_STATE]),
+    });
+    render(<RouteAcceptanceSection dataSource={source} />);
+
+    await screen.findByTestId("route-state-tr-boat");
+    expect(screen.getByText("01 · CENTRO LOCAL ↔ LANCHERA")).toBeTruthy();
+    expect(screen.getByText("02 · LANCHERA ↔ CENTRO RECEPTOR")).toBeTruthy();
+    expect(
+      screen.getByText(/Esperando aceptación de la lanchera/),
+    ).toBeTruthy();
+    // El código se entrega a quien pilota, no a «quien conduce».
+    expect(
+      screen.getByText(/Entrégaselo a quien pilota/),
+    ).toBeTruthy();
+  });
+});
+

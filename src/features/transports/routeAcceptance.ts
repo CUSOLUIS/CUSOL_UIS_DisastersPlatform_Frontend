@@ -1,10 +1,13 @@
 import { Platform } from "react-native";
+import { transportKindInline } from "./types";
 
 /**
- * CHG-174 — Aceptación inicial de ruta Centro de Acopio Local ↔ Mulera.
+ * CHG-174 — Aceptación inicial de ruta Centro de Acopio Local ↔
+ * transporte (Mulera o Lanchera; CHG-179 confirmó que el acuerdo vale
+ * igual para los dos medios y solo cambia cómo se les nombra).
  *
  * Dos etapas que el contrato exige no confundir: la **solicitud**
- * («acepto que esta Mulera use mi centro») y la **ruta** («esta es la
+ * («acepto que este transporte use mi centro») y la **ruta** («esta es la
  * ruta que vamos a iniciar», con código único). Todo el estado vive en
  * backend: aquí no se decide nada, solo se consulta y se pide.
  */
@@ -186,13 +189,13 @@ export function receptionStageMessage(state: TransportRouteState): string {
     return "Una solicitud fue declinada: la ruta no puede continuar.";
   }
   if (state.routeStatus !== "accepted") {
-    return "Esperando la aceptación inicial entre la Mulera y el Centro de Acopio Local.";
+    return `Esperando la aceptación inicial entre ${transportKindInline[state.transportKind]} y el Centro de Acopio Local.`;
   }
   if (state.receptionMuleAcceptedAt) {
     return "Aceptación con el Centro de Acopio Receptor completada.";
   }
   if (state.receptionStartedAt) {
-    return "Código entregado. Esperando aceptación de la Mulera.";
+    return `Código entregado. Esperando aceptación de ${transportKindInline[state.transportKind]}.`;
   }
   return "La etapa anterior terminó: ya puedes aceptar la ruta con este centro.";
 }
@@ -232,7 +235,7 @@ export function routeStateMessage(state: TransportRouteState): string {
     return "Aceptación con el Centro de Acopio Local completada.";
   }
   if (state.routeStatus === "code_issued") {
-    return "Código entregado. Esperando aceptación de la Mulera.";
+    return `Código entregado. Esperando aceptación de ${transportKindInline[state.transportKind]}.`;
   }
   return "Los dos centros aceptaron: ya puedes aceptar la ruta.";
 }

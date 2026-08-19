@@ -22,6 +22,8 @@ import {
   type CenterTransportRequest,
   type RouteAcceptanceDataSource,
 } from "../transports/routeAcceptance";
+// CHG-179: un solo origen para los nombres de cada medio.
+import { transportDriverCopy, transportKindLabel } from "../transports/types";
 
 type SectionStatus = "loading" | "error" | "ready";
 
@@ -36,7 +38,6 @@ const roleLabels: Record<CenterTransportRequest["centerRole"], string> = {
   reception: "Centro de acopio receptor (destino)",
 };
 
-const kindLabels = { mule: "La mulera", boat: "La lanchera" } as const;
 
 function formatDate(value: string): string {
   const date = new Date(value);
@@ -90,7 +91,7 @@ export function TransportRequestsSection({
       await dataSource.decideRequest(request.id, decision);
       setNotice(
         decision === "accept"
-          ? `Aceptaste la solicitud de ${kindLabels[request.transportKind].toLowerCase()}. La ruta se define en «12 · Aceptación de ruta».`
+          ? `Aceptaste la solicitud de ${transportKindLabel[request.transportKind].toLowerCase()}. La ruta se define en «12 · Aceptación de ruta».`
           : "Declinaste la solicitud: esta ruta no puede continuar con tu centro.",
       );
       setDetail(null);
@@ -197,7 +198,7 @@ export function TransportRequestsSection({
               <>
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle} accessibilityRole="header">
-                    {kindLabels[detail.transportKind]}
+                    {transportKindLabel[detail.transportKind]}
                   </Text>
                   <Pressable
                     accessibilityRole="button"
@@ -233,7 +234,11 @@ export function TransportRequestsSection({
 
                   {/* §12-§13: vista autorizada. Estos datos no se
                       publican en el mapa ni en ninguna ficha pública. */}
-                  <DetailBlock title="CONDUCTOR">
+                  <DetailBlock
+                    title={transportDriverCopy[
+                      detail.transportKind
+                    ].driverNoun.toUpperCase()}
+                  >
                     <DetailRow
                       label="Nombre"
                       value={detail.driverFullName ?? "—"}
@@ -373,12 +378,13 @@ function RequestCard({
   return (
     <View style={styles.card} testID={`transport-request-${request.id}`}>
       <Text style={styles.cardTitle}>
-        {kindLabels[request.transportKind]} · {request.centerName}
+        {transportKindLabel[request.transportKind]} · {request.centerName}
       </Text>
       <Text style={styles.cardMeta}>
         {request.originMunicipality} → {request.destinationMunicipality}
       </Text>
-      {/* §10: el resumen no expone al conductor; eso vive en VER MÁS. */}
+      {/* §10: el resumen no expone a quien conduce o pilota; eso vive
+          en VER MÁS. */}
       <Text style={styles.cardMeta}>
         {request.transportKind === "mule"
           ? `Placa ${request.tractorPlate ?? "—"}`
