@@ -17,6 +17,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, contentMaxWidth, fontFamilies } from "../../theme";
 import { AdminApiError, adminDataSource } from "./dataSource";
 import { CenterVerificationsSection } from "./CenterVerificationsSection";
+import { RouteAcceptanceSection } from "./RouteAcceptanceSection";
+import { TransportRequestsSection } from "./TransportRequestsSection";
 import { HelpRequestsAdminSection } from "./HelpRequestsAdminSection";
 import { PeopleRecordsAdminSection } from "./PeopleRecordsAdminSection";
 import { PlatformResetSection } from "./PlatformResetSection";
@@ -66,6 +68,10 @@ const SECTION_OPTIONS: Array<{
   { value: "peopleRecords", label: "Personas", code: "09" },
   // CHG-139: reinicio absoluto de la plataforma.
   { value: "reset", label: "Reinicio", code: "10" },
+  // CHG-174: el centro acepta que un transporte lo use, y después
+  // confirma la ruta con la mulera mediante un código.
+  { value: "transportRequests", label: "Transportes", code: "11" },
+  { value: "routeAcceptance", label: "Rutas", code: "12" },
 ];
 
 const KIND_LABELS: Record<AdminSubmissionKind, string> = {
@@ -380,6 +386,13 @@ export function AdminDashboard({
                 onMutated={refreshAll}
               />
             )}
+            {/* CHG-174: las dos etapas del acuerdo con el transporte.
+                Sus endpoints son de cuenta (no /admin), porque el
+                responsable de un centro puede no ser super_admin. */}
+            {section === "transportRequests" && (
+              <TransportRequestsSection onMutated={refreshAll} />
+            )}
+            {section === "routeAcceptance" && <RouteAcceptanceSection />}
             {section === "system" && (
               <SystemMetricsSection
                 dataSource={protectedDataSource}

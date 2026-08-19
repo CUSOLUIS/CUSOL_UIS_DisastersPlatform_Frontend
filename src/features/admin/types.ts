@@ -14,7 +14,10 @@ export type AdminSection =
   // CHG-154: gestión de registros de personas (ocultar/editar).
   | "peopleRecords"
   // CHG-139: reinicio absoluto de la plataforma.
-  | "reset";
+  | "reset"
+  // CHG-174: solicitudes de transporte y aceptación de ruta del centro.
+  | "transportRequests"
+  | "routeAcceptance";
 export type AdminSubmissionKind =
   | "missing_person_report"
   | "unverified_building_report"

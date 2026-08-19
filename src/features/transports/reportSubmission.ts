@@ -222,6 +222,148 @@ export function sendTransportPosition(
   );
 }
 
+// CHG-174 — Aceptación de ruta desde el panel de quien conduce.
+// Validar y aceptar son DOS acciones: el código correcto solo habilita
+// el botón; la ruta no queda aceptada hasta que se confirma.
+async function routeRequest<T>(
+  path: string,
+  code: string,
+  options: { requestBaseUrl?: string; signal?: AbortSignal } = {},
+): Promise<T> {
+  const requestBaseUrl = options.requestBaseUrl ?? apiBaseUrl;
+  if (requestBaseUrl === undefined) {
+    throw new Error(
+      "Configura EXPO_PUBLIC_API_BASE_URL para aceptar la ruta.",
+    );
+  }
+  const response = await fetch(`${requestBaseUrl}${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ code: code.trim().toUpperCase() }),
+    signal: options.signal,
+  });
+  if (!response.ok) {
+    const problem = await extractProblem(response);
+    throw new ReportRejectedError(
+      problem.detail ??
+        `La aceptación de ruta respondió con estado ${response.status}.`,
+      problem.fields,
+    );
+  }
+  return (await response.json()) as T;
+}
+
+export interface RouteCodeValidation {
+  transportId: string;
+  validated: boolean;
+  originCenterName: string;
+  destinationCenterName: string;
+}
+
+export interface RouteAcceptance {
+  transportId: string;
+  status: "code_issued" | "accepted";
+  muleAcceptedAt: string | null;
+  // CHG-175: presente solo cuando esa aceptación completó la ruta.
+  routeAcceptedAt?: string | null;
+}
+
+export function validateRouteCode(
+  transportId: string,
+  code: string,
+  options: { requestBaseUrl?: string; signal?: AbortSignal } = {},
+): Promise<RouteCodeValidation> {
+  return routeRequest<RouteCodeValidation>(
+    `/api/v1/me/transports/${transportId}/route-code/validate`,
+    code,
+    options,
+  );
+}
+
+export function validateReceptionRouteCode(
+  transportId: string,
+  code: string,
+  options: { requestBaseUrl?: string; signal?: AbortSignal } = {},
+): Promise<RouteCodeValidation> {
+  return routeRequest<RouteCodeValidation>(
+    `/api/v1/me/transports/${transportId}/reception-route-code/validate`,
+    code,
+    options,
+  );
+}
+
+export function acceptReceptionRoute(
+  transportId: string,
+  code: string,
+  options: { requestBaseUrl?: string; signal?: AbortSignal } = {},
+): Promise<RouteAcceptance> {
+  return routeRequest<RouteAcceptance>(
+    `/api/v1/me/transports/${transportId}/reception-route-accept`,
+    code,
+    options,
+  );
+}
+
+export function acceptTransportRoute(
+  transportId: string,
+  code: string,
+  options: { requestBaseUrl?: string; signal?: AbortSignal } = {},
+): Promise<RouteAcceptance> {
+  return routeRequest<RouteAcceptance>(
+    `/api/v1/me/transports/${transportId}/route-accept`,
+    code,
+    options,
+  );
+}
+
+// CHG-174 — Los transportes de la cuenta, para retomar el viaje desde
+// «Mi espacio» (cierra además la deuda que dejó CHG-171). Nunca trae el
+// código: ese lo entrega el Centro de Acopio Local por fuera.
+export interface MyTransportSummary {
+  transportId: string;
+  transportKind: "mule" | "boat";
+  transportCreatedAt: string;
+  originCenterName: string;
+  destinationCenterName: string;
+  originMunicipality: string;
+  destinationMunicipality: string;
+  localStatus: "pending" | "accepted" | "declined" | null;
+  receptionStatus: "pending" | "accepted" | "declined" | null;
+  routeStatus: "code_issued" | "accepted" | null;
+  muleCodeValidatedAt: string | null;
+  muleAcceptedAt: string | null;
+  // CHG-175: la segunda etapa, con el receptor.
+  receptionStartedAt: string | null;
+  receptionMuleCodeValidatedAt: string | null;
+  receptionMuleAcceptedAt: string | null;
+  routeAcceptedAt: string | null;
+}
+
+export async function fetchMyTransports(
+  options: { requestBaseUrl?: string; signal?: AbortSignal } = {},
+): Promise<MyTransportSummary[]> {
+  const requestBaseUrl = options.requestBaseUrl ?? apiBaseUrl;
+  if (requestBaseUrl === undefined) {
+    throw new Error(
+      "Configura EXPO_PUBLIC_API_BASE_URL para ver tus transportes.",
+    );
+  }
+  const response = await fetch(`${requestBaseUrl}/api/v1/me/transports`, {
+    credentials: "include",
+    headers: { Accept: "application/json" },
+    signal: options.signal,
+  });
+  if (!response.ok) {
+    throw new Error("No fue posible cargar tus transportes.");
+  }
+  const body = (await response.json()) as { items: MyTransportSummary[] };
+  return body.items;
+}
+
 // CHG-171 — Feed público del mapa: viajes vivos con su rastro.
 export async function fetchActiveTransports(
   options: { requestBaseUrl?: string; signal?: AbortSignal } = {},

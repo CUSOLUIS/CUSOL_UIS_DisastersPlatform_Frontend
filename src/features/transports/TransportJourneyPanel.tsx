@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { colors, fontFamilies } from "../../theme";
@@ -13,9 +14,13 @@ import { font } from "../../typography";
 import { watchVisitorLocation } from "../operational-map/visitorLocation";
 import type { GeographicCenter } from "../operational-map/webMercator";
 import {
+  acceptReceptionRoute,
+  acceptTransportRoute,
   arriveTransportJourney,
   sendTransportPosition,
   startTransportJourney,
+  validateReceptionRouteCode,
+  validateRouteCode,
 } from "./reportSubmission";
 import {
   transportKindLabel,
@@ -51,10 +56,20 @@ export function TransportJourneyPanel({
   sendPosition = sendTransportPosition,
   watchLocation = watchVisitorLocation,
   positionIntervalMs = POSITION_INTERVAL_MS,
+  // CHG-174: aceptación de ruta con el Centro de Acopio Local.
+  validateCode = validateRouteCode,
+  acceptRoute = acceptTransportRoute,
+  // CHG-175: la segunda etapa, con el Centro de Acopio Receptor.
+  validateReceptionCode = validateReceptionRouteCode,
+  acceptReceptionRouteStage = acceptReceptionRoute,
 }: {
   receipt: TransportReceipt;
   kind: TransportKind;
   onHome: () => void;
+  validateCode?: typeof validateRouteCode;
+  acceptRoute?: typeof acceptTransportRoute;
+  validateReceptionCode?: typeof validateReceptionRouteCode;
+  acceptReceptionRouteStage?: typeof acceptReceptionRoute;
   // Inyectables en pruebas.
   startJourney?: (id: string) => Promise<TransportJourneyReceipt>;
   arriveJourney?: (id: string) => Promise<TransportJourneyReceipt>;
@@ -72,6 +87,9 @@ export function TransportJourneyPanel({
   const [busy, setBusy] = useState(false);
   const [journeyError, setJourneyError] = useState<string | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
+  // CHG-175: la etapa 2 se desbloquea cuando la 1 queda cerrada.
+  const [localStageDone, setLocalStageDone] = useState(false);
+  const [routeFullyAccepted, setRouteFullyAccepted] = useState(false);
   const [lastSentAt, setLastSentAt] = useState<string | null>(null);
   const lastSentRef = useRef(0);
   const statusRef = useRef<TransportStatus>(receipt.status);
@@ -167,6 +185,44 @@ export function TransportJourneyPanel({
             </Text>
           </View>
 
+          {/* CHG-174 y CHG-175: las dos etapas del acuerdo, separadas
+              y en orden. La segunda solo se ofrece cuando la primera
+              está cerrada (§30-§32). */}
+          <RouteAcceptanceBlock
+            stage="01"
+            title="01 · CENTRO DE ACOPIO LOCAL"
+            transportId={receipt.id}
+            validateCode={validateCode}
+            acceptRoute={acceptRoute}
+            onAccepted={() => setLocalStageDone(true)}
+          />
+          {localStageDone ? (
+            <RouteAcceptanceBlock
+              stage="02"
+              title="02 · CENTRO DE ACOPIO RECEPTOR"
+              transportId={receipt.id}
+              validateCode={validateReceptionCode}
+              acceptRoute={acceptReceptionRouteStage}
+              onAccepted={() => setRouteFullyAccepted(true)}
+            />
+          ) : (
+            <View style={styles.routeBox} testID="reception-stage-locked">
+              <Text style={styles.statusLabel}>
+                02 · CENTRO DE ACOPIO RECEPTOR
+              </Text>
+              <Text style={styles.routeText}>
+                Disponible cuando termine la aceptación con el Centro de
+                Acopio Local.
+              </Text>
+            </View>
+          )}
+          {routeFullyAccepted && (
+            // §47: solo aquí puede decirse que la ruta está aceptada.
+            <Text style={styles.routeFullyAccepted} testID="route-accepted">
+              ESTADO DE RUTA · ✓ RUTA ACEPTADA
+            </Text>
+          )}
+
           {journeyError && (
             <Text
               style={styles.errorText}
@@ -230,7 +286,173 @@ export function TransportJourneyPanel({
   );
 }
 
+
+// CHG-174 §35-§42 — Aceptación de ruta con el Centro de Acopio Local.
+//
+// Dos acciones distintas, deliberadamente: validar el código solo
+// habilita el botón; la ruta no queda aceptada hasta que quien conduce
+// pulsa ACEPTAR. Al terminar se nombra exactamente lo aceptado — la
+// relación con el Centro Receptor sigue pendiente (§74).
+function RouteAcceptanceBlock({
+  stage,
+  title,
+  transportId,
+  validateCode,
+  acceptRoute,
+  onAccepted,
+}: {
+  stage: "01" | "02";
+  title: string;
+  transportId: string;
+  validateCode: typeof validateRouteCode;
+  acceptRoute: typeof acceptTransportRoute;
+  onAccepted: () => void;
+}) {
+  const [code, setCode] = useState("");
+  const [validated, setValidated] = useState<{ origin: string } | null>(null);
+  const [accepted, setAccepted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = async (action: "validate" | "accept") => {
+    setBusy(true);
+    setError(null);
+    try {
+      if (action === "validate") {
+        const result = await validateCode(transportId, code);
+        setValidated({ origin: result.originCenterName });
+      } else {
+        await acceptRoute(transportId, code);
+        setAccepted(true);
+        onAccepted();
+      }
+    } catch (actionError: unknown) {
+      setError(
+        actionError instanceof Error
+          ? actionError.message
+          : "No fue posible completar la aceptación de ruta.",
+      );
+      if (action === "validate") setValidated(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const centerName =
+    stage === "01" ? "Centro de Acopio Local" : "Centro de Acopio Receptor";
+
+  if (accepted) {
+    return (
+      <View style={styles.routeBox} testID={`route-acceptance-done-${stage}`}>
+        <Text style={styles.statusLabel}>{title}</Text>
+        <Text style={styles.routeDone}>
+          ✓ Aceptación completada con el {centerName}.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.routeBox} testID={`route-acceptance-block-${stage}`}>
+      <Text style={styles.statusLabel}>{title}</Text>
+      <Text style={styles.routeText}>
+        El {centerName} te entrega un código cuando acepta la ruta.
+        Introdúcelo aquí para confirmarla. Cada etapa tiene el suyo: no
+        son intercambiables.
+      </Text>
+      <TextInput
+        accessibilityLabel="Código de registro de ruta"
+        placeholder="RT-2026-XXXXXXXX"
+        placeholderTextColor="#4b586d"
+        autoCapitalize="characters"
+        value={code}
+        onChangeText={(value) => {
+          setCode(value.toUpperCase());
+          setValidated(null);
+        }}
+        maxLength={40}
+        style={styles.routeInput}
+        testID={`route-code-input-${stage}`}
+      />
+      {error && (
+        <Text
+          style={styles.errorText}
+          accessibilityRole="alert"
+          testID={`route-code-error-${stage}`}
+        >
+          {error}
+        </Text>
+      )}
+      {validated && (
+        <Text style={styles.routeValidated} testID={`route-code-validated-${stage}`}>
+          Código verificado correctamente. Centro de origen:{" "}
+          {validated.origin}
+        </Text>
+      )}
+      {validated ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Aceptar la ruta con el centro de acopio local"
+          disabled={busy}
+          onPress={() => void run("accept")}
+          style={[styles.primaryButton, styles.arriveButton]}
+          testID={`route-accept-${stage}`}
+        >
+          <Text style={styles.primaryText}>ACEPTAR</Text>
+        </Pressable>
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Validar el código de ruta"
+          disabled={busy || code.trim().length < 4}
+          onPress={() => void run("validate")}
+          style={[
+            styles.primaryButton,
+            (busy || code.trim().length < 4) && styles.routeDisabled,
+          ]}
+          testID={`route-code-validate-${stage}`}
+        >
+          <Text style={styles.primaryText}>VALIDAR CÓDIGO</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  routeBox: {
+    gap: 8,
+    width: "100%",
+    marginTop: 4,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 10,
+    backgroundColor: "rgba(13,20,33,0.7)",
+  },
+  routeText: { color: colors.inkSoft, fontSize: 12, lineHeight: 18 },
+  routeInput: {
+    minHeight: 42,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 8,
+    color: colors.ink,
+    fontFamily: fontFamilies.mono,
+    fontSize: 14,
+    letterSpacing: 1,
+  },
+  routeValidated: { color: colors.alive, fontSize: 12, lineHeight: 18 },
+  routeDone: { color: colors.alive, fontSize: 13, lineHeight: 19 },
+  routeDisabled: { opacity: 0.45 },
+  routeFullyAccepted: {
+    marginTop: 6,
+    color: colors.alive,
+    fontFamily: fontFamilies.mono,
+    fontSize: 13,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+  },
   root: { flex: 1 },
   scroll: {
     flexGrow: 1,

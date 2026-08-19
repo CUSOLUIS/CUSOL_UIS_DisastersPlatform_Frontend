@@ -22,6 +22,10 @@ import {
   type AddressCandidate,
 } from "../missing-persons/geocoding";
 import { requestVisitorLocation } from "../operational-map/visitorLocation";
+import {
+  fetchMyTransports,
+  type MyTransportSummary,
+} from "../transports/reportSubmission";
 import { helpRequestsDataSource } from "../help-requests/dataSource";
 import { HelpRequestsSection } from "../help-requests/HelpRequestsSection";
 import type {
@@ -93,6 +97,8 @@ export function MySpacePanel({
   locate = requestVisitorLocation,
   isSuperAdmin = false,
   onOpenAdmin,
+  // CHG-174: transportes de la cuenta (inyectable en pruebas).
+  loadTransports = fetchMyTransports,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -107,9 +113,10 @@ export function MySpacePanel({
   foodOffers?: FoodOffersDataSource;
   geocode?: (query: string) => Promise<AddressCandidate[]>;
   locate?: () => Promise<{ latitude: number; longitude: number }>;
+  loadTransports?: typeof fetchMyTransports;
 }) {
   const [section, setSection] = useState<
-    "reports" | "volunteers" | "help" | "food"
+    "reports" | "volunteers" | "help" | "food" | "transports"
   >("reports");
   const [reports, setReports] = useState<MyReportsPage | null>(null);
   const [alerts, setAlerts] = useState<VolunteerAlertPage | null>(null);
@@ -234,6 +241,28 @@ export function MySpacePanel({
                 AYUDA
               </Text>
             </Pressable>
+            {/* CHG-174: desde aquí se retoma un transporte para
+                aceptar su ruta con el Centro de Acopio Local. */}
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityState={{ selected: section === "transports" }}
+              accessibilityLabel="Mis transportes"
+              onPress={() => setSection("transports")}
+              style={[
+                styles.tab,
+                section === "transports" && styles.tabActive,
+              ]}
+              testID="my-space-transports-tab"
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  section === "transports" && styles.tabTextActive,
+                ]}
+              >
+                TRANSPORTES
+              </Text>
+            </Pressable>
             <Pressable
               accessibilityRole="tab"
               accessibilityState={{ selected: section === "food" }}
@@ -303,6 +332,11 @@ export function MySpacePanel({
                 title="Solicitudes de ayuda vigentes"
               />
             )}
+            {/* CHG-174: los transportes de la cuenta, con el estado de
+                la aceptación de ruta y el acceso para retomarlos. */}
+            {section === "transports" && (
+              <MyTransportsSection loadTransports={loadTransports} />
+            )}
             {/* CHG-163: ofertas «Ofrecer comida» vigentes — el canal de
                 notificación a las cuentas (patrón DEC-125-11). */}
             {section === "food" && (
@@ -318,6 +352,85 @@ export function MySpacePanel({
       </View>
     </Modal>
   );
+}
+
+
+// CHG-174 — Los transportes de la cuenta. Sirve para retomar el viaje
+// (antes solo se alcanzaba justo después de registrarlo) y para ver en
+// qué punto va la aceptación de ruta con el Centro de Acopio Local.
+function MyTransportsSection({
+  loadTransports,
+}: {
+  loadTransports: typeof fetchMyTransports;
+}) {
+  const [items, setItems] = useState<MyTransportSummary[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    loadTransports()
+      .then((transports) => {
+        if (active) setItems(transports);
+      })
+      .catch(() => {
+        if (active) setError("No fue posible cargar tus transportes.");
+      });
+    return () => {
+      active = false;
+    };
+  }, [loadTransports]);
+
+  if (error) {
+    return (
+      <Text style={styles.emptyText} accessibilityRole="alert">
+        {error}
+      </Text>
+    );
+  }
+  if (items === null) {
+    return <Text style={styles.emptyText}>Cargando tus transportes…</Text>;
+  }
+  if (items.length === 0) {
+    return (
+      <Text style={styles.emptyText}>
+        Todavía no has registrado ninguna mulera ni lanchera.
+      </Text>
+    );
+  }
+
+  return (
+    <View style={styles.section} testID="my-space-transports">
+      {items.map((item) => (
+        <View key={item.transportId} style={styles.itemCard}>
+          <Text style={styles.itemKind}>
+            {item.transportKind === "mule" ? "LA MULERA" : "LA LANCHERA"}
+          </Text>
+          <Text style={styles.itemTitle}>
+            {item.originMunicipality} → {item.destinationMunicipality}
+          </Text>
+          <Text style={styles.itemMeta}>
+            {item.originCenterName} → {item.destinationCenterName}
+          </Text>
+          <Text style={styles.itemMeta}>{routeSummary(item)}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// §73: qué ve la Mulera en cada punto del proceso, sin prometer que la
+// ruta completa esté aceptada.
+function routeSummary(item: MyTransportSummary): string {
+  if (item.routeStatus === "accepted") {
+    return "Ruta aceptada con el Centro de Acopio Local.";
+  }
+  if (item.routeStatus === "code_issued") {
+    return "El Centro de Acopio Local inició la aceptación: introduce el código que te entregó.";
+  }
+  if (item.localStatus === "declined" || item.receptionStatus === "declined") {
+    return "Un centro declinó la solicitud: esta ruta no puede continuar.";
+  }
+  return "Esperando que los centros involucrados acepten la solicitud.";
 }
 
 function MyReportsSection({ page }: { page: MyReportsPage }) {
