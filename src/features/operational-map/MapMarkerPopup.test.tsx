@@ -479,3 +479,48 @@ it("la ventana de acción de la solicitud también muestra la puntuación", asyn
   );
 });
 
+// CHG-181 — La banda de detalle bajo el mapa era la única superficie de
+// la solicitud sin calificación ni paso a la ficha; ahora las tiene,
+// como la tarjeta de un centro de acopio.
+it("la banda de la solicitud seleccionada muestra estrellas y VER MÁS", async () => {
+  const onOpenPointDetail = jest.fn();
+  const calificada = {
+    ...request,
+    commentRatingAverage: 4.5,
+    commentRatingCount: 8,
+  };
+  renderPanel({
+    helpRequests: [calificada],
+    helpRequestActions: { isAuthenticated: false, attend: jest.fn() },
+    onOpenPointDetail,
+  });
+
+  fireEvent.press(
+    await screen.findByTestId(`map-marker-help_request:${request.id}`),
+  );
+
+  const banda = screen.getByTestId("help-request-map-detail");
+  expect(banda).toBeTruthy();
+  expect(
+    screen.getByTestId("help-request-map-detail-rating"),
+  ).toHaveTextContent(/4,5 · 8 calificaciones/);
+
+  fireEvent.press(screen.getByTestId("help-request-map-detail-more"));
+  expect(onOpenPointDetail).toHaveBeenCalledWith({
+    kind: "help_request",
+    request: calificada,
+  });
+});
+
+it("una solicitud sin calificar lo dice también en la banda", async () => {
+  renderPanel({ helpRequests: [request], onOpenPointDetail: jest.fn() });
+
+  fireEvent.press(
+    await screen.findByTestId(`map-marker-help_request:${request.id}`),
+  );
+
+  expect(
+    screen.getByTestId("help-request-map-detail-rating"),
+  ).toHaveTextContent(/Sin calificaciones/);
+});
+

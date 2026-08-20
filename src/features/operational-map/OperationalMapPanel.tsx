@@ -33,6 +33,7 @@ import {
 import type { ActiveTransport } from "../transports/types";
 import type { SelectedPhoto } from "../missing-persons/reportTypes";
 import type { HumanStatus } from "../human-impact/types";
+import { ratingSummaryLine } from "../aid-locations/ratingStars";
 import { categoryMeta } from "./categoryMeta";
 import { CategoryMarkerIcon } from "./CategoryMarkerIcon";
 import { humanStatusMeta } from "./humanStatusMeta";
@@ -573,7 +574,10 @@ function MapContent({
       />
 
       {/* CHG-125: los datos de la solicitud elegida en el mapa —
-          descripción, dirección, vigencia y cuánta gente atiende. */}
+          descripción, dirección, vigencia y cuánta gente atiende.
+          CHG-181: y, como en la tarjeta de un centro de acopio, su
+          calificación y el paso a la ficha completa. Era la última
+          superficie de la solicitud sin esas dos piezas. */}
       {selectedHelpRequest && (
         <View style={styles.detail} testID="help-request-map-detail">
           <View
@@ -584,6 +588,15 @@ function MapContent({
               NECESITAMOS AYUDA · SOLICITUD VIGENTE
             </Text>
             <Text style={styles.detailTitle}>{selectedHelpRequest.address}</Text>
+            <Text
+              style={styles.detailRating}
+              testID="help-request-map-detail-rating"
+            >
+              {ratingSummaryLine(
+                selectedHelpRequest.commentRatingAverage ?? null,
+                selectedHelpRequest.commentRatingCount ?? 0,
+              )}
+            </Text>
             <Text style={styles.detailDescription}>
               {selectedHelpRequest.description}
             </Text>
@@ -598,6 +611,22 @@ function MapContent({
                 ? "1 PERSONA ATENDIENDO"
                 : `${mapNumberFormatter.format(selectedHelpRequest.attendersCount)} PERSONAS ATENDIENDO`}
             </Text>
+            {onOpenPointDetail && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Ver más información de la solicitud"
+                onPress={() =>
+                  onOpenPointDetail({
+                    kind: "help_request",
+                    request: selectedHelpRequest,
+                  })
+                }
+                style={styles.detailMoreButton}
+                testID="help-request-map-detail-more"
+              >
+                <Text style={styles.detailMoreText}>VER MÁS →</Text>
+              </Pressable>
+            )}
           </View>
         </View>
       )}
@@ -1141,7 +1170,28 @@ const styles = StyleSheet.create({
   detailTitle: { color: colors.ink, fontSize: font(11), fontWeight: "700" },
   detailLocation: { marginTop: 3, color: colors.inkSoft, fontSize: font(11) },
   detailDescription: { maxWidth: 660, marginTop: 6, color: colors.inkSoft, fontSize: font(11), lineHeight: 17 },
+  // CHG-181: misma línea de estrellas que el popup del marcador.
+  detailRating: {
+    color: colors.missing,
+    fontFamily: fontFamilies.mono,
+    fontSize: font(11),
+  },
   detailMeta: { alignItems: "flex-end", gap: 2 },
+  detailMoreButton: {
+    marginTop: 4,
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+    borderWidth: 1,
+    borderColor: colors.lineStrong,
+    borderRadius: 7,
+  },
+  detailMoreText: {
+    color: colors.ink,
+    fontFamily: fontFamilies.mono,
+    fontSize: font(9),
+    fontWeight: "800",
+    letterSpacing: 0.7,
+  },
   detailMetaText: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: font(11) },
   noSelection: {
     minHeight: 70,
