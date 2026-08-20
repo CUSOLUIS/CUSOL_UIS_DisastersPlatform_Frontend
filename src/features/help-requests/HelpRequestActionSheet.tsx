@@ -14,6 +14,7 @@ import { ReportRejectedError } from "../missing-persons/reportSubmission";
 import type { SelectedPhoto } from "../missing-persons/reportTypes";
 import { CountdownLabel } from "./CountdownLabel";
 import { communityTextIssue } from "../humanitarian-directory/textQuality";
+import { ratingSummaryLine } from "../aid-locations/ratingStars";
 import {
   submitHelpRequestVolunteer,
   type HelpRequestVolunteerDraft,
@@ -179,6 +180,14 @@ export function HelpRequestActionSheet({
             </View>
 
             <Text style={styles.title}>{request.address}</Text>
+            {/* CHG-180: la solicitud se califica como un centro de
+                acopio, así que su tarjeta muestra la puntuación. */}
+            <Text style={styles.rating} testID="action-sheet-rating">
+              {ratingSummaryLine(
+                request.commentRatingAverage ?? null,
+                request.commentRatingCount ?? 0,
+              )}
+            </Text>
             <Text style={styles.description}>{request.description}</Text>
             <View style={styles.metaRow}>
               <CountdownLabel
@@ -397,6 +406,14 @@ const styles = StyleSheet.create({
   close: { padding: 4 },
   closeText: { color: colors.inkDim, fontSize: 18 },
   title: { color: colors.ink, fontSize: 18, fontWeight: "800" },
+  // CHG-180: misma tipografía monoespaciada que la línea de estrellas
+  // del popup del mapa, para que la tarjeta se lea igual en los dos
+  // caminos (popup y ventana de acción).
+  rating: {
+    color: colors.missing,
+    fontFamily: fontFamilies.mono,
+    fontSize: 11,
+  },
   description: { color: colors.inkSoft, fontSize: 13, lineHeight: 20 },
   metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
   meta: {

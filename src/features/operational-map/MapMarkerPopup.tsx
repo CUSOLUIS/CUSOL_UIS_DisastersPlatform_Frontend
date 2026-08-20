@@ -114,7 +114,12 @@ function summarize(target: MapMarkerPopupTarget): PopupSummary {
       return {
         accentColor: colors.emergency,
         eyebrow: "NECESITAMOS AYUDA · SOLICITUD VIGENTE",
-        ratingLine: null,
+        // CHG-180: la solicitud también se califica, así que su tarjeta
+        // muestra la puntuación como la de un centro de acopio.
+        ratingLine: ratingSummaryLine(
+          target.request.commentRatingAverage ?? null,
+          target.request.commentRatingCount ?? 0,
+        ),
         title: target.request.address,
         description: target.request.description,
         metaLines: [

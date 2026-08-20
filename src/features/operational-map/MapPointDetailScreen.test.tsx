@@ -443,3 +443,68 @@ it("sin super_admin la oferta no ofrece ELIMINAR", async () => {
 
   expect(screen.queryByTestId("map-point-delete-block")).toBeNull();
 });
+
+// CHG-180 — La ficha de «Necesitamos ayuda» gana lo mismo que la de un
+// acopio: estrellas, panel comunitario y ELIMINAR para el super_admin.
+const helpRequestWithCommunity = {
+  id: "77777777-7777-4777-8777-777777777180",
+  description: "Necesitamos agua potable y cobijas para tres familias.",
+  address: "Vereda El Salado, Piedecuesta",
+  latitude: 6.98,
+  longitude: -73.05,
+  notificationRadiusKm: 10,
+  createdAt: "2026-08-19T00:00:00Z",
+  expiresAt: "2099-08-19T18:00:00Z",
+  attendersCount: 2,
+  attendedByMe: false,
+  photoUrl: null,
+  commentRatingAverage: 4.5,
+  commentRatingCount: 8,
+};
+
+it("la ficha de una solicitud muestra su puntuación y su comunidad", async () => {
+  render(
+    <MapPointDetailScreen
+      payload={{ kind: "help_request", request: helpRequestWithCommunity }}
+      onBack={jest.fn()}
+      communityDataSource={fakeCommunitySource()}
+    />,
+  );
+
+  expect(await screen.findByTestId("map-point-detail-rating")).toHaveTextContent(
+    /4,5 · 8 calificaciones/,
+  );
+  // Mismo panel que los acopios: comentar, denunciar y la lista.
+  expect(
+    await screen.findByTestId("collection-center-community-panel"),
+  ).toBeTruthy();
+  expect(screen.getByTestId("center-comment-button")).toBeTruthy();
+  expect(screen.getByTestId("center-report-button")).toBeTruthy();
+});
+
+it("el super_admin elimina una solicitud en dos pasos", async () => {
+  const onBack = jest.fn();
+  const dataSource = fakeCommunitySource();
+  render(
+    <MapPointDetailScreen
+      payload={{ kind: "help_request", request: helpRequestWithCommunity }}
+      onBack={onBack}
+      communityDataSource={dataSource}
+      sessionSource={adminSessionSource()}
+    />,
+  );
+  const button = await screen.findByTestId("map-point-delete-center");
+
+  fireEvent.press(button);
+  expect(dataSource.adminDeleteAidLocation).not.toHaveBeenCalled();
+
+  fireEvent.press(screen.getByTestId("map-point-delete-center"));
+  await waitFor(() =>
+    // El borrado apunta a la solicitud, no a un acopio.
+    expect(dataSource.adminDeleteAidLocation).toHaveBeenCalledWith(
+      helpRequestWithCommunity.id,
+    ),
+  );
+  await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
+});
+

@@ -20,6 +20,7 @@ import {
 } from "../aid-locations/communityDataSource";
 import { ratingSummaryLine } from "../aid-locations/ratingStars";
 import { foodOfferCommunityDataSource } from "../food-offers/communityDataSource";
+import { helpRequestCommunityDataSource } from "../help-requests/communityDataSource";
 import {
   transportKindLabel,
   transportStatusLabel,
@@ -181,7 +182,11 @@ function buildContent(payload: MapPointDetailPayload): DetailContent {
         accentColor: colors.emergency,
         eyebrow: "NECESITAMOS AYUDA · SOLICITUD VIGENTE",
         title: request.address,
-        ratingLine: null,
+        // CHG-180: la misma línea de estrellas que un centro de acopio.
+        ratingLine: ratingSummaryLine(
+          request.commentRatingAverage ?? null,
+          request.commentRatingCount ?? 0,
+        ),
         description: request.description,
         rows,
         expiresAt: request.expiresAt,
@@ -361,10 +366,16 @@ export function MapPointDetailScreen({
   // CHG-176: la oferta de comida tiene la misma comunidad, con su
   // propia fuente de datos (mismas reglas, otro objetivo).
   const foodOfferId = payload?.kind === "food_offer" ? payload.offer.id : null;
-  const communityTargetId = collectionCenterId ?? foodOfferId;
+  // CHG-180: la solicitud de ayuda tiene la misma comunidad, con su
+  // propia fuente de datos (mismas reglas, otro objetivo).
+  const helpRequestId =
+    payload?.kind === "help_request" ? payload.request.id : null;
+  const communityTargetId = collectionCenterId ?? foodOfferId ?? helpRequestId;
   const communityTargetLabel = foodOfferId
     ? "esta oferta de comida"
-    : "este centro de acopio";
+    : helpRequestId
+      ? "esta solicitud de ayuda"
+      : "este centro de acopio";
   // CHG-170: solo el super_admin ve ELIMINAR en la ficha del acopio
   // (ambos tipos); la barrera real es el backend. Dos pasos.
   const session = useSessionAccount(sessionSource);
@@ -378,7 +389,9 @@ export function MapPointDetailScreen({
     communityDataSource ??
     (foodOfferId
       ? foodOfferCommunityDataSource
-      : aidLocationCommunityDataSource);
+      : helpRequestId
+        ? helpRequestCommunityDataSource
+        : aidLocationCommunityDataSource);
 
   const deleteCenter = async () => {
     if (!communityTargetId) return;

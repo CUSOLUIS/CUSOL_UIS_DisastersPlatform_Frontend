@@ -67,6 +67,11 @@ export interface ActiveHelpRequest {
   // Solo puede ser true con sesión activa.
   attendedByMe: boolean;
   photoUrl: string | null;
+  // CHG-180: promedio de estrellas y cuántos comentarios calificaron;
+  // viajan con la solicitud porque el mapa la fusiona en cliente, igual
+  // que en las ofertas de comida.
+  commentRatingAverage?: number | null;
+  commentRatingCount?: number;
 }
 
 export interface HelpRequestPage {

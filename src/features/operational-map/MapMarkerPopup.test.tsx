@@ -430,3 +430,52 @@ it("tocar una oferta no inserta la banda inferior del dashboard", async () => {
   expect(screen.getByTestId("map-marker-popup")).toBeTruthy();
   expect(screen.queryByTestId("food-offer-map-detail")).toBeNull();
 });
+
+// CHG-180 — La solicitud de «Necesitamos ayuda» se califica como un
+// centro de acopio, así que su tarjeta del mapa muestra la puntuación
+// por los dos caminos: el popup genérico y la ventana de acción.
+it("el popup de una solicitud calificada muestra su línea de estrellas", async () => {
+  renderPanel({
+    helpRequests: [
+      { ...request, commentRatingAverage: 4.5, commentRatingCount: 8 },
+    ],
+  });
+
+  fireEvent.press(
+    await screen.findByTestId(`map-marker-help_request:${request.id}`),
+  );
+
+  expect(screen.getByTestId("map-marker-popup-rating")).toHaveTextContent(
+    /4,5 · 8 calificaciones/,
+  );
+});
+
+it("una solicitud sin calificar lo dice, en vez de callar", async () => {
+  renderPanel({ helpRequests: [request] });
+
+  fireEvent.press(
+    await screen.findByTestId(`map-marker-help_request:${request.id}`),
+  );
+
+  expect(screen.getByTestId("map-marker-popup-rating")).toHaveTextContent(
+    /Sin calificaciones/,
+  );
+});
+
+it("la ventana de acción de la solicitud también muestra la puntuación", async () => {
+  renderPanel({
+    helpRequests: [
+      { ...request, commentRatingAverage: 3.5, commentRatingCount: 2 },
+    ],
+    helpRequestActions: { isAuthenticated: false, attend: jest.fn() },
+  });
+
+  fireEvent.press(
+    await screen.findByTestId(`map-marker-help_request:${request.id}`),
+  );
+
+  expect(screen.getByTestId("action-sheet-rating")).toHaveTextContent(
+    /3,5 · 2 calificaciones/,
+  );
+});
+
