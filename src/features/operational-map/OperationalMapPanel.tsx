@@ -26,6 +26,11 @@ import {
 } from "../food-offers/mapPoints";
 import type { ActiveFoodOffer } from "../food-offers/types";
 import {
+  damagedHomeIdFromPointId,
+  damagedHomesToMapPoints,
+} from "../damaged-homes/mapPoints";
+import type { ActiveDamagedHome } from "../damaged-homes/types";
+import {
   transportIdFromPointId,
   transportsToMapPoints,
   transportsToTrailDots,
@@ -129,6 +134,8 @@ interface OperationalMapPanelProps {
   // CHG-163: ofertas de comida vigentes fusionadas en cliente como
   // marcadores `community_meal`; misma regla de expiración server-side.
   foodOffers?: ActiveFoodOffer[];
+  // CHG-182: casitas destruidas publicadas por sus familias.
+  damagedHomes?: ActiveDamagedHome[];
   // CHG-171: viajes de La Mulera/La Lanchera en curso, fusionados en
   // cliente como marcadores `humanitarian_transport` con su rastro.
   transports?: ActiveTransport[];
@@ -167,6 +174,7 @@ export function OperationalMapPanel({
   helpRequests = [],
   helpRequestActions,
   foodOffers = [],
+  damagedHomes = [],
   transports = [],
   onOpenPointDetail,
 }: OperationalMapPanelProps) {
@@ -296,6 +304,7 @@ export function OperationalMapPanel({
       helpRequests={helpRequests}
       helpRequestActions={helpRequestActions}
       foodOffers={foodOffers}
+      damagedHomes={damagedHomes}
       transports={transports}
       onOpenPointDetail={onOpenPointDetail}
       activeCategories={activeCategories}
@@ -322,6 +331,7 @@ function MapContent({
   helpRequests,
   helpRequestActions,
   foodOffers,
+  damagedHomes,
   transports,
   onOpenPointDetail,
   activeCategories,
@@ -344,6 +354,7 @@ function MapContent({
   helpRequests: ActiveHelpRequest[];
   helpRequestActions?: HelpRequestMapActions;
   foodOffers: ActiveFoodOffer[];
+  damagedHomes: ActiveDamagedHome[];
   transports: ActiveTransport[];
   onOpenPointDetail?: (payload: MapPointDetailPayload) => void;
   activeCategories: OperationalMapCategory[];
@@ -370,10 +381,12 @@ function MapContent({
       // CHG-163: las ofertas de comida se fusionan igual; comparten la
       // categoría `community_meal` que existía sin datos desde CHG-044.
       ...foodOffersToMapPoints(foodOffers),
+      // CHG-182: la casita se fusiona en cliente, como la oferta.
+      ...damagedHomesToMapPoints(damagedHomes),
       // CHG-171: los viajes en curso, con su marcador móvil.
       ...transportsToMapPoints(transports),
     ],
-    [data.items, helpRequests, foodOffers, transports],
+    [data.items, helpRequests, foodOffers, damagedHomes, transports],
   );
   // CHG-171: rastro no interactivo del GPS de cada viaje.
   const transportTrailDots = useMemo(
@@ -388,8 +401,16 @@ function MapContent({
       // Se SUMA al conteo del overview (hoy 0: la publicación de
       // aid-offers sigue bloqueada por DEC-021) en vez de sustituirlo.
       communityMeal: data.summary.communityMeal + foodOffers.length,
+      // CHG-182: el contador sale del feed, no de la tabla del mapa.
+      damagedHome: damagedHomes.length,
     }),
-    [data.summary, helpRequests.length, foodOffers.length, transports.length],
+    [
+      data.summary,
+      helpRequests.length,
+      foodOffers.length,
+      damagedHomes.length,
+      transports.length,
+    ],
   );
   const visiblePoints = useMemo(
     () => mergedItems.filter((point) => activeCategories.includes(point.category)),
@@ -447,6 +468,16 @@ function MapContent({
         setPopupTarget({ kind: "food_offer", offer });
         return;
       }
+      // CHG-182: la casita abre su popup con la leyenda resumen, su
+      // puntuación y el VER MÁS hacia la ficha completa.
+      const rawHomeId = damagedHomeIdFromPointId(pointId);
+      const home = rawHomeId
+        ? (damagedHomes.find((item) => item.id === rawHomeId) ?? null)
+        : null;
+      if (home) {
+        setPopupTarget({ kind: "damaged_home", home });
+        return;
+      }
       // CHG-171: el marcador de un viaje abre su popup con estado,
       // salida y llegada.
       const rawTransportId = transportIdFromPointId(pointId);
@@ -464,6 +495,7 @@ function MapContent({
       helpRequestActions,
       helpRequests,
       foodOffers,
+      damagedHomes,
       transports,
       mergedItems,
     ],

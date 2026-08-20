@@ -38,6 +38,12 @@ import type {
   FoodOfferPage,
   FoodOffersDataSource,
 } from "../food-offers/types";
+import { damagedHomesDataSource } from "../damaged-homes/dataSource";
+import { MyDamagedHomesSection } from "../damaged-homes/MyDamagedHomesSection";
+import type {
+  DamagedHomesDataSource,
+  MyDamagedHomesResponse,
+} from "../damaged-homes/types";
 import { mySpaceDataSource } from "./dataSource";
 import type {
   MySpaceDataSource,
@@ -93,6 +99,7 @@ export function MySpacePanel({
   dataSource = mySpaceDataSource,
   helpRequests = helpRequestsDataSource,
   foodOffers = foodOffersDataSource,
+  damagedHomes = damagedHomesDataSource,
   geocode = searchAddressCandidates,
   locate = requestVisitorLocation,
   isSuperAdmin = false,
@@ -114,14 +121,19 @@ export function MySpacePanel({
   geocode?: (query: string) => Promise<AddressCandidate[]>;
   locate?: () => Promise<{ latitude: number; longitude: number }>;
   loadTransports?: typeof fetchMyTransports;
+  // CHG-182: casitas de la cuenta y sus comentarios sin leer.
+  damagedHomes?: DamagedHomesDataSource;
 }) {
   const [section, setSection] = useState<
-    "reports" | "volunteers" | "help" | "food" | "transports"
+    "reports" | "volunteers" | "help" | "food" | "transports" | "homes"
   >("reports");
   const [reports, setReports] = useState<MyReportsPage | null>(null);
   const [alerts, setAlerts] = useState<VolunteerAlertPage | null>(null);
   const [helpPage, setHelpPage] = useState<HelpRequestPage | null>(null);
   const [foodPage, setFoodPage] = useState<FoodOfferPage | null>(null);
+  const [homesPage, setHomesPage] = useState<MyDamagedHomesResponse | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -129,23 +141,34 @@ export function MySpacePanel({
     setLoading(true);
     setError(null);
     try {
-      const [reportsPage, alertsPage, helpRequestsPage, foodOffersPage] =
-        await Promise.all([
-          dataSource.getMyReports(),
-          dataSource.listVolunteerAlerts(),
-          helpRequests.listActive(),
-          foodOffers.listActive(),
-        ]);
+      const [
+        reportsPage,
+        alertsPage,
+        helpRequestsPage,
+        foodOffersPage,
+        myHomes,
+      ] = await Promise.all([
+        dataSource.getMyReports(),
+        dataSource.listVolunteerAlerts(),
+        helpRequests.listActive(),
+        foodOffers.listActive(),
+        // CHG-182: si la cuenta no tiene casitas, la bandeja llega
+        // vacía; un fallo aquí no debe tumbar el panel entero.
+        damagedHomes
+          .listMine()
+          .catch(() => ({ items: [], total: 0, unreadTotal: 0 })),
+      ]);
       setReports(reportsPage);
       setAlerts(alertsPage);
       setHelpPage(helpRequestsPage);
       setFoodPage(foodOffersPage);
+      setHomesPage(myHomes);
     } catch (caught: unknown) {
       setError(messageOf(caught));
     } finally {
       setLoading(false);
     }
-  }, [dataSource, helpRequests]);
+  }, [dataSource, helpRequests, foodOffers, damagedHomes]);
 
   useEffect(() => {
     if (visible) void load();
@@ -245,6 +268,26 @@ export function MySpacePanel({
                 aceptar su ruta con el Centro de Acopio Local. */}
             <Pressable
               accessibilityRole="tab"
+              accessibilityState={{ selected: section === "homes" }}
+              accessibilityLabel="Mis casitas"
+              onPress={() => setSection("homes")}
+              style={[styles.tab, section === "homes" && styles.tabActive]}
+              testID="my-space-homes-tab"
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  section === "homes" && styles.tabTextActive,
+                ]}
+              >
+                CASITAS
+                {homesPage && homesPage.unreadTotal > 0
+                  ? ` · ${homesPage.unreadTotal}`
+                  : ""}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="tab"
               accessibilityState={{ selected: section === "transports" }}
               accessibilityLabel="Mis transportes"
               onPress={() => setSection("transports")}
@@ -336,6 +379,15 @@ export function MySpacePanel({
                 la aceptación de ruta y el acceso para retomarlos. */}
             {section === "transports" && (
               <MyTransportsSection loadTransports={loadTransports} />
+            )}
+            {/* CHG-182: las casitas de la cuenta, con el aviso de los
+                comentarios que todavía no ha leído. */}
+            {section === "homes" && (
+              <MyDamagedHomesSection
+                page={homesPage}
+                dataSource={damagedHomes}
+                onSeen={() => void load()}
+              />
             )}
             {/* CHG-163: ofertas «Ofrecer comida» vigentes — el canal de
                 notificación a las cuentas (patrón DEC-125-11). */}

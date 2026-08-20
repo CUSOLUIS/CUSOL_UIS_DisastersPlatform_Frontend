@@ -43,22 +43,32 @@ import {
   type SubmitReportOptions,
 } from "../missing-persons/reportSubmission";
 import { ReportConsiderations } from "../reporting/ReportConsiderations";
+import { SessionGate } from "../auth/SessionGate";
 import { submitDamagedHomeReport } from "./reportSubmission";
 import {
+  DAMAGED_HOME_DONATION_CHANNELS,
+  DONATION_DISCLAIMER,
+  donationReferenceHint,
+  MAX_DONATION_REFERENCE_LENGTH,
+  MAX_HOUSEHOLD_SIZE,
+  MIN_DONATION_REFERENCE_LENGTH,
+  MIN_HOUSEHOLD_SIZE,
   MAX_DAMAGE_DESCRIPTION_LENGTH,
   MAX_HOME_ADDRESS_LENGTH,
   MAX_HOME_CITY_LENGTH,
   MIN_DAMAGE_DESCRIPTION_LENGTH,
   MIN_HOME_ADDRESS_LENGTH,
+  type DamagedHomeDonationChannel,
   type DamagedHomeDraft,
   type DamagedHomeReceipt,
 } from "./types";
 
-// CHG-162 — Formulario de «Mi casita partida»: la misma silueta de los
-// reportes ciudadanos (anónimo permitido, publicación inmediata) con
-// las reglas de ubicación de CHG-160 — dirección que se completa sola
-// al fijar el muñequito, «CRUZAR DIRECCIÓN», GPS y paneo táctil. El
-// informe sale en el mapa con la categoría `damaged_home` (🏚).
+// CHG-182 — Formulario de «Mi casita destruida» (antes «Mi casita
+// partida», CHG-162). Ahora publica SOLO quien tiene cuenta: aquí se
+// declara un medio para recibir dinero y hay a quién avisarle de los
+// comentarios. Conserva las reglas de ubicación de CHG-160 —dirección
+// que se completa sola al fijar el muñequito, «CRUZAR DIRECCIÓN», GPS y
+// paneo táctil— y sale en el mapa con la categoría `damaged_home` (🏚).
 //
 // F2: acepta hasta tres fotografías del daño (opcionales), con el mismo
 // pipeline de evidencia que los demás reportes — se comprimen si hace
@@ -71,8 +81,16 @@ export const initialDamagedHomeDraft: DamagedHomeDraft = {
   address: "",
   latitude: "",
   longitude: "",
+  householdSize: "",
+  donationChannel: null,
+  donationReference: "",
   truthConfirmed: false,
 };
+
+// CHG-182 — Por qué esta publicación exige cuenta, dicho donde se
+// pregunta.
+export const DAMAGED_HOME_SESSION_EXPLANATION =
+  "Publicar tu casita exige iniciar sesión: aquí puedes dejar un medio para recibir ayuda directa, y quien lo publica debe poder responder por él y recibir los comentarios de quienes quieran ayudar.";
 
 export type DamagedHomeIssueField = keyof DamagedHomeDraft | "location";
 
@@ -131,6 +149,43 @@ export function collectDamagedHomeIssues(
     push("location", "Las coordenadas del hogar están fuera de rango.");
   }
 
+  // CHG-182: cuántas personas viven en la casa.
+  const household = Number.parseInt(draft.householdSize.trim(), 10);
+  if (!Number.isFinite(household)) {
+    push("householdSize", "Indica cuántas personas viven en la casa.");
+  } else if (
+    household < MIN_HOUSEHOLD_SIZE ||
+    household > MAX_HOUSEHOLD_SIZE
+  ) {
+    push(
+      "householdSize",
+      `Las personas que viven en la casa deben estar entre ${MIN_HOUSEHOLD_SIZE} y ${MAX_HOUSEHOLD_SIZE}.`,
+    );
+  }
+
+  // CHG-182: el medio de ayuda va completo o no va.
+  const reference = draft.donationReference.trim();
+  if (draft.donationChannel && !reference) {
+    push(
+      "donationReference",
+      "Escribe a dónde transferir, o quita el medio de ayuda.",
+    );
+  } else if (!draft.donationChannel && reference) {
+    push(
+      "donationChannel",
+      "Elige el medio (Nequi, Daviplata…) al que corresponde ese dato.",
+    );
+  } else if (
+    reference &&
+    (reference.length < MIN_DONATION_REFERENCE_LENGTH ||
+      reference.length > MAX_DONATION_REFERENCE_LENGTH)
+  ) {
+    push(
+      "donationReference",
+      `El dato para transferir debe tener entre ${MIN_DONATION_REFERENCE_LENGTH} y ${MAX_DONATION_REFERENCE_LENGTH} caracteres.`,
+    );
+  }
+
   if (!draft.truthConfirmed) {
     push("truthConfirmed", "Debes confirmar que la información es real.");
   }
@@ -141,13 +196,16 @@ export function collectDamagedHomeIssues(
 // Sección (01..03) de cada campo, para el scroll al primer error.
 const FIELD_SECTIONS: Record<string, string> = {
   description: "01",
+  householdSize: "01",
+  donationChannel: "04",
+  donationReference: "04",
   municipality: "02",
   department: "02",
   address: "02",
   location: "02",
   latitude: "02",
   longitude: "02",
-  truthConfirmed: "04",
+  truthConfirmed: "05",
 };
 
 interface DamagedHomeFormProps {
@@ -347,47 +405,69 @@ export function DamagedHomeForm({
         >
           <View style={[styles.content, compact && styles.contentCompact]}>
             <View style={styles.intro}>
-              <Text style={styles.overline}>HOGAR / MI CASITA PARTIDA</Text>
+              <Text style={styles.overline}>HOGAR / MI CASITA DESTRUIDA</Text>
               <Text
                 style={[styles.title, compact && styles.titleCompact]}
                 accessibilityRole="header"
               >
-                Informar un hogar en malas condiciones
+                Publicar mi casita destruida
               </Text>
               <Text style={styles.introText}>
-                Genera un informe sobre un hogar que quedó en muy malas
-                condiciones después del desastre. El informe se publica de
-                inmediato y aparece en el mapa, para que la ayuda sepa a
+                Cuenta cómo quedó tu casa después del desastre: qué
+                sucedió, cuántas personas viven en ella y, si quieres, a
+                dónde pueden transferirte para ayudarte. La publicación
+                aparece de inmediato en el mapa, para que la ayuda sepa a
                 dónde llegar.
               </Text>
             </View>
 
             <ReportConsiderations
-              purpose="Un informe del hogar que quedó en muy malas condiciones; también sale en el mapa."
+              purpose="La publicación de tu casa destruida; sale en el mapa para que la ayuda sepa a dónde llegar."
               considerations={[
-                "Describe el daño con tus palabras: qué se cayó, qué se inundó, qué quedó inservible.",
-                "La dirección y el punto del mapa son públicos: así la ayuda puede llegar al hogar.",
-                "El informe se publica de inmediato; el equipo de la plataforma puede retirarlo si no corresponde.",
+                "Cuenta qué sucedió con tus palabras: qué se cayó, qué se inundó, qué quedó inservible.",
+                "La dirección y el punto del mapa son públicos: así la ayuda puede llegar a tu casa.",
+                "Si dejas un medio para transferir, será público. La plataforma no lo verifica ni intermedia los envíos.",
+                "La publicación aparece de inmediato; el equipo puede retirarla si no corresponde.",
               ]}
               onRegister={onRegister}
               onLogin={onLogin}
               session={session}
             />
 
+            {/* CHG-182: sin cuenta no se muestra el formulario ni se
+                envía nada; se explica por qué y se ofrece entrar. */}
+            <SessionGate
+              session={session}
+              explanation={DAMAGED_HOME_SESSION_EXPLANATION}
+              onRegister={onRegister}
+              onLogin={onLogin}
+            >
             <FormSection
               code="01"
-              title="Qué pasó con el hogar"
-              description="Cuenta el estado en el que quedó: daños, riesgos y lo que ya no funciona."
+              title="Qué le pasó a tu casa"
+              description="Cuenta el estado en el que quedó: qué sucedió, qué daños hay y quiénes viven allí."
               onPosition={registerSection}
             >
               <FormField
-                label="Descripción del daño *"
+                label="Qué sucedió y cómo quedó la casa *"
                 hint={`Entre ${MIN_DAMAGE_DESCRIPTION_LENGTH} y ${MAX_DAMAGE_DESCRIPTION_LENGTH} caracteres`}
                 multiline
                 invalid={invalidFields.has("description")}
                 value={draft.description}
                 maxLength={MAX_DAMAGE_DESCRIPTION_LENGTH}
                 onChangeText={(value) => setField("description", value)}
+              />
+              {/* CHG-182: la cifra que dimensiona la ayuda. */}
+              <FormField
+                label="Personas que viven en la casa *"
+                hint={`Entre ${MIN_HOUSEHOLD_SIZE} y ${MAX_HOUSEHOLD_SIZE}; cuenta a todos los que dormían allí`}
+                keyboardType="number-pad"
+                invalid={invalidFields.has("householdSize")}
+                value={draft.householdSize}
+                maxLength={2}
+                onChangeText={(value) =>
+                  setField("householdSize", value.replace(/[^0-9]/g, ""))
+                }
               />
             </FormSection>
 
@@ -546,8 +626,70 @@ export function DamagedHomeForm({
               ))}
             </FormSection>
 
+            {/* CHG-182: el medio para recibir ayuda directa. Opcional,
+                público y sin verificación de la plataforma: eso último
+                se dice aquí y se repite en la ficha. */}
             <FormSection
               code="04"
+              title="Cómo pueden ayudarte"
+              description="Opcional. Si quieres recibir transferencias, deja el medio y el dato exacto."
+              onPosition={registerSection}
+            >
+              <View style={styles.channels}>
+                {DAMAGED_HOME_DONATION_CHANNELS.map((channel) => {
+                  const active = draft.donationChannel === channel;
+                  return (
+                    <Pressable
+                      key={channel}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Medio de ayuda: ${channel}`}
+                      accessibilityState={{ selected: active }}
+                      onPress={() =>
+                        setField(
+                          "donationChannel",
+                          (active
+                            ? null
+                            : channel) as DamagedHomeDonationChannel | null,
+                        )
+                      }
+                      style={({ pressed }) => [
+                        styles.channel,
+                        active && styles.channelActive,
+                        pressed && styles.pressedButton,
+                        invalidFields.has("donationChannel") &&
+                          styles.channelInvalid,
+                      ]}
+                      testID={`donation-channel-${channel}`}
+                    >
+                      <Text
+                        style={[
+                          styles.channelText,
+                          active && styles.channelTextActive,
+                        ]}
+                      >
+                        {channel.toUpperCase()}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {draft.donationChannel && (
+                <FormField
+                  label="A dónde transferir *"
+                  hint={donationReferenceHint[draft.donationChannel]}
+                  invalid={invalidFields.has("donationReference")}
+                  value={draft.donationReference}
+                  maxLength={MAX_DONATION_REFERENCE_LENGTH}
+                  onChangeText={(value) =>
+                    setField("donationReference", value)
+                  }
+                />
+              )}
+              <Text style={styles.disclaimer}>{DONATION_DISCLAIMER}</Text>
+            </FormSection>
+
+            <FormSection
+              code="05"
               title="Confirmación"
               description="Lee y confirma antes de publicar."
               onPosition={registerSection}
@@ -601,14 +743,16 @@ export function DamagedHomeForm({
               <View style={styles.submitCopy}>
                 <Text style={styles.submitTitle}>PUBLICACIÓN Y REVISIÓN</Text>
                 <Text style={styles.submitText}>
-                  El informe se publica de inmediato y aparece en el mapa
-                  como hogar en malas condiciones. El equipo de la
-                  plataforma puede revisarlo y retirarlo si no corresponde.
+                  Tu casita se publica de inmediato y aparece en el mapa.
+                  Quien quiera ayudarte podrá comentar y calificar tu
+                  publicación, y te avisaremos aquí y por correo. El
+                  equipo de la plataforma puede retirarla si no
+                  corresponde.
                 </Text>
               </View>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Publicar informe del hogar"
+                accessibilityLabel="Publicar mi casita destruida"
                 disabled={submitting}
                 onPress={() => void submit()}
                 style={({ pressed }) => [
@@ -620,11 +764,12 @@ export function DamagedHomeForm({
                   <ActivityIndicator color="#07101b" />
                 ) : (
                   <Text style={styles.submitButtonText}>
-                    PUBLICAR INFORME →
+                    PUBLICAR MI CASITA →
                   </Text>
                 )}
               </Pressable>
             </View>
+            </SessionGate>
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -651,12 +796,14 @@ function DamagedHomeConfirmation({
         </View>
         <Text style={styles.overline}>CONSTANCIA / CUSOL</Text>
         <Text style={styles.confirmationTitle} accessibilityRole="header">
-          Informe publicado
+          Tu casita quedó publicada
         </Text>
         <Text style={styles.confirmationText}>
-          El informe del hogar ya aparece en el mapa desde el{" "}
-          {createdFormatter.format(new Date(receipt.createdAt))}. Gracias
-          por avisar: así la ayuda sabe a dónde llegar.
+          Ya aparece en el mapa desde el{" "}
+          {createdFormatter.format(new Date(receipt.createdAt))}
+          {receipt.publicCode ? ` con el código ${receipt.publicCode}` : ""}.
+          Cuando alguien comente tu publicación te avisaremos en «Mi
+          espacio» y por correo.
         </Text>
         <Pressable
           accessibilityRole="button"
@@ -723,6 +870,8 @@ function FormField({
   maxLength?: number;
   invalid?: boolean;
   placeholder?: string;
+  // CHG-182: el número de personas se escribe con teclado numérico.
+  keyboardType?: "default" | "number-pad";
 }) {
   return (
     <View style={[styles.field, multiline && styles.fieldWide]}>
@@ -987,6 +1136,35 @@ const styles = StyleSheet.create({
   },
   pressedButton: { opacity: 0.72 },
   disabledButton: { opacity: 0.45 },
+  // CHG-182: chips del medio de ayuda y su advertencia.
+  channels: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  channel: {
+    paddingVertical: 9,
+    paddingHorizontal: 13,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 999,
+    backgroundColor: colors.panelSoft,
+  },
+  channelActive: {
+    borderColor: colors.cyan,
+    backgroundColor: "rgba(81,229,255,0.10)",
+  },
+  channelInvalid: { borderColor: colors.reported },
+  channelText: {
+    color: colors.inkDim,
+    fontFamily: fontFamilies.mono,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+  },
+  channelTextActive: { color: colors.cyan },
+  disclaimer: {
+    color: colors.inkSoft,
+    fontSize: 10,
+    lineHeight: 16,
+    fontStyle: "italic",
+  },
   // CHG-162 (F2): bloque de fotografías del daño.
   photoRules: {
     gap: 4,

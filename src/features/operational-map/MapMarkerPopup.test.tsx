@@ -524,3 +524,44 @@ it("una solicitud sin calificar lo dice también en la banda", async () => {
   ).toHaveTextContent(/Sin calificaciones/);
 });
 
+// CHG-182 — La casita destruida se toca en el mapa como cualquier otro
+// punto: leyenda resumen con su puntuación y VER MÁS hacia la ficha.
+const damagedHome = {
+  id: "9a1b7c33-3333-4e5f-8a6b-000000000182",
+  publicCode: "CASA-2026-ABCD1234",
+  description: "El río se llevó la cocina y una habitación.",
+  department: "Chocó",
+  municipality: "Quibdó",
+  address: "Barrio Niño Jesús, calle 3",
+  latitude: 5.6919,
+  longitude: -76.6583,
+  householdSize: 5,
+  donationChannel: "Nequi" as const,
+  donationReference: "3001234567",
+  createdAt: "2026-08-20T10:00:00Z",
+  updatedAt: "2026-08-20T10:00:00Z",
+  photoUrls: [],
+  commentRatingAverage: 4.5,
+  commentRatingCount: 8,
+};
+
+it("el popup de una casita muestra estrellas, personas y VER MÁS", async () => {
+  const onOpenPointDetail = jest.fn();
+  renderPanel({ damagedHomes: [damagedHome], onOpenPointDetail });
+
+  fireEvent.press(
+    await screen.findByTestId(`map-marker-damaged_home:${damagedHome.id}`),
+  );
+
+  expect(screen.getByTestId("map-marker-popup-rating")).toHaveTextContent(
+    /4,5 · 8 calificaciones/,
+  );
+  expect(screen.getByText(/5 personas viven aquí/)).toBeTruthy();
+
+  fireEvent.press(screen.getByTestId("map-marker-popup-more"));
+  expect(onOpenPointDetail).toHaveBeenCalledWith({
+    kind: "damaged_home",
+    home: damagedHome,
+  });
+});
+

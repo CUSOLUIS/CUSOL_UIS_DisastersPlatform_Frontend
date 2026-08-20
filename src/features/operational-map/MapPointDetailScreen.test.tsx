@@ -508,3 +508,76 @@ it("el super_admin elimina una solicitud en dos pasos", async () => {
   await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
 });
 
+// CHG-182 — La ficha de la casita: personas, medio de ayuda con su
+// advertencia, fotos y el panel comunitario completo.
+const damagedHomeDetail = {
+  id: "9a1b7c33-3333-4e5f-8a6b-000000000182",
+  publicCode: "CASA-2026-ABCD1234",
+  description: "El río se llevó la cocina y una habitación.",
+  department: "Chocó",
+  municipality: "Quibdó",
+  address: "Barrio Niño Jesús, calle 3",
+  latitude: 5.6919,
+  longitude: -76.6583,
+  householdSize: 5,
+  donationChannel: "Nequi" as const,
+  donationReference: "3001234567",
+  createdAt: "2026-08-20T10:00:00Z",
+  updatedAt: "2026-08-20T10:00:00Z",
+  // Absoluta a propósito: en pruebas no hay base de API configurada y
+  // `resolvePublicMediaUrl` devolvería null con una ruta relativa.
+  photoUrls: ["https://cusol.local/api/v1/public/damaged-homes/9a1b7c33/photos/1"],
+  commentRatingAverage: 4.5,
+  commentRatingCount: 8,
+};
+
+it("la ficha de la casita muestra personas, ayuda directa y comunidad", async () => {
+  render(
+    <MapPointDetailScreen
+      payload={{ kind: "damaged_home", home: damagedHomeDetail }}
+      onBack={jest.fn()}
+      communityDataSource={fakeCommunitySource()}
+    />,
+  );
+
+  expect(await screen.findByTestId("map-point-detail-rating")).toHaveTextContent(
+    /4,5 · 8 calificaciones/,
+  );
+  expect(screen.getByText("PERSONAS QUE VIVEN AQUÍ")).toBeTruthy();
+  expect(screen.getByText("AYUDA DIRECTA · NEQUI")).toBeTruthy();
+  expect(screen.getByText("3001234567")).toBeTruthy();
+  // El medio de ayuda nunca aparece sin su advertencia.
+  expect(
+    screen.getByText(/no verifica este dato ni intermedia/i),
+  ).toBeTruthy();
+  expect(screen.getByTestId("map-point-detail-photo-0")).toBeTruthy();
+  expect(
+    await screen.findByTestId("collection-center-community-panel"),
+  ).toBeTruthy();
+  expect(screen.getByTestId("center-comment-button")).toBeTruthy();
+  expect(screen.getByTestId("center-report-button")).toBeTruthy();
+});
+
+it("el super_admin elimina una casita en dos pasos", async () => {
+  const onBack = jest.fn();
+  const dataSource = fakeCommunitySource();
+  render(
+    <MapPointDetailScreen
+      payload={{ kind: "damaged_home", home: damagedHomeDetail }}
+      onBack={onBack}
+      communityDataSource={dataSource}
+      sessionSource={adminSessionSource()}
+    />,
+  );
+  fireEvent.press(await screen.findByTestId("map-point-delete-center"));
+  expect(dataSource.adminDeleteAidLocation).not.toHaveBeenCalled();
+
+  fireEvent.press(screen.getByTestId("map-point-delete-center"));
+  await waitFor(() =>
+    expect(dataSource.adminDeleteAidLocation).toHaveBeenCalledWith(
+      damagedHomeDetail.id,
+    ),
+  );
+  await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
+});
+

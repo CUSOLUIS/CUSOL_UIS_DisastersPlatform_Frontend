@@ -1,5 +1,6 @@
 import type { ActiveHelpRequest } from "../help-requests/types";
 import type { ActiveFoodOffer } from "../food-offers/types";
+import type { ActiveDamagedHome } from "../damaged-homes/types";
 import type { ActiveTransport } from "../transports/types";
 import type { HumanMapPoint, OperationalMapPoint } from "./types";
 
@@ -13,6 +14,8 @@ export type MapPointDetailPayload =
   | { kind: "operational"; point: OperationalMapPoint }
   | { kind: "help_request"; request: ActiveHelpRequest }
   | { kind: "food_offer"; offer: ActiveFoodOffer }
+  // CHG-182: casita destruida, con sus fotos y su medio de ayuda.
+  | { kind: "damaged_home"; home: ActiveDamagedHome }
   | { kind: "human"; feature: HumanMapPoint }
   // CHG-171: viaje de La Mulera/La Lanchera.
   | { kind: "transport"; transport: ActiveTransport };
@@ -82,6 +85,19 @@ export function decodeMapPointDetail(
         return {
           kind: "help_request",
           request: request as unknown as ActiveHelpRequest,
+        };
+      }
+      return null;
+    }
+    case "damaged_home": {
+      const home = parsed.home;
+      if (
+        isRecord(home) &&
+        hasStringFields(home, ["id", "description", "address"])
+      ) {
+        return {
+          kind: "damaged_home",
+          home: home as unknown as ActiveDamagedHome,
         };
       }
       return null;

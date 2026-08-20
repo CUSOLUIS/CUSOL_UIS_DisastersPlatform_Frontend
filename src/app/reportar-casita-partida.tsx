@@ -1,19 +1,8 @@
-import { useRouter } from "expo-router";
-import { DamagedHomeForm } from "../features/damaged-homes/DamagedHomeForm";
-import { useSafeBack } from "../navigation/useSafeBack";
+import { Redirect } from "expo-router";
 
-// CHG-162 — «Mi casita partida»: informe de un hogar en muy malas
-// condiciones; también sale en el mapa.
-export default function ReportDamagedHomeRoute() {
-  const router = useRouter();
-  const safeBack = useSafeBack();
-
-  return (
-    <DamagedHomeForm
-      onBack={safeBack}
-      onHome={() => router.replace("/")}
-      onRegister={() => router.push("/registrarse")}
-      onLogin={() => router.push("/iniciar-sesion")}
-    />
-  );
+// CHG-182 — «Mi casita partida» pasó a llamarse «Mi casita destruida».
+// La ruta anterior se conserva como redirección: hay enlaces
+// publicados y bundles viejos que todavía la usan (CHG-137).
+export default function LegacyDamagedHomeRoute() {
+  return <Redirect href="/reportar-casita-destruida" />;
 }

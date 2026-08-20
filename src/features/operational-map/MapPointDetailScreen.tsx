@@ -21,6 +21,8 @@ import {
 import { ratingSummaryLine } from "../aid-locations/ratingStars";
 import { foodOfferCommunityDataSource } from "../food-offers/communityDataSource";
 import { helpRequestCommunityDataSource } from "../help-requests/communityDataSource";
+import { damagedHomeCommunityDataSource } from "../damaged-homes/communityDataSource";
+import { DONATION_DISCLAIMER } from "../damaged-homes/types";
 import {
   transportKindLabel,
   transportStatusLabel,
@@ -95,7 +97,9 @@ interface DetailContent {
   description: string | null;
   rows: DetailRow[];
   expiresAt: string | null;
-  photoUrl: string | null;
+  // CHG-182: la casita publica varias fotos; el resto de fichas
+  // entregan una o ninguna en la misma lista.
+  photoUrls: string[];
   note: string | null;
 }
 
@@ -153,7 +157,7 @@ function buildContent(payload: MapPointDetailPayload): DetailContent {
         description: point.description,
         rows,
         expiresAt: null,
-        photoUrl: null,
+        photoUrls: [],
         note: null,
       };
     }
@@ -190,7 +194,9 @@ function buildContent(payload: MapPointDetailPayload): DetailContent {
         description: request.description,
         rows,
         expiresAt: request.expiresAt,
-        photoUrl: resolvePublicMediaUrl(request.photoUrl),
+        photoUrls: [resolvePublicMediaUrl(request.photoUrl)].filter(
+          (url): url is string => url !== null,
+        ),
         note: null,
       };
     }
@@ -223,8 +229,59 @@ function buildContent(payload: MapPointDetailPayload): DetailContent {
         description: offer.description,
         rows,
         expiresAt: offer.expiresAt,
-        photoUrl: null,
+        photoUrls: [],
         note: null,
+      };
+    }
+    case "damaged_home": {
+      const { home } = payload;
+      const rows: DetailRow[] = [
+        { label: "Dirección", value: home.address },
+        {
+          label: "Municipio",
+          value: `${home.municipality}, ${home.department}`,
+        },
+        { label: "Publicada", value: formatDate(home.createdAt) },
+      ];
+      if (home.householdSize !== null) {
+        rows.push({
+          label: "Personas que viven aquí",
+          value: countFormatter.format(home.householdSize),
+        });
+      }
+      const coordinates = formatCoordinates(home.latitude, home.longitude);
+      if (coordinates) {
+        rows.push({ label: "Coordenadas", value: coordinates });
+      }
+      // CHG-182: el medio de ayuda es público a propósito, y siempre
+      // acompañado de su advertencia.
+      if (home.donationChannel && home.donationReference) {
+        rows.push({
+          label: `Ayuda directa · ${home.donationChannel}`,
+          value: home.donationReference,
+        });
+      }
+      if (home.publicCode) {
+        rows.push({ label: "Código", value: home.publicCode });
+      }
+      return {
+        accentColor: categoryMeta.damaged_home.color,
+        eyebrow: "MI CASITA DESTRUIDA",
+        title: home.address,
+        ratingLine: ratingSummaryLine(
+          home.commentRatingAverage ?? null,
+          home.commentRatingCount ?? 0,
+        ),
+        description: home.description,
+        rows,
+        expiresAt: null,
+        photoUrls: home.photoUrls
+          .map((url) => resolvePublicMediaUrl(url))
+          .filter((url): url is string => url !== null),
+        note:
+          home.donationChannel && home.donationReference
+            ? DONATION_DISCLAIMER
+            : null,
       };
     }
     case "transport": {
@@ -299,7 +356,7 @@ function buildContent(payload: MapPointDetailPayload): DetailContent {
           transport.suppliesSummary,
         rows,
         expiresAt: null,
-        photoUrl: null,
+        photoUrls: [],
         note: transport.suppliesSummary
           ? `Insumos que lleva: ${transport.suppliesSummary}`
           : null,
@@ -336,7 +393,7 @@ function buildContent(payload: MapPointDetailPayload): DetailContent {
         description: null,
         rows,
         expiresAt: null,
-        photoUrl: null,
+        photoUrls: [],
         note: "Este punto es anónimo por diseño: la plataforma no publica datos personales de la persona. Para buscar o aportar novedades sobre alguien, usa el directorio humanitario de la portada.",
       };
     }
@@ -370,12 +427,18 @@ export function MapPointDetailScreen({
   // propia fuente de datos (mismas reglas, otro objetivo).
   const helpRequestId =
     payload?.kind === "help_request" ? payload.request.id : null;
-  const communityTargetId = collectionCenterId ?? foodOfferId ?? helpRequestId;
+  // CHG-182: la casita tiene la misma comunidad, con su fuente propia.
+  const damagedHomeId =
+    payload?.kind === "damaged_home" ? payload.home.id : null;
+  const communityTargetId =
+    collectionCenterId ?? foodOfferId ?? helpRequestId ?? damagedHomeId;
   const communityTargetLabel = foodOfferId
     ? "esta oferta de comida"
     : helpRequestId
       ? "esta solicitud de ayuda"
-      : "este centro de acopio";
+      : damagedHomeId
+        ? "esta publicación de casita"
+        : "este centro de acopio";
   // CHG-170: solo el super_admin ve ELIMINAR en la ficha del acopio
   // (ambos tipos); la barrera real es el backend. Dos pasos.
   const session = useSessionAccount(sessionSource);
@@ -391,7 +454,9 @@ export function MapPointDetailScreen({
       ? foodOfferCommunityDataSource
       : helpRequestId
         ? helpRequestCommunityDataSource
-        : aidLocationCommunityDataSource);
+        : damagedHomeId
+          ? damagedHomeCommunityDataSource
+          : aidLocationCommunityDataSource);
 
   const deleteCenter = async () => {
     if (!communityTargetId) return;
@@ -535,16 +600,17 @@ function DetailCard({ content }: { content: DetailContent }) {
         <Text style={styles.description}>{content.description}</Text>
       )}
 
-      {content.photoUrl && (
+      {content.photoUrls.map((url, index) => (
         <Image
+          key={url}
           accessibilityIgnoresInvertColors
-          accessibilityLabel="Fotografía del lugar de la solicitud"
+          accessibilityLabel={`Fotografía ${index + 1} del lugar`}
           resizeMode="cover"
-          source={{ uri: content.photoUrl }}
+          source={{ uri: url }}
           style={styles.photo}
-          testID="map-point-detail-photo"
+          testID={`map-point-detail-photo-${index}`}
         />
-      )}
+      ))}
 
       <View style={styles.rows}>
         {content.rows.map((row) => (

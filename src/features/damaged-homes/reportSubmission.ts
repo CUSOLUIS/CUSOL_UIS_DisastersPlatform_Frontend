@@ -15,10 +15,13 @@ import type { SelectedPhoto } from "../missing-persons/reportTypes";
 import { searchAddressCandidates } from "../missing-persons/geocoding";
 import type { DamagedHomeDraft, DamagedHomeReceipt } from "./types";
 
-// CHG-162 — Alta del informe de hogar en malas condiciones, con
+// CHG-182 — Alta de «Mi casita destruida» (antes «Mi casita partida»,
+// CHG-162). Solo con cuenta: la cookie de sesión viaja siempre y el
+// backend responde 401 sin ella. Con
 // Idempotency-Key en todos los intentos y reintento acotado durante
 // ventanas de despliegue (CHG-101). La cookie de sesión (si existe)
-// asocia la cuenta; sin sesión el informe sigue siendo anónimo.
+// asocia la publicación a su dueña, que es quien recibirá los avisos
+// de los comentarios.
 //
 // F2: con fotografías del daño el envío es multipart (parte `payload`
 // + partes `photos`, como los demás reportes con evidencia); sin
@@ -41,7 +44,18 @@ export function buildDamagedHomePayload(
     municipality: draft.municipality.trim(),
     department: draft.department.trim(),
     address: draft.address.trim(),
+    // CHG-182: cuántas personas viven en la casa.
+    householdSize: Number.parseInt(draft.householdSize.trim(), 10),
   };
+
+  // CHG-182: el medio de ayuda viaja completo o no viaja: un canal sin
+  // referencia no sirve para transferirle a nadie (el backend lo
+  // rechaza igual).
+  const reference = draft.donationReference.trim();
+  if (draft.donationChannel && reference) {
+    payload.donationChannel = draft.donationChannel;
+    payload.donationReference = reference;
+  }
 
   // Las coordenadas viajan solo en pareja (regla del contrato).
   const latitude = Number.parseFloat(draft.latitude.trim());
@@ -55,6 +69,7 @@ export function buildDamagedHomePayload(
 }
 
 const ERROR_MESSAGES_BY_STATUS: Record<number, string> = {
+  401: "Para publicar tu casita necesitas iniciar sesión.",
   413: "Las fotografías superan el máximo permitido. Quita alguna e intenta de nuevo.",
   415: "Alguna fotografía no pudo procesarse. Prueba con otra imagen.",
   422: "La API rechazó el informe por datos inválidos. Revisa los campos e intenta de nuevo.",

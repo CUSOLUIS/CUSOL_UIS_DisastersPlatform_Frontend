@@ -107,14 +107,15 @@ export const reportActionCatalog: Record<ReportActionId, ReportActionCopy> = {
       "Registra la lancha que llevará insumos desde un centro de acopio local hasta un centro de acopio receptor, con trazabilidad de los suministros.",
     hint: "Registra la lancha que llevará insumos desde un centro de acopio local hasta un centro de acopio receptor, con trazabilidad de los suministros",
   },
-  // CHG-162: el informe sale también en el mapa (categoría propia).
+  // CHG-182: publica la familia (solo con cuenta) y sale en el mapa con
+  // su ficha, sus fotos y su medio para recibir ayuda directa.
   "damaged-home": {
     id: "damaged-home",
     category: "HOGAR · DAÑOS GRAVES",
-    title: "Mi casita partida",
+    title: "Mi casita destruida",
     purpose:
-      "Genera un informe sobre un hogar que quedó en muy malas condiciones; también aparecerá en el mapa.",
-    hint: "Genera un informe sobre un hogar que quedó en muy malas condiciones; también aparecerá en el mapa",
+      "Publica cómo quedó tu casa, cuántas personas viven en ella y a dónde pueden transferirte para ayudarte.",
+    hint: "Publica cómo quedó tu casa, cuántas personas viven en ella y a dónde pueden transferirte para ayudarte",
   },
   // CHG-163: la oferta es pública, admite anónimos, sale en el mapa y
   // expira sola (reglas de «Necesitamos ayuda»).

@@ -32,7 +32,7 @@ export default function HomeRoute() {
       }
       onRegisterMuleTransport={() => router.push("/registrar-mulera")}
       onRegisterBoatTransport={() => router.push("/registrar-lanchera")}
-      onReportDamagedHome={() => router.push("/reportar-casita-partida")}
+      onReportDamagedHome={() => router.push("/reportar-casita-destruida")}
       onRequestHelp={() => router.push("/necesitamos-ayuda")}
       onOfferCommunityMeals={() => router.push("/ofrecer-comida")}
       // CHG-164: «VER MÁS» del popup de un marcador → vista completa.

@@ -36,6 +36,9 @@ import { HelpRequestProximityAlert } from "../help-requests/HelpRequestProximity
 import { useActiveHelpRequests } from "../help-requests/useActiveHelpRequests";
 import { FoodOfferProximityAlert } from "../food-offers/FoodOfferProximityAlert";
 import { useActiveFoodOffers } from "../food-offers/useActiveFoodOffers";
+import { useActiveDamagedHomes } from "../damaged-homes/useActiveDamagedHomes";
+import type { DamagedHomesDataSource } from "../damaged-homes/types";
+import { damagedHomesDataSource as defaultDamagedHomesDataSource } from "../damaged-homes/dataSource";
 import { useActiveTransports } from "../transports/useActiveTransports";
 import { pickVolunteerPhoto } from "../help-requests/pickVolunteerPhoto";
 import {
@@ -76,6 +79,8 @@ interface HumanImpactDashboardProps {
   helpRequestsDataSource: HelpRequestsDataSource;
   // CHG-163: ofertas «Ofrecer comida» vigentes.
   foodOffersDataSource: FoodOffersDataSource;
+  // CHG-182: inyectable en pruebas; por defecto, el feed real.
+  damagedHomesDataSource?: DamagedHomesDataSource;
   onReportMissingPerson: () => void;
   onReportUnverifiedBuilding: () => void;
   onRegisterCollectionCenter: () => void;
@@ -211,6 +216,7 @@ export function HumanImpactDashboard({
   communityContributionDataSource,
   helpRequestsDataSource,
   foodOffersDataSource,
+  damagedHomesDataSource = defaultDamagedHomesDataSource,
   initialDirectorySearch,
   onReportMissingPerson,
   onReportUnverifiedBuilding,
@@ -321,6 +327,10 @@ export function HumanImpactDashboard({
     useActiveHelpRequests(helpRequestsDataSource);
   // CHG-163: ofertas de comida vigentes, con el mismo pulso.
   const { state: foodOffersState } = useActiveFoodOffers(foodOffersDataSource);
+  // CHG-182: casitas destruidas publicadas, con el mismo pulso.
+  const { state: damagedHomesState } = useActiveDamagedHomes(
+    damagedHomesDataSource,
+  );
   // CHG-171: viajes de La Mulera/La Lanchera en curso, para el mapa.
   const transportsState = useActiveTransports();
   const helpRequestActions = useMemo(
@@ -505,6 +515,7 @@ export function HumanImpactDashboard({
                 helpRequests={helpRequestsState.items}
                 helpRequestActions={helpRequestActions}
                 foodOffers={foodOffersState.items}
+                damagedHomes={damagedHomesState.items}
                 transports={transportsState.items}
                 onOpenPointDetail={onOpenMapPointDetail}
               />

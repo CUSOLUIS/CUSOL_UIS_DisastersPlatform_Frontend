@@ -4,6 +4,7 @@ import { font } from "../../typography";
 import { CountdownLabel } from "../help-requests/CountdownLabel";
 import type { ActiveHelpRequest } from "../help-requests/types";
 import type { ActiveFoodOffer } from "../food-offers/types";
+import type { ActiveDamagedHome } from "../damaged-homes/types";
 import {
   transportKindLabel,
   transportStatusLabel,
@@ -26,6 +27,8 @@ export type MapMarkerPopupTarget =
   | { kind: "operational"; point: OperationalMapPoint }
   | { kind: "help_request"; request: ActiveHelpRequest }
   | { kind: "food_offer"; offer: ActiveFoodOffer }
+  // CHG-182: casita destruida publicada por su familia.
+  | { kind: "damaged_home"; home: ActiveDamagedHome }
   | { kind: "human"; feature: HumanMapFeature }
   // CHG-171: viaje de La Mulera/La Lanchera en curso.
   | { kind: "transport"; transport: ActiveTransport };
@@ -66,6 +69,8 @@ export function detailPayloadFromTarget(
       return { kind: "help_request", request: target.request };
     case "food_offer":
       return { kind: "food_offer", offer: target.offer };
+    case "damaged_home":
+      return { kind: "damaged_home", home: target.home };
     case "human":
       return target.feature.kind === "point"
         ? { kind: "human", feature: target.feature }
@@ -144,6 +149,28 @@ function summarize(target: MapMarkerPopupTarget): PopupSummary {
         metaLines: [],
         expiresAt: target.offer.expiresAt,
       };
+    case "damaged_home": {
+      const { home } = target;
+      const personas =
+        home.householdSize === null
+          ? null
+          : home.householdSize === 1
+            ? "1 persona vive aquí"
+            : `${countFormatter.format(home.householdSize)} personas viven aquí`;
+      return {
+        accentColor: categoryMeta.damaged_home.color,
+        eyebrow: "MI CASITA DESTRUIDA",
+        // La misma línea de estrellas que un centro de acopio.
+        ratingLine: ratingSummaryLine(
+          home.commentRatingAverage ?? null,
+          home.commentRatingCount ?? 0,
+        ),
+        title: home.address,
+        description: home.description,
+        metaLines: personas ? [personas] : [],
+        expiresAt: null,
+      };
+    }
     case "transport": {
       const { transport } = target;
       const journeyLines = [

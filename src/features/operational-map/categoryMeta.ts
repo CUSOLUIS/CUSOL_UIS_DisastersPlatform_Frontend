@@ -110,10 +110,11 @@ export const categoryMeta: Record<OperationalMapCategory, CategoryMeta> = {
     markerKind: "building",
     summaryKey: "temporaryShelter",
   },
-  // CHG-162: hogares en muy malas condiciones («Mi casita partida»).
+  // CHG-182: casas destruidas publicadas por sus familias («Mi casita
+  // destruida»; antes «Mi casita partida», CHG-162).
   damaged_home: {
-    label: "Hogares en malas condiciones",
-    shortLabel: "Hogar en malas condiciones",
+    label: "Casas destruidas",
+    shortLabel: "Casa destruida",
     glyph: "🏚",
     color: "#fb7185",
     markerKind: "building",
