@@ -66,6 +66,10 @@ export interface ActiveHelpRequest {
   attendersCount: number;
   // Solo puede ser true con sesión activa.
   attendedByMe: boolean;
+  // CHG-190: true solo para la cuenta que creó la solicitud. Opcional
+  // porque un backend anterior no lo manda (CHG-137): ausente se lee
+  // como «no es mía», que es el comportamiento de siempre.
+  createdByMe?: boolean;
   photoUrl: string | null;
   // CHG-180: promedio de estrellas y cuántos comentarios calificaron;
   // viajan con la solicitud porque el mapa la fusiona en cliente, igual

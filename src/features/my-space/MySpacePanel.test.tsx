@@ -6,6 +6,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { MySpacePanel } from "./MySpacePanel";
 import type { MySpaceDataSource } from "./types";
+import type { HelpRequestsDataSource } from "../help-requests/types";
 
 function createDataSource(): MySpaceDataSource & {
   createVolunteerAlert: jest.Mock;
@@ -234,4 +235,94 @@ it("sin rol super_admin no existe el acceso a la consola", async () => {
   expect(
     screen.queryByLabelText("Abrir la consola de administración"),
   ).toBeNull();
+});
+
+// CHG-190 — En «Mi espacio» las solicitudes de ayuda están para
+// atenderlas, así que la propia no se ofrece: nadie se atiende a sí
+// mismo. El servidor las sigue devolviendo todas (el mapa las necesita);
+// esconderlas es cosa de esta superficie.
+function helpRequestsWith(
+  items: { id: string; address: string; createdByMe?: boolean }[],
+): HelpRequestsDataSource {
+  return {
+    transport: "demo",
+    listActive: jest.fn().mockResolvedValue({
+      items: items.map((item) => ({
+        id: item.id,
+        description: `Necesitamos ayuda en ${item.address}.`,
+        address: item.address,
+        latitude: 7.12,
+        longitude: -73.12,
+        notificationRadiusKm: null,
+        createdAt: "2026-08-21T10:00:00Z",
+        expiresAt: "2126-08-21T10:00:00Z",
+        attendersCount: 0,
+        attendedByMe: false,
+        createdByMe: item.createdByMe ?? false,
+        photoUrl: null,
+      })),
+      total: items.length,
+      generatedAt: "2026-08-21T10:05:00Z",
+    }),
+    attend: jest.fn(),
+  };
+}
+
+it("no ofrece para atender la solicitud de ayuda creada por la propia cuenta", async () => {
+  render(
+    <MySpacePanel
+      visible
+      onClose={jest.fn()}
+      dataSource={createDataSource()}
+      helpRequests={helpRequestsWith([
+        {
+          id: "40000000-0000-4000-8000-000000000001",
+          address: "Calle 33, Bucaramanga",
+          createdByMe: true,
+        },
+        {
+          id: "40000000-0000-4000-8000-000000000002",
+          address: "Vereda El Salado, Piedecuesta",
+        },
+      ])}
+      geocode={geocode}
+    />,
+  );
+
+  fireEvent.press(await screen.findByRole("tab", { name: "Solicitudes de ayuda" }));
+
+  expect(
+    await screen.findByTestId("help-request-item-40000000-0000-4000-8000-000000000002"),
+  ).toBeTruthy();
+  expect(
+    screen.queryByTestId("help-request-item-40000000-0000-4000-8000-000000000001"),
+  ).toBeNull();
+  // El contador de la cabecera cuenta lo que de verdad se puede atender.
+  expect(screen.getByText("1 VIGENTE")).toBeTruthy();
+});
+
+it("si todas las solicitudes vigentes son propias, la pestaña queda vacía sin error", async () => {
+  render(
+    <MySpacePanel
+      visible
+      onClose={jest.fn()}
+      dataSource={createDataSource()}
+      helpRequests={helpRequestsWith([
+        {
+          id: "40000000-0000-4000-8000-000000000003",
+          address: "Calle 33, Bucaramanga",
+          createdByMe: true,
+        },
+      ])}
+      geocode={geocode}
+    />,
+  );
+
+  fireEvent.press(await screen.findByRole("tab", { name: "Solicitudes de ayuda" }));
+
+  expect(
+    await screen.findByText(
+      "No hay solicitudes de ayuda vigentes en este momento.",
+    ),
+  ).toBeTruthy();
 });

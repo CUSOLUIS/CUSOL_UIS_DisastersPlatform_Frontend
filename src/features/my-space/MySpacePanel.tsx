@@ -5,7 +5,7 @@
 // servicio de mapa (o su ubicación actual), descripción y marcador
 // público inmediato en el mapa operativo.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -173,6 +173,16 @@ export function MySpacePanel({
   useEffect(() => {
     if (visible) void load();
   }, [load, visible]);
+
+  // CHG-190: en «Mi espacio» las solicitudes de ayuda están para
+  // atenderlas, y nadie se atiende a sí mismo: la que creó esta cuenta
+  // no se lista aquí. El listado del servidor sigue siendo completo
+  // —el mapa, la alerta de proximidad y el contador de portada la
+  // necesitan viva—; quien la esconde es esta superficie.
+  const attendableHelpRequests = useMemo(
+    () => (helpPage?.items ?? []).filter((request) => !request.createdByMe),
+    [helpPage],
+  );
 
   if (!visible) return null;
 
@@ -365,7 +375,7 @@ export function MySpacePanel({
                 atender siempre está disponible. */}
             {section === "help" && (
               <HelpRequestsSection
-                items={helpPage?.items ?? []}
+                items={attendableHelpRequests}
                 loading={loading && helpPage === null}
                 errorMessage={null}
                 isAuthenticated
