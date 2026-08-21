@@ -515,7 +515,7 @@ it("la banda de la solicitud seleccionada muestra estrellas y VER MÁS", async (
 // CHG-194 — Quien creó la solicitud no ve «VER MÁS» en ninguna de las
 // superficies que abre un click en el mapa: ni la banda de detalle ni el
 // popup genérico. La ficha pública es para los demás.
-it("la banda de la solicitud propia no ofrece VER MÁS", async () => {
+it("la banda de la solicitud propia no ofrece la ficha pública", async () => {
   const onOpenPointDetail = jest.fn();
   renderPanel({
     helpRequests: [{ ...request, createdByMe: true }],
@@ -552,6 +552,40 @@ it("el popup genérico de la solicitud propia tampoco ofrece VER MÁS", async ()
 
   expect(screen.getByTestId("map-marker-popup")).toBeTruthy();
   expect(screen.queryByTestId("map-marker-popup-more")).toBeNull();
+});
+
+// CHG-195 — El VER MÁS de la dueña cambia de destino, no desaparece:
+// en el mapa la lleva a quiénes la atienden, igual que la píldora de
+// «Mi espacio».
+it("el VER MÁS de la dueña lleva a quiénes atienden, en la banda y en la ventana", async () => {
+  const onOpenAttenders = jest.fn();
+  const onOpenPointDetail = jest.fn();
+  const propia = { ...request, createdByMe: true };
+  renderPanel({
+    helpRequests: [propia],
+    helpRequestActions: {
+      isAuthenticated: true,
+      attend: jest.fn(),
+      onOpenAttenders,
+    },
+    onOpenPointDetail,
+  });
+
+  fireEvent.press(
+    await screen.findByTestId(`map-marker-help_request:${request.id}`),
+  );
+
+  // La ventana de acción ofrece su VER MÁS propio.
+  fireEvent.press(screen.getByTestId("action-sheet-view-attenders"));
+  expect(onOpenAttenders).toHaveBeenCalledWith(propia);
+
+  // Y la banda bajo el mapa, el mismo destino.
+  fireEvent.press(screen.getByTestId("help-request-map-detail-attenders"));
+  expect(onOpenAttenders).toHaveBeenCalledTimes(2);
+
+  // En ningún caso la ficha pública.
+  expect(onOpenPointDetail).not.toHaveBeenCalled();
+  expect(screen.queryByTestId("help-request-map-detail-more")).toBeNull();
 });
 
 it("una solicitud sin calificar lo dice también en la banda", async () => {

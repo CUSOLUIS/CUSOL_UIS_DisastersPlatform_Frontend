@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -262,3 +263,111 @@ it("cuando nadie atiende todavía, la píldora lo dice con todas las letras", ()
   expect(screen.getByText("NADIE ATIENDE TU SOLICITUD AÚN")).toBeTruthy();
 });
 
+
+// CHG-196 — La dueña puede retirar su solicitud cuando la ayuda llegó.
+// Va en dos pasos porque no se puede deshacer.
+it("la dueña elimina su solicitud, pero solo tras confirmarlo", async () => {
+  const propia = { ...requests[0], createdByMe: true, attendersCount: 3 };
+  const onDeleteOwn = jest.fn().mockResolvedValue(undefined);
+  render(
+    <HelpRequestsSection
+      items={[requests[1]]}
+      loading={false}
+      errorMessage={null}
+      isAuthenticated
+      attend={jest.fn()}
+      onAttended={jest.fn()}
+      ownRequests={[propia]}
+      onDeleteOwn={onDeleteOwn}
+    />,
+  );
+
+  // Primer toque: advierte, no borra.
+  fireEvent.press(screen.getByTestId("help-request-own-delete"));
+  expect(onDeleteOwn).not.toHaveBeenCalled();
+  expect(screen.getByText(/No se puede deshacer/)).toBeTruthy();
+  expect(screen.getByText(/quienes la estaban atendiendo/)).toBeTruthy();
+
+  // Arrepentirse deja todo como estaba.
+  fireEvent.press(screen.getByRole("button", { name: "Conservar mi solicitud" }));
+  expect(onDeleteOwn).not.toHaveBeenCalled();
+
+  // Segundo toque + confirmación: ahora sí.
+  fireEvent.press(screen.getByTestId("help-request-own-delete"));
+  await act(async () => {
+    fireEvent.press(screen.getByTestId("help-request-own-delete-confirm"));
+  });
+  expect(onDeleteOwn).toHaveBeenCalledWith(propia.id);
+});
+
+it("si el borrado falla, lo dice y la solicitud sigue ahí", async () => {
+  const propia = { ...requests[0], createdByMe: true };
+  const onDeleteOwn = jest
+    .fn()
+    .mockRejectedValue(new Error("La solicitud no existe o no es tuya."));
+  render(
+    <HelpRequestsSection
+      items={[requests[1]]}
+      loading={false}
+      errorMessage={null}
+      isAuthenticated
+      attend={jest.fn()}
+      onAttended={jest.fn()}
+      ownRequests={[propia]}
+      onDeleteOwn={onDeleteOwn}
+    />,
+  );
+
+  fireEvent.press(screen.getByTestId("help-request-own-delete"));
+  await act(async () => {
+    fireEvent.press(screen.getByTestId("help-request-own-delete-confirm"));
+  });
+
+  expect(screen.getByText("La solicitud no existe o no es tuya.")).toBeTruthy();
+  expect(screen.getByTestId("help-request-own-delete")).toBeTruthy();
+});
+
+it("quien no tiene solicitud propia no ve ELIMINAR", () => {
+  render(
+    <HelpRequestsSection
+      items={requests}
+      loading={false}
+      errorMessage={null}
+      isAuthenticated
+      attend={jest.fn()}
+      onAttended={jest.fn()}
+      onDeleteOwn={jest.fn()}
+    />,
+  );
+
+  expect(screen.queryByTestId("help-request-own-delete")).toBeNull();
+});
+
+// CHG-198 — Quien ya aceptó atender necesita la ficha completa: va a
+// acudir, no solo a mirar.
+it("la solicitud que ya atiendes ofrece VER MÁS hacia su ficha", () => {
+  const onOpenDetail = jest.fn();
+  // En el juego de prueba, la segunda ya está atendida y la primera no.
+  const atendida = requests[1];
+  const sinAtender = requests[0];
+  render(
+    <HelpRequestsSection
+      items={requests}
+      loading={false}
+      errorMessage={null}
+      isAuthenticated
+      attend={jest.fn()}
+      onAttended={jest.fn()}
+      onOpenDetail={onOpenDetail}
+    />,
+  );
+
+  expect(screen.getByText("✓ ESTÁS ATENDIENDO ESTA SOLICITUD")).toBeTruthy();
+  fireEvent.press(screen.getByTestId(`help-request-detail-${atendida.id}`));
+  expect(onOpenDetail).toHaveBeenCalledWith(atendida);
+
+  // La que todavía no atiende sigue como estaba: sin ficha, con acción.
+  expect(
+    screen.queryByTestId(`help-request-detail-${sinAtender.id}`),
+  ).toBeNull();
+});

@@ -121,6 +121,10 @@ export interface HelpRequestMapActions {
   onLogin?: () => void;
   onRegister?: () => void;
   pickPhoto?: () => Promise<SelectedPhoto[]>;
+  // CHG-195: quien creó la solicitud no ve la ficha pública —la
+  // escribió ella— sino quiénes la atienden y cómo llamarles. Es el
+  // mismo callback que ya usa la píldora de «Mi espacio» (CHG-193).
+  onOpenAttenders?: (request: ActiveHelpRequest) => void;
 }
 
 interface OperationalMapPanelProps {
@@ -643,24 +647,40 @@ function MapContent({
                 ? "1 PERSONA ATENDIENDO"
                 : `${mapNumberFormatter.format(selectedHelpRequest.attendersCount)} PERSONAS ATENDIENDO`}
             </Text>
-            {/* CHG-194: quien creó la solicitud no necesita el paso a
-                la ficha pública; su vista es «Mi espacio» (CHG-193). */}
-            {onOpenPointDetail && selectedHelpRequest.createdByMe !== true && (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Ver más información de la solicitud"
-                onPress={() =>
-                  onOpenPointDetail({
-                    kind: "help_request",
-                    request: selectedHelpRequest,
-                  })
-                }
-                style={styles.detailMoreButton}
-                testID="help-request-map-detail-more"
-              >
-                <Text style={styles.detailMoreText}>VER MÁS →</Text>
-              </Pressable>
-            )}
+            {/* CHG-194/195: el mismo VER MÁS lleva a sitios distintos
+                según quién mire. A la dueña no le sirve la ficha
+                pública —la escribió ella—: le sirve saber quién va en
+                camino y cómo llamarle (CHG-193). */}
+            {selectedHelpRequest.createdByMe === true
+              ? helpRequestActions?.onOpenAttenders && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Ver quiénes atienden mi solicitud"
+                    onPress={() =>
+                      helpRequestActions.onOpenAttenders?.(selectedHelpRequest)
+                    }
+                    style={styles.detailMoreButton}
+                    testID="help-request-map-detail-attenders"
+                  >
+                    <Text style={styles.detailMoreText}>VER MÁS →</Text>
+                  </Pressable>
+                )
+              : onOpenPointDetail && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Ver más información de la solicitud"
+                    onPress={() =>
+                      onOpenPointDetail({
+                        kind: "help_request",
+                        request: selectedHelpRequest,
+                      })
+                    }
+                    style={styles.detailMoreButton}
+                    testID="help-request-map-detail-more"
+                  >
+                    <Text style={styles.detailMoreText}>VER MÁS →</Text>
+                  </Pressable>
+                )}
           </View>
         </View>
       )}
@@ -683,6 +703,16 @@ function MapContent({
           onLogin={helpRequestActions.onLogin}
           onRegister={helpRequestActions.onRegister}
           pickPhoto={helpRequestActions.pickPhoto}
+          // CHG-195: si la solicitud es de quien mira, su VER MÁS abre
+          // quiénes la atienden en vez de la ficha pública.
+          onViewAttenders={
+            helpRequestActions.onOpenAttenders
+              ? () => {
+                  setActionRequestId(null);
+                  helpRequestActions.onOpenAttenders?.(actionRequest);
+                }
+              : undefined
+          }
           // CHG-164: también la ventana de acción ofrece la vista de
           // información completa de la solicitud.
           onViewMore={

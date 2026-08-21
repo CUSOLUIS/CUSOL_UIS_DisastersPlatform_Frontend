@@ -123,4 +123,8 @@ export interface HelpRequestsDataSource {
     id: string,
     signal?: AbortSignal,
   ): Promise<HelpRequestAttendersPage>;
+  // CHG-196: eliminar la solicitud propia. El servidor responde igual
+  // ante una ajena que ante una inexistente, así que aquí no hay nada
+  // que decidir: se pide y se refresca.
+  remove(id: string): Promise<void>;
 }

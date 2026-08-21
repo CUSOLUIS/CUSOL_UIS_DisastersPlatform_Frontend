@@ -271,6 +271,7 @@ function helpRequestsWith(
       generatedAt: "2026-08-21T10:05:00Z",
     }),
     attend: jest.fn(),
+    remove: jest.fn().mockResolvedValue(undefined),
     listAttenders: jest.fn().mockResolvedValue({
       items: [],
       total: 0,

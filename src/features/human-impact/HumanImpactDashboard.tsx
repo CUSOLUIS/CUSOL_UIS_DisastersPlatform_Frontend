@@ -345,8 +345,18 @@ export function HumanImpactDashboard({
       onLogin,
       onRegister,
       pickPhoto: pickVolunteerPhoto,
+      // CHG-195: el mapa necesita el mismo camino que «Mi espacio»
+      // para llevar a la dueña a quiénes atienden su solicitud.
+      onOpenAttenders,
     }),
-    [account, helpRequestsDataSource, refreshHelpRequests, onLogin, onRegister],
+    [
+      account,
+      helpRequestsDataSource,
+      refreshHelpRequests,
+      onLogin,
+      onRegister,
+      onOpenAttenders,
+    ],
   );
 
   return (
@@ -407,6 +417,14 @@ export function HumanImpactDashboard({
           isSuperAdmin={account?.assignedRole === "super_admin"}
           onOpenAdmin={onOpenAdmin}
           onOpenAttenders={onOpenAttenders}
+          // CHG-198: quien ya aceptó atender abre desde «Mi espacio» la
+          // MISMA ficha que se abre tocando el marcador en el mapa.
+          onOpenRequestDetail={
+            onOpenMapPointDetail
+              ? (request) =>
+                  onOpenMapPointDetail({ kind: "help_request", request })
+              : undefined
+          }
           helpRequests={helpRequestsDataSource}
           foodOffers={foodOffersDataSource}
         />

@@ -62,6 +62,39 @@ async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await response.json()) as T;
 }
 
+// CHG-196 — Mutación que responde 204: mismas cabeceras y misma
+// cookie que `apiRequest`, pero sin intentar leer un cuerpo que no
+// existe. Los errores se traducen igual.
+async function apiRequestNoContent(
+  path: string,
+  init: RequestInit = {},
+): Promise<void> {
+  if (apiBaseUrl === undefined) {
+    throw new HelpRequestsApiError(
+      "Configura EXPO_PUBLIC_API_BASE_URL para consultar las solicitudes de ayuda desde un dispositivo móvil.",
+      503,
+    );
+  }
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    credentials: "include",
+    ...init,
+    headers: { Accept: "application/json", ...init.headers },
+  });
+  if (!response.ok) {
+    let detail: string | null;
+    try {
+      const body = (await response.json()) as { detail?: unknown };
+      detail = typeof body.detail === "string" ? body.detail : null;
+    } catch {
+      detail = null;
+    }
+    throw new HelpRequestsApiError(
+      detail ?? `Las solicitudes de ayuda respondieron con estado ${response.status}.`,
+      response.status,
+    );
+  }
+}
+
 const apiHelpRequestsDataSource: HelpRequestsDataSource = {
   transport: "api",
   listActive: (signal) =>
@@ -77,6 +110,13 @@ const apiHelpRequestsDataSource: HelpRequestsDataSource = {
       `/api/v1/help-requests/${id}/attenders`,
       { signal },
     ),
+  // CHG-196: 204 sin cuerpo; `apiRequest` devolvería un JSON vacío, así
+  // que se pide aparte y solo se comprueba el estado.
+  remove: async (id) => {
+    await apiRequestNoContent(`/api/v1/help-requests/${id}`, {
+      method: "DELETE",
+    });
+  },
 };
 
 function nowIso() {
@@ -159,6 +199,10 @@ const demoHelpRequestsDataSource: HelpRequestsDataSource = {
       }),
     );
     return { items, total: items.length, generatedAt: nowIso() };
+  },
+  async remove(id) {
+    // CHG-196: en demo la solicitud sale de la lista, como en la vida.
+    demoRequests = demoRequests.filter((item) => item.id !== id);
   },
   async attend(id) {
     const request = demoRequests.find((item) => item.id === id);

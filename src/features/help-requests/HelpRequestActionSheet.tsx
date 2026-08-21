@@ -29,10 +29,11 @@ import type { ActiveHelpRequest, HelpRequestAttendReceipt } from "./types";
 //     teléfono y la foto los ve la DUEÑA de la solicitud —el formulario
 //     lo advierte antes de pedirlos—; el correo sigue siendo privado
 //     del super_admin. El público solo ve el contador.
-// CHG-194: a quien CREÓ la solicitud la ventana no le ofrece nada que
-// hacer —ni atender (inflaría el contador que mira la comunidad) ni
-// «VER MÁS»—; se queda en informativa. Su camino a quién la atiende es
-// «Mi espacio» (CHG-193), no esta ventana.
+// CHG-194: a quien CREÓ la solicitud la ventana no le ofrece atenderla
+// —inflaría el contador que mira la comunidad—.
+// CHG-195: pero su «VER MÁS» sí existe, y lleva a otro sitio que el de
+// los demás: a quiénes la atienden y cómo llamarles (CHG-193), no a la
+// ficha pública, que ella misma escribió.
 
 const countFormatter = new Intl.NumberFormat("es-CO");
 const VOLUNTEER_MIN_NAME_WORDS = 1;
@@ -61,6 +62,9 @@ export interface HelpRequestActionSheetProps {
   submitVolunteer?: typeof submitHelpRequestVolunteer;
   // CHG-164: abre la vista de información completa de la solicitud.
   onViewMore?: () => void;
+  // CHG-195: el VER MÁS de quien creó la solicitud — quiénes la
+  // atienden y sus datos de contacto.
+  onViewAttenders?: () => void;
 }
 
 const initialDraft: HelpRequestVolunteerDraft = {
@@ -81,11 +85,17 @@ export function HelpRequestActionSheet({
   pickPhoto,
   submitVolunteer = submitHelpRequestVolunteer,
   onViewMore,
+  onViewAttenders,
 }: HelpRequestActionSheetProps) {
   // CHG-194: `createdByMe` solo puede ser true con sesión; ausente
   // (bundle viejo, CHG-137) se lee como «no es mía», que es el
   // comportamiento de siempre.
   const isOwnRequest = request.createdByMe === true;
+  // CHG-197: la verdad de si esta cuenta ya atiende la solicitud la
+  // tiene el servidor (`attendedByMe`, calculado contra la sesión). El
+  // estado local solo cubre lo que acaba de pasar en esta ventana; sin
+  // esto, quien atendió desde «Mi espacio» volvía a ver el botón.
+  const alreadyAttending = isAuthenticated && request.attendedByMe;
   const [count, setCount] = useState(request.attendersCount);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -215,23 +225,46 @@ export function HelpRequestActionSheet({
 
             {/* CHG-164: información completa de la solicitud, para
                 cualquier visitante (anónimo o con cuenta).
-                CHG-194: menos para quien la creó. */}
-            {onViewMore && !isOwnRequest && (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Ver más información de la solicitud"
-                onPress={onViewMore}
-                style={styles.viewMoreButton}
-                testID="action-sheet-view-more"
-              >
-                <Text style={styles.viewMoreText}>VER MÁS</Text>
-              </Pressable>
-            )}
+                CHG-195: para quien la creó, el mismo botón lleva a
+                quiénes la atienden. */}
+            {isOwnRequest
+              ? onViewAttenders && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Ver quiénes atienden mi solicitud"
+                    onPress={onViewAttenders}
+                    style={styles.viewMoreButton}
+                    testID="action-sheet-view-attenders"
+                  >
+                    <Text style={styles.viewMoreText}>VER MÁS</Text>
+                  </Pressable>
+                )
+              : onViewMore && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Ver más información de la solicitud"
+                    onPress={onViewMore}
+                    style={styles.viewMoreButton}
+                    testID="action-sheet-view-more"
+                  >
+                    <Text style={styles.viewMoreText}>VER MÁS</Text>
+                  </Pressable>
+                )}
 
             {/* CHG-194: la solicitud propia no tiene zona de acción.
                 Quien la creó ya hizo lo suyo —pedir la ayuda—, así que
                 la ventana se queda en la información de arriba. */}
-            {isOwnRequest ? null : done ? (
+            {isOwnRequest ? null : alreadyAttending && !done ? (
+              /* CHG-197: ya atiende esta solicitud desde antes. Mismo
+                 texto que la lista de «Mi espacio», para que las dos
+                 superficies digan lo mismo. */
+              <Text
+                style={styles.attendingNote}
+                testID="action-sheet-already-attending"
+              >
+                ✓ ESTÁS ATENDIENDO ESTA SOLICITUD
+              </Text>
+            ) : done ? (
               <View style={styles.confirmation} accessibilityRole="alert">
                 <Text style={styles.confirmationText}>
                   {isAuthenticated
@@ -528,6 +561,16 @@ const styles = StyleSheet.create({
     color: colors.cyan,
     fontFamily: fontFamilies.mono,
     fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+  },
+  // CHG-197: mismo registro que la nota equivalente de la lista de
+  // «Mi espacio» — versalita mono en el verde de «con vida».
+  attendingNote: {
+    marginTop: 3,
+    color: colors.alive,
+    fontFamily: fontFamilies.mono,
+    fontSize: 11,
     fontWeight: "800",
     letterSpacing: 0.6,
   },

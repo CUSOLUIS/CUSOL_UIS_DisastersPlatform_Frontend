@@ -56,6 +56,13 @@ export interface HelpRequestsSectionProps {
   ownRequests?: ActiveHelpRequest[];
   // CHG-193: abrir la vista de quién atiende la solicitud propia.
   onOpenAttenders?: (request: ActiveHelpRequest) => void;
+  // CHG-196: eliminar la solicitud propia. Sin este callback el botón
+  // no se pinta, así que las superficies que no lo pasan (la portada)
+  // siguen igual.
+  onDeleteOwn?: (id: string) => Promise<void>;
+  // CHG-198: abrir la ficha completa de una solicitud que esta cuenta
+  // ya atiende. Quien va a acudir necesita más que el resumen.
+  onOpenDetail?: (request: ActiveHelpRequest) => void;
 }
 
 // CHG-125 — Solicitudes «Necesitamos ayuda» vigentes: descripción,
@@ -77,14 +84,39 @@ export function HelpRequestsSection({
   viewerLocation = null,
   ownRequests = [],
   onOpenAttenders,
+  onDeleteOwn,
+  onOpenDetail,
 }: HelpRequestsSectionProps) {
   const [attendingId, setAttendingId] = useState<string | null>(null);
   const [attendError, setAttendError] = useState<string | null>(null);
   // CHG-193: atender comparte tu nombre y tu teléfono con quien pidió
   // ayuda, así que se avisa ANTES y solo se registra si se acepta.
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  // CHG-196: eliminar es irreversible, así que va en dos pasos: pulsar
+  // ELIMINAR abre la advertencia, y solo la confirmación borra.
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const visibleItems =
     maxItems !== undefined ? items.slice(0, maxItems) : items;
+
+  const deleteOwnRequest = async () => {
+    if (!onDeleteOwn || ownRequests.length === 0) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await onDeleteOwn(ownRequests[0].id);
+      setConfirmingDelete(false);
+    } catch (error: unknown) {
+      setDeleteError(
+        error instanceof Error
+          ? error.message
+          : "No fue posible eliminar la solicitud. Intenta de nuevo.",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const attendRequest = async (id: string) => {
     setAttendingId(id);
@@ -148,8 +180,71 @@ export function HelpRequestsSection({
               <Text style={styles.seeMoreText}>VER MÁS</Text>
             </Pressable>
           )}
+          {/* CHG-196: la dueña puede retirar su solicitud cuando la
+              ayuda ya llegó. Dos pasos, porque no se puede deshacer. */}
+          {ownRequests.length > 0 && onDeleteOwn && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Eliminar mi solicitud de ayuda"
+              onPress={() => {
+                setDeleteError(null);
+                setConfirmingDelete(true);
+              }}
+              testID="help-request-own-delete"
+              style={({ pressed }) => [
+                styles.deleteButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.deleteText}>ELIMINAR</Text>
+            </Pressable>
+          )}
         </View>
       </View>
+
+      {/* CHG-196: la advertencia dice exactamente qué se pierde. */}
+      {confirmingDelete && ownRequests.length > 0 && (
+        <View style={styles.deleteConfirm} accessibilityRole="alert">
+          <Text style={styles.deleteConfirmText}>
+            Se eliminará tu solicitud y desaparecerá del mapa. También se
+            borrará la lista de quienes la estaban atendiendo. No se puede
+            deshacer.
+          </Text>
+          <View style={styles.deleteConfirmRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Confirmar que quiero eliminar mi solicitud"
+              disabled={deleting}
+              onPress={() => void deleteOwnRequest()}
+              testID="help-request-own-delete-confirm"
+              style={({ pressed }) => [
+                styles.deleteConfirmButton,
+                pressed && styles.pressed,
+                deleting && styles.disabledButton,
+              ]}
+            >
+              <Text style={styles.deleteConfirmButtonText}>
+                {deleting ? "ELIMINANDO…" : "SÍ, ELIMINAR"}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Conservar mi solicitud"
+              disabled={deleting}
+              onPress={() => setConfirmingDelete(false)}
+              style={({ pressed }) => [
+                styles.deleteCancelButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.deleteCancelText}>CONSERVARLA</Text>
+            </Pressable>
+          </View>
+          {deleteError && (
+            <Text style={styles.deleteErrorText}>{deleteError}</Text>
+          )}
+        </View>
+      )}
 
       {loading && items.length === 0 && (
         <View style={styles.loadingRow}>
@@ -210,9 +305,27 @@ export function HelpRequestsSection({
             <Text style={styles.itemDescription}>{request.description}</Text>
             {isAuthenticated ? (
               request.attendedByMe ? (
-                <Text style={styles.attendingNote}>
-                  ✓ ESTÁS ATENDIENDO ESTA SOLICITUD
-                </Text>
+                /* CHG-197: ya la atiende. CHG-198: y por eso mismo
+                   necesita la ficha completa — va a acudir. */
+                <View style={styles.attendingRow}>
+                  <Text style={styles.attendingNote}>
+                    ✓ ESTÁS ATENDIENDO ESTA SOLICITUD
+                  </Text>
+                  {onOpenDetail && (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Ver más información de la solicitud en ${request.address}`}
+                      onPress={() => onOpenDetail(request)}
+                      testID={`help-request-detail-${request.id}`}
+                      style={({ pressed }) => [
+                        styles.seeMoreButton,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={styles.seeMoreText}>VER MÁS</Text>
+                    </Pressable>
+                  )}
+                </View>
               ) : confirmingId === request.id ? (
                 /* CHG-193: quien pidió ayuda necesita saber quién va en
                    camino, así que atender comparte nombre y teléfono.
@@ -361,6 +474,75 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: 6,
   },
+  // CHG-196 — Eliminar la solicitud propia. El botón se lee como una
+  // acción secundaria (borde, no relleno) y la advertencia toma el rojo
+  // de emergencia, que es el color con el que ya se avisa en esta
+  // sección; el destructivo no compite con «atender».
+  deleteButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "rgba(255, 77, 94, 0.5)",
+    borderRadius: 6,
+  },
+  deleteText: {
+    color: colors.emergency,
+    fontFamily: fontFamilies.mono,
+    fontSize: font(10),
+    fontWeight: "800",
+    letterSpacing: 0.8,
+  },
+  deleteConfirm: {
+    gap: 9,
+    padding: 11,
+    borderWidth: 1,
+    borderColor: "rgba(255, 77, 94, 0.36)",
+    borderRadius: 8,
+    backgroundColor: "rgba(255, 77, 94, 0.06)",
+  },
+  deleteConfirmText: {
+    color: colors.ink,
+    fontSize: font(12),
+    lineHeight: 18,
+  },
+  deleteConfirmRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  deleteConfirmButton: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: colors.emergency,
+  },
+  deleteConfirmButtonText: {
+    color: "#07101b",
+    fontFamily: fontFamilies.mono,
+    fontSize: font(11),
+    fontWeight: "900",
+    letterSpacing: 0.7,
+  },
+  deleteCancelButton: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 8,
+  },
+  deleteCancelText: {
+    color: colors.inkSoft,
+    fontFamily: fontFamilies.mono,
+    fontSize: font(11),
+    fontWeight: "800",
+    letterSpacing: 0.7,
+  },
+  deleteErrorText: {
+    color: colors.reported,
+    fontSize: font(11),
+    lineHeight: 16,
+  },
+  disabledButton: { opacity: 0.55 },
   consentBox: {
     gap: 9,
     padding: 11,
@@ -494,6 +676,14 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
     fontSize: font(12),
     lineHeight: 18,
+  },
+  // CHG-198: la confirmación y el paso a la ficha van en la misma
+  // línea, y envuelven en pantalla estrecha.
+  attendingRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 10,
   },
   attendingNote: {
     marginTop: 3,

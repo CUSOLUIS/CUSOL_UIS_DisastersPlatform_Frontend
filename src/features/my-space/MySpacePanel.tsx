@@ -118,6 +118,7 @@ export function MySpacePanel({
   onOpenAdmin,
   // CHG-193: ver quién atiende la solicitud propia (vista aparte).
   onOpenAttenders,
+  onOpenRequestDetail,
   // CHG-174: transportes de la cuenta (inyectable en pruebas).
   loadTransports = fetchMyTransports,
 }: {
@@ -127,6 +128,8 @@ export function MySpacePanel({
   isSuperAdmin?: boolean;
   onOpenAdmin?: () => void;
   onOpenAttenders?: (request: ActiveHelpRequest) => void;
+  // CHG-198: la ficha completa de una solicitud que esta cuenta atiende.
+  onOpenRequestDetail?: (request: ActiveHelpRequest) => void;
   dataSource?: MySpaceDataSource;
   // CHG-125 / DEC-125-09 y DEC-125-11: las solicitudes activas se
   // notifican dentro del espacio personal con su acción de atender.
@@ -437,6 +440,23 @@ export function MySpacePanel({
                 title="Solicitudes de ayuda vigentes"
                 viewerLocation={viewerLocation}
                 ownRequests={ownHelpRequests}
+                // CHG-196: eliminar la solicitud propia. Al borrarla se
+                // recarga el panel, así que el contador y el VER MÁS de
+                // la dueña desaparecen con ella.
+                onOpenDetail={
+                  onOpenRequestDetail
+                    ? (request) => {
+                        // Como con la lista de quién atiende: la ficha
+                        // es otra pantalla, así que el panel se cierra.
+                        onClose();
+                        onOpenRequestDetail(request);
+                      }
+                    : undefined
+                }
+                onDeleteOwn={async (id) => {
+                  await helpRequests.remove(id);
+                  await load();
+                }}
                 onOpenAttenders={
                   onOpenAttenders
                     ? (request) => {
