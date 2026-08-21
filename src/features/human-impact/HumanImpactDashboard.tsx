@@ -425,6 +425,13 @@ export function HumanImpactDashboard({
                   onOpenMapPointDetail({ kind: "help_request", request })
               : undefined
           }
+          // CHG-202: la casita propia abre la MISMA ficha que abre su
+          // marcador en el mapa.
+          onOpenDamagedHomeDetail={
+            onOpenMapPointDetail
+              ? (home) => onOpenMapPointDetail({ kind: "damaged_home", home })
+              : undefined
+          }
           helpRequests={helpRequestsDataSource}
           foodOffers={foodOffersDataSource}
         />

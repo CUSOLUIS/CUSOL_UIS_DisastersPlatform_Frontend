@@ -2,6 +2,7 @@
 // leer y el botón que los marca como leídos.
 
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -51,6 +52,7 @@ function fakeSource(): DamagedHomesDataSource {
     listActive: jest.fn(),
     listMine: jest.fn(),
     markCommentsSeen: jest.fn().mockResolvedValue(undefined),
+    remove: jest.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -101,4 +103,57 @@ it("sin casitas lo dice, en vez de mostrar una lista vacía", () => {
   );
 
   expect(screen.getByTestId("my-damaged-homes-empty")).toBeTruthy();
+});
+
+
+// CHG-202 — La dueña ve su publicación entera y puede retirarla. La
+// casita no expira sola: sin este botón, la única salida era pedírselo
+// al super_admin.
+it("ofrece VER MÁS hacia la ficha de su propia casita", () => {
+  const casitas = page(0);
+  const onOpenDetail = jest.fn();
+  render(
+    <MyDamagedHomesSection
+      page={casitas}
+      dataSource={fakeSource()}
+      onOpenDetail={onOpenDetail}
+    />,
+  );
+
+  fireEvent.press(screen.getByTestId(`my-home-detail-${casitas.items[0].id}`));
+  expect(onOpenDetail).toHaveBeenCalledWith(casitas.items[0]);
+});
+
+it("elimina la publicación solo tras confirmarlo, y recarga", async () => {
+  const casitas = page(0);
+  const dataSource = fakeSource();
+  const onDeleted = jest.fn();
+  render(
+    <MyDamagedHomesSection
+      page={casitas}
+      dataSource={dataSource}
+      onDeleted={onDeleted}
+    />,
+  );
+  const id = casitas.items[0].id;
+
+  // Primer toque: advierte, no borra.
+  fireEvent.press(screen.getByTestId(`my-home-delete-${id}`));
+  expect(dataSource.remove).not.toHaveBeenCalled();
+  expect(screen.getByText(/No se puede deshacer/)).toBeTruthy();
+  expect(screen.getByText(/comentarios que\s+te dejaron/)).toBeTruthy();
+
+  // Arrepentirse no borra nada.
+  fireEvent.press(
+    screen.getByRole("button", { name: "Conservar mi publicación" }),
+  );
+  expect(dataSource.remove).not.toHaveBeenCalled();
+
+  // Confirmar sí.
+  fireEvent.press(screen.getByTestId(`my-home-delete-${id}`));
+  await act(async () => {
+    fireEvent.press(screen.getByTestId(`my-home-delete-confirm-${id}`));
+  });
+  expect(dataSource.remove).toHaveBeenCalledWith(id);
+  expect(onDeleted).toHaveBeenCalled();
 });

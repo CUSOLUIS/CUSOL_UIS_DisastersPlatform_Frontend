@@ -91,6 +91,11 @@ interface DetailContent {
   accentColor: string;
   eyebrow: string;
   title: string;
+  // CHG-201: vídeo de TikTok de la casita. Se abre en TikTok
+  // (DEC-201-02): la app no tiene con qué incrustarlo, y meter el
+  // reproductor de un tercero en esta plataforma es una decisión que
+  // no se toma de paso.
+  videoUrl?: string | null;
   // CHG-166: la misma línea de estrellas del popup, solo para acopios
   // locales; null en el resto.
   ratingLine: string | null;
@@ -278,6 +283,7 @@ function buildContent(payload: MapPointDetailPayload): DetailContent {
         photoUrls: home.photoUrls
           .map((url) => resolvePublicMediaUrl(url))
           .filter((url): url is string => url !== null),
+        videoUrl: home.videoUrl ?? null,
         note:
           home.donationChannel && home.donationReference
             ? DONATION_DISCLAIMER
@@ -612,6 +618,21 @@ function DetailCard({ content }: { content: DetailContent }) {
         />
       ))}
 
+      {/* CHG-201: el vídeo del daño, para cualquiera que abra la ficha
+          —con cuenta o anónimo—. Se abre en TikTok; el enlace lo validó
+          el servidor contra una lista cerrada de anfitriones. */}
+      {content.videoUrl && (
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Ver el vídeo del daño en TikTok. Se abre fuera de la plataforma."
+          onPress={() => void Linking.openURL(content.videoUrl as string)}
+          testID="map-point-detail-video"
+          style={styles.videoButton}
+        >
+          <Text style={styles.videoButtonText}>▶ VER EL VÍDEO EN TIKTOK</Text>
+        </Pressable>
+      )}
+
       <View style={styles.rows}>
         {content.rows.map((row) => (
           <View key={row.label} style={styles.row}>
@@ -694,6 +715,25 @@ const styles = StyleSheet.create({
     color: colors.missing,
     fontFamily: fontFamilies.mono,
     fontSize: font(13),
+  },
+  // CHG-201: acceso al vídeo del daño. Botón contorneado, no relleno:
+  // es una salida de la plataforma, no la acción principal de la ficha.
+  videoButton: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "flex-start",
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: colors.cyan,
+    borderRadius: 8,
+  },
+  videoButtonText: {
+    color: colors.cyan,
+    fontFamily: fontFamilies.mono,
+    fontSize: font(11),
+    fontWeight: "800",
+    letterSpacing: 0.8,
   },
   // CHG-170: bloque de eliminación (solo super_admin).
   deleteBlock: { gap: 8 },

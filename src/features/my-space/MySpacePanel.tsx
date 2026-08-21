@@ -51,6 +51,7 @@ import { damagedHomesDataSource } from "../damaged-homes/dataSource";
 import { MyDamagedHomesSection } from "../damaged-homes/MyDamagedHomesSection";
 import type {
   DamagedHomesDataSource,
+  MyDamagedHome,
   MyDamagedHomesResponse,
 } from "../damaged-homes/types";
 import { mySpaceDataSource } from "./dataSource";
@@ -119,6 +120,7 @@ export function MySpacePanel({
   // CHG-193: ver quién atiende la solicitud propia (vista aparte).
   onOpenAttenders,
   onOpenRequestDetail,
+  onOpenDamagedHomeDetail,
   // CHG-174: transportes de la cuenta (inyectable en pruebas).
   loadTransports = fetchMyTransports,
 }: {
@@ -130,6 +132,8 @@ export function MySpacePanel({
   onOpenAttenders?: (request: ActiveHelpRequest) => void;
   // CHG-198: la ficha completa de una solicitud que esta cuenta atiende.
   onOpenRequestDetail?: (request: ActiveHelpRequest) => void;
+  // CHG-202: la ficha completa de una casita propia.
+  onOpenDamagedHomeDetail?: (home: MyDamagedHome) => void;
   dataSource?: MySpaceDataSource;
   // CHG-125 / DEC-125-09 y DEC-125-11: las solicitudes activas se
   // notifican dentro del espacio personal con su acción de atender.
@@ -481,6 +485,16 @@ export function MySpacePanel({
                 page={homesPage}
                 dataSource={damagedHomes}
                 onSeen={() => void load()}
+                // CHG-202: ver la publicación entera y retirarla.
+                onOpenDetail={
+                  onOpenDamagedHomeDetail
+                    ? (home) => {
+                        onClose();
+                        onOpenDamagedHomeDetail(home);
+                      }
+                    : undefined
+                }
+                onDeleted={() => void load()}
               />
             )}
             {/* CHG-163: ofertas «Ofrecer comida» vigentes — el canal de

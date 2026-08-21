@@ -57,7 +57,6 @@ import {
   humanMapStatuses,
   humanitarianAidLegendCategories,
   infrastructureLegendCategories,
-  operationalResponseCategories,
 } from "./types";
 
 // CHG-157: los dos bloques de la leyenda del mapa.
@@ -185,17 +184,25 @@ export function OperationalMapPanel({
       ? { status: "success", data: dataSource.initialOverview, stale: false }
       : { status: "loading" },
   );
-  const [activeCategories, setActiveCategories] = useState<OperationalMapCategory[]>([
-    ...operationalResponseCategories,
-  ]);
+  // CHG-203: el mapa arranca limpio. Antes abría con las catorce capas
+  // encima y quien buscaba una cosa tenía que apagar trece; ahora cada
+  // quien pone lo que necesita. Las cifras de la leyenda se siguen
+  // mostrando: desmarcado es «no dibujado», no «sin datos».
+  const [activeCategories, setActiveCategories] = useState<
+    OperationalMapCategory[]
+  >([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [requestVersion, setRequestVersion] = useState(0);
   // CHG-082: refresco inmediato cuando la señal de cambios avisa.
   const refreshTick = useDataRefreshTick();
   const [humanLayerVisible, setHumanLayerVisible] = useState(true);
-  const [activeHumanStatuses, setActiveHumanStatuses] = useState<HumanStatus[]>([
-    ...humanMapStatuses,
-  ]);
+  // CHG-203: igual que las categorías. Con la lista vacía la capa
+  // humana ni consulta ni se dibuja, así que el mapa abre en blanco.
+  // El interruptor VISIBLE se queda encendido: si se apagara también,
+  // tocar un estado no mostraría nada hasta encenderlo.
+  const [activeHumanStatuses, setActiveHumanStatuses] = useState<HumanStatus[]>(
+    [],
+  );
   const [selectedHumanFeatureId, setSelectedHumanFeatureId] = useState<
     string | null
   >(null);

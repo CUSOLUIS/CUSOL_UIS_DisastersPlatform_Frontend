@@ -2,7 +2,11 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, fontFamilies } from "../../theme";
 import { font } from "../../typography";
-import type { DamagedHomesDataSource, MyDamagedHomesResponse } from "./types";
+import type {
+  DamagedHomesDataSource,
+  MyDamagedHome,
+  MyDamagedHomesResponse,
+} from "./types";
 
 const countFormatter = new Intl.NumberFormat("es-CO");
 
@@ -26,13 +30,41 @@ export function MyDamagedHomesSection({
   page,
   dataSource,
   onSeen,
+  onOpenDetail,
+  onDeleted,
 }: {
   page: MyDamagedHomesResponse | null;
   dataSource: DamagedHomesDataSource;
   onSeen?: () => void;
+  // CHG-202: abrir la ficha completa de la casita propia — la misma que
+  // ve cualquiera desde el mapa.
+  onOpenDetail?: (home: MyDamagedHome) => void;
+  // CHG-202: recargar la bandeja tras eliminar.
+  onDeleted?: () => void;
 }) {
   const [working, setWorking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // CHG-202: eliminar no se deshace, así que va en dos pasos.
+  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const deleteHome = async (homeId: string) => {
+    setDeleting(homeId);
+    setError(null);
+    try {
+      await dataSource.remove(homeId);
+      setConfirmingDelete(null);
+      onDeleted?.();
+    } catch (caught: unknown) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "No fue posible eliminar la publicación.",
+      );
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   const markSeen = async (homeId: string) => {
     setWorking(homeId);
@@ -122,6 +154,66 @@ export function MyDamagedHomesSection({
               </Text>
             </Pressable>
           )}
+          {/* CHG-202: ver la publicación entera —como la ve el resto— y
+              retirarla. La casita no expira sola, así que este es su
+              único camino de salida sin pedírselo a nadie. */}
+          <View style={styles.cardActions}>
+            {onOpenDetail && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Ver toda la publicación de ${home.address}`}
+                onPress={() => onOpenDetail(home)}
+                style={styles.seenButton}
+                testID={`my-home-detail-${home.id}`}
+              >
+                <Text style={styles.seenText}>VER MÁS</Text>
+              </Pressable>
+            )}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Eliminar la publicación de ${home.address}`}
+              onPress={() => {
+                setError(null);
+                setConfirmingDelete(home.id);
+              }}
+              style={styles.deleteButton}
+              testID={`my-home-delete-${home.id}`}
+            >
+              <Text style={styles.deleteText}>ELIMINAR PUBLICACIÓN</Text>
+            </Pressable>
+          </View>
+          {confirmingDelete === home.id && (
+            <View style={styles.confirmBox} accessibilityRole="alert">
+              <Text style={styles.confirmText}>
+                Se eliminará tu publicación y saldrá del mapa. También se
+                borrarán sus fotografías, su vídeo y los comentarios que
+                te dejaron. No se puede deshacer.
+              </Text>
+              <View style={styles.cardActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Confirmar que quiero eliminar la publicación de ${home.address}`}
+                  disabled={deleting === home.id}
+                  onPress={() => void deleteHome(home.id)}
+                  style={styles.confirmDeleteButton}
+                  testID={`my-home-delete-confirm-${home.id}`}
+                >
+                  <Text style={styles.confirmDeleteText}>
+                    {deleting === home.id ? "ELIMINANDO…" : "SÍ, ELIMINAR"}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Conservar mi publicación"
+                  disabled={deleting === home.id}
+                  onPress={() => setConfirmingDelete(null)}
+                  style={styles.seenButton}
+                >
+                  <Text style={styles.seenText}>CONSERVARLA</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
         </View>
       ))}
     </View>
@@ -175,6 +267,55 @@ const styles = StyleSheet.create({
     fontSize: font(8),
     fontWeight: "800",
     letterSpacing: 0.6,
+  },
+  // CHG-202: los dos accesos de la tarjeta, envolviendo en pantalla
+  // estrecha; el destructivo se distingue por el color, no por el peso.
+  cardActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 2,
+  },
+  deleteButton: {
+    alignSelf: "flex-start",
+    marginTop: 2,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255, 77, 94, 0.5)",
+    borderRadius: 7,
+  },
+  deleteText: {
+    color: colors.emergency,
+    fontFamily: fontFamilies.mono,
+    fontSize: font(10),
+    fontWeight: "800",
+    letterSpacing: 0.7,
+  },
+  confirmBox: {
+    gap: 9,
+    marginTop: 6,
+    padding: 11,
+    borderWidth: 1,
+    borderColor: "rgba(255, 77, 94, 0.36)",
+    borderRadius: 8,
+    backgroundColor: "rgba(255, 77, 94, 0.06)",
+  },
+  confirmText: { color: colors.ink, fontSize: font(12), lineHeight: 18 },
+  confirmDeleteButton: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    backgroundColor: colors.emergency,
+  },
+  confirmDeleteText: {
+    color: "#07101b",
+    fontFamily: fontFamilies.mono,
+    fontSize: font(11),
+    fontWeight: "900",
+    letterSpacing: 0.7,
   },
   seenButton: {
     alignSelf: "flex-start",

@@ -465,3 +465,37 @@ describe("DamagedHomeForm (CHG-182)", () => {
     expect(screen.getByText(/CASA-2026-ABCD1234/)).toBeTruthy();
   });
 });
+
+
+// CHG-201 — El vídeo es opcional, pero si lo hay solo puede ser de
+// TikTok (DEC-201-01): un enlace libre junto a un medio para recibir
+// dinero es la mitad que le falta a una estafa.
+describe("vídeo de TikTok (CHG-201)", () => {
+  it("acepta los enlaces de TikTok y los deja viajar en el envío", () => {
+    const enlace = "https://vm.tiktok.com/ZM6abcdef/";
+    const draft = { ...validDraft, videoUrl: enlace };
+
+    expect(collectDamagedHomeIssues(draft)).toEqual([]);
+    expect(buildDamagedHomePayload(draft).videoUrl).toBe(enlace);
+  });
+
+  it("rechaza lo que no sea TikTok, y por https", () => {
+    for (const malo of [
+      "https://www.youtube.com/watch?v=abc",
+      "https://tiktok.com.malicioso.example/video/1",
+      "http://www.tiktok.com/@familia/video/74123",
+      "no es un enlace",
+    ]) {
+      const fields = collectDamagedHomeIssues({
+        ...validDraft,
+        videoUrl: malo,
+      }).map((issue) => issue.field);
+      expect(fields).toContain("videoUrl");
+    }
+  });
+
+  it("sin vídeo, el envío no lleva el campo", () => {
+    expect(collectDamagedHomeIssues(validDraft)).toEqual([]);
+    expect(buildDamagedHomePayload(validDraft).videoUrl).toBeUndefined();
+  });
+});

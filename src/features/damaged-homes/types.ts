@@ -60,7 +60,42 @@ export interface DamagedHomeDraft {
   householdSize: string;
   donationChannel: DamagedHomeDonationChannel | null;
   donationReference: string;
+  // CHG-201: enlace opcional a un vídeo de TikTok que muestre la casa.
+  videoUrl: string;
   truthConfirmed: boolean;
+}
+
+// CHG-201 — DEC-201-01: solo TikTok, y solo https. La comprobación que
+// manda es la del servidor; esta existe para avisar antes de enviar, en
+// vez de dejar que el formulario muera con un 422.
+const TIKTOK_HOSTS = [
+  "tiktok.com",
+  "www.tiktok.com",
+  "m.tiktok.com",
+  "vm.tiktok.com",
+  "vt.tiktok.com",
+];
+
+export const VIDEO_URL_HINT =
+  "Pega el enlace del vídeo de TikTok (opcional). Se abrirá en TikTok cuando alguien lo toque.";
+
+/** `null` si el enlace sirve; si no, el motivo, en prosa. */
+export function videoUrlIssue(value: string): string | null {
+  const limpio = value.trim();
+  if (limpio.length === 0) return null;
+  if (limpio.length > 300) return "El enlace es demasiado largo.";
+  let url: URL;
+  try {
+    url = new URL(limpio);
+  } catch {
+    return "Eso no parece un enlace. Copia la dirección del vídeo desde TikTok.";
+  }
+  if (url.protocol !== "https:") return "El enlace debe empezar por https://";
+  if (url.username || url.password)
+    return "El enlace no puede llevar usuario ni contraseña.";
+  if (!TIKTOK_HOSTS.includes(url.hostname))
+    return "Solo se aceptan enlaces de TikTok.";
+  return null;
 }
 
 export interface DamagedHomeReceipt {
@@ -84,6 +119,9 @@ export interface ActiveDamagedHome {
   householdSize: number | null;
   donationChannel: DamagedHomeDonationChannel | null;
   donationReference: string | null;
+  // CHG-201: vídeo de TikTok, si la familia lo dejó. Público como las
+  // fotos: lo ve cualquiera que abra la ficha.
+  videoUrl?: string | null;
   createdAt: string;
   updatedAt: string;
   // Rutas relativas de las fotografías públicas.
@@ -116,4 +154,8 @@ export interface DamagedHomesDataSource {
   listActive(signal?: AbortSignal): Promise<DamagedHomePage>;
   listMine(signal?: AbortSignal): Promise<MyDamagedHomesResponse>;
   markCommentsSeen(homeId: string): Promise<void>;
+  // CHG-202: eliminar la casita propia. El servidor responde igual ante
+  // una ajena que ante una inexistente, así que aquí no hay nada que
+  // decidir: se pide y se recarga.
+  remove(homeId: string): Promise<void>;
 }

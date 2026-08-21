@@ -73,6 +73,12 @@ const apiDamagedHomesDataSource: DamagedHomesDataSource = {
       { method: "POST" },
     );
   },
+  // CHG-202: 204 sin cuerpo, como el sello de lectura de arriba.
+  remove: async (homeId) => {
+    await apiRequest<void>(`/api/v1/me/damaged-homes/${homeId}`, {
+      method: "DELETE",
+    });
+  },
 };
 
 function nowIso() {
@@ -113,6 +119,7 @@ const demoDamagedHomesDataSource: DamagedHomesDataSource = {
   },
   listMine: async () => ({ items: [], total: 0, unreadTotal: 0 }),
   markCommentsSeen: async () => undefined,
+  remove: async () => undefined,
 };
 
 export const damagedHomesDataSource: DamagedHomesDataSource =

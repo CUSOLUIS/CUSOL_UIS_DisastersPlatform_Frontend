@@ -108,10 +108,24 @@ const offer: ActiveFoodOffer = {
   expiresAt: "2099-08-19T18:00:00Z",
 };
 
+// CHG-203: el mapa arranca con TODOS los filtros desmarcados, así que
+// estas pruebas —que van sobre lo que pasa al tocar un marcador— hacen
+// primero lo que hace una persona: encender las capas. Se enciende todo
+// en un solo sitio para no repetirlo en cada prueba, y hay una prueba
+// aparte que defiende el punto de partida en blanco.
+function encenderTodasLasCapas() {
+  for (const boton of screen.queryAllByLabelText(/^Filtrar mapa por /)) {
+    fireEvent.press(boton);
+  }
+  for (const boton of screen.queryAllByLabelText(/^Filtrar capa humana por /)) {
+    fireEvent.press(boton);
+  }
+}
+
 function renderPanel(
   props: Partial<Parameters<typeof OperationalMapPanel>[0]> = {},
 ) {
-  return render(
+  const resultado = render(
     <OperationalMapPanel
       dataSource={mapSource}
       humanDataSource={humanSource}
@@ -119,6 +133,8 @@ function renderPanel(
       {...props}
     />,
   );
+  encenderTodasLasCapas();
+  return resultado;
 }
 
 it("tocar un marcador operativo abre el popup con resumen, VER MÁS y cierre", async () => {
@@ -645,3 +661,37 @@ it("el popup de una casita muestra estrellas, personas y VER MÁS", async () => 
   });
 });
 
+
+
+// CHG-203 — El punto de partida: nada dibujado hasta que alguien lo
+// pida. Esta prueba NO usa `renderPanel`, que enciende las capas.
+it("el mapa abre con todos los filtros desmarcados y sin dibujar nada", async () => {
+  render(
+    <OperationalMapPanel
+      dataSource={mapSource}
+      humanDataSource={humanSource}
+      compact={false}
+      helpRequests={[request]}
+    />,
+  );
+
+  // La leyenda está, con sus opciones; lo que no hay es puntos.
+  const opciones = await screen.findAllByLabelText(/^Filtrar mapa por /);
+  expect(opciones.length).toBeGreaterThan(0);
+  for (const opcion of opciones) {
+    expect(opcion.props.accessibilityState?.selected).toBe(false);
+  }
+  expect(
+    screen.queryByTestId(`map-marker-help_request:${request.id}`),
+  ).toBeNull();
+  expect(screen.queryByTestId(`map-marker-${firstPoint.id}`)).toBeNull();
+
+  // Y al tocar una opción, esa capa —y solo esa— aparece.
+  fireEvent.press(
+    screen.getByLabelText("Filtrar mapa por Necesitamos ayuda"),
+  );
+  expect(
+    await screen.findByTestId(`map-marker-help_request:${request.id}`),
+  ).toBeTruthy();
+  expect(screen.queryByTestId(`map-marker-${firstPoint.id}`)).toBeNull();
+});

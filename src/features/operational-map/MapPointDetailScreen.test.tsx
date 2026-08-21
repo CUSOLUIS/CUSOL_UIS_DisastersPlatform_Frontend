@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react-native";
+import { Linking } from "react-native";
 import { MapPointDetailScreen } from "./MapPointDetailScreen";
 import { normalizeOperationalMapOverview } from "./dataSource";
 import { operationalMapDemoData } from "./demoData";
@@ -581,3 +582,43 @@ it("el super_admin elimina una casita en dos pasos", async () => {
   await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
 });
 
+
+
+// CHG-201 — El vídeo de TikTok de la casita: lo ve cualquiera que abra
+// la ficha, y se abre en TikTok (DEC-201-02).
+it("la ficha ofrece el vídeo del daño y lo abre en TikTok", async () => {
+  const openURL = jest
+    .spyOn(Linking, "openURL")
+    .mockResolvedValue(undefined as never);
+  const enlace = "https://www.tiktok.com/@familia/video/7412345678901234567";
+
+  render(
+    <MapPointDetailScreen
+      payload={{
+        kind: "damaged_home",
+        home: { ...damagedHomeDetail, videoUrl: enlace },
+      }}
+      onBack={jest.fn()}
+      communityDataSource={fakeCommunitySource()}
+    />,
+  );
+
+  const boton = await screen.findByTestId("map-point-detail-video");
+  expect(boton).toHaveTextContent(/VER EL VÍDEO EN TIKTOK/);
+  fireEvent.press(boton);
+  expect(openURL).toHaveBeenCalledWith(enlace);
+  openURL.mockRestore();
+});
+
+it("una casita sin vídeo no dice nada al respecto", async () => {
+  render(
+    <MapPointDetailScreen
+      payload={{ kind: "damaged_home", home: damagedHomeDetail }}
+      onBack={jest.fn()}
+      communityDataSource={fakeCommunitySource()}
+    />,
+  );
+
+  await screen.findByTestId("map-point-detail-photo-0");
+  expect(screen.queryByTestId("map-point-detail-video")).toBeNull();
+});

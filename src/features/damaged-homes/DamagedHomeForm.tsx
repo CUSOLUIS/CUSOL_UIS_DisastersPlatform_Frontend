@@ -52,6 +52,8 @@ import {
   MAX_DONATION_REFERENCE_LENGTH,
   MAX_HOUSEHOLD_SIZE,
   MIN_DONATION_REFERENCE_LENGTH,
+  videoUrlIssue,
+  VIDEO_URL_HINT,
   MIN_HOUSEHOLD_SIZE,
   MAX_DAMAGE_DESCRIPTION_LENGTH,
   MAX_HOME_ADDRESS_LENGTH,
@@ -84,6 +86,7 @@ export const initialDamagedHomeDraft: DamagedHomeDraft = {
   householdSize: "",
   donationChannel: null,
   donationReference: "",
+  videoUrl: "",
   truthConfirmed: false,
 };
 
@@ -186,6 +189,13 @@ export function collectDamagedHomeIssues(
     );
   }
 
+  // CHG-201: el vídeo es opcional, pero si lo hay tiene que ser de
+  // TikTok. Se avisa aquí para no morir con un 422 del servidor.
+  const problemaVideo = videoUrlIssue(draft.videoUrl);
+  if (problemaVideo) {
+    push("videoUrl", problemaVideo);
+  }
+
   if (!draft.truthConfirmed) {
     push("truthConfirmed", "Debes confirmar que la información es real.");
   }
@@ -199,6 +209,7 @@ const FIELD_SECTIONS: Record<string, string> = {
   householdSize: "01",
   donationChannel: "04",
   donationReference: "04",
+  videoUrl: "03",
   municipality: "02",
   department: "02",
   address: "02",
@@ -628,6 +639,19 @@ export function DamagedHomeForm({
                   </Pressable>
                 </View>
               ))}
+              {/* CHG-201: el vídeo es evidencia del daño, como las
+                  fotos, así que vive en esta misma sección. Se abre en
+                  TikTok al tocarlo (DEC-201-02); no se reproduce
+                  dentro de la plataforma. */}
+              <FormField
+                label="Vídeo del daño en TikTok (opcional)"
+                hint={VIDEO_URL_HINT}
+                invalid={invalidFields.has("videoUrl")}
+                value={draft.videoUrl}
+                maxLength={300}
+                placeholder="https://www.tiktok.com/@…"
+                onChangeText={(value) => setField("videoUrl", value)}
+              />
             </FormSection>
 
             {/* CHG-182: el medio para recibir ayuda directa. Opcional,

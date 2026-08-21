@@ -57,6 +57,14 @@ export function buildDamagedHomePayload(
     payload.donationReference = reference;
   }
 
+  // CHG-201: el vídeo es opcional; vacío significa que no hay, así que
+  // el campo no viaja (el backend prohíbe campos desconocidos, pero un
+  // null explícito solo añadiría ruido).
+  const video = draft.videoUrl.trim();
+  if (video) {
+    payload.videoUrl = video;
+  }
+
   // Las coordenadas viajan solo en pareja (regla del contrato).
   const latitude = Number.parseFloat(draft.latitude.trim());
   const longitude = Number.parseFloat(draft.longitude.trim());
