@@ -142,8 +142,14 @@ describe("RegistrationForm", () => {
     fireEvent.changeText(screen.getByLabelText("Apellidos *"), " Gómez ");
     fireEvent.changeText(screen.getByLabelText("Correo electrónico *"), "LAURA@EXAMPLE.COM");
     fireEvent.changeText(screen.getByLabelText("Teléfono privado"), "+57 300 123 4567");
-    fireEvent.changeText(screen.getByLabelText("Departamento *"), "Santander");
-    fireEvent.changeText(screen.getByLabelText("Municipio *"), "Bucaramanga");
+    // CHG-185: territorio por lista cerrada — escribir filtra, y el
+    // valor se guarda al tocar la opción del catálogo.
+    fireEvent.changeText(screen.getByLabelText("Departamento *"), "santand");
+    fireEvent.press(screen.getByLabelText("Elegir el departamento Santander"));
+    fireEvent.changeText(screen.getByLabelText("Municipio *"), "bucaram");
+    fireEvent.press(
+      screen.getByLabelText("Elegir el municipio Bucaramanga"),
+    );
     fireEvent.press(screen.getByRole("radio", { name: "Organización" }));
     fireEvent.changeText(screen.getByLabelText("Nombre de la organización *"), "Fundación Ayuda");
     fireEvent.changeText(screen.getByLabelText("Función o cargo"), "Coordinadora");
@@ -162,6 +168,8 @@ describe("RegistrationForm", () => {
       firstNames: "Laura",
       lastNames: "Gómez",
       email: "laura@example.com",
+      department: "Santander",
+      municipality: "Bucaramanga",
       requestedAccountType: "organization_representative",
       organizationName: "Fundación Ayuda",
       healthProfession: "Médica general",
@@ -192,5 +200,86 @@ describe("RegistrationForm", () => {
     expect(registerAccount).not.toHaveBeenCalled();
     expect(screen.getByText("Revisa los datos antes de continuar")).toBeTruthy();
     expect(screen.getByText("• Ingresa tus nombres.")).toBeTruthy();
+  });
+
+  // CHG-185 — Departamento y municipio salen del catálogo oficial.
+  it("rechaza territorio que no está en el catálogo y la pareja imposible", () => {
+    expect(
+      validateRegistrationDraft({
+        ...strongDraft,
+        department: "Santanderr",
+        municipality: "Bucaramanga",
+      }),
+    ).toEqual([
+      "Elige un departamento de la lista oficial.",
+      "Elige un municipio de la lista oficial del departamento elegido.",
+    ]);
+
+    expect(
+      validateRegistrationDraft({
+        ...strongDraft,
+        department: "Santander",
+        municipality: "Medellín",
+      }),
+    ).toEqual([
+      "Elige un municipio de la lista oficial del departamento elegido.",
+    ]);
+
+    expect(
+      validateRegistrationDraft({
+        ...strongDraft,
+        department: "",
+        municipality: "",
+      }),
+    ).toEqual([
+      "Elige tu departamento de la lista.",
+      "Elige tu municipio de la lista.",
+    ]);
+  });
+
+  it("no deja elegir municipio antes que departamento", () => {
+    render(
+      <RegistrationForm
+        onBack={jest.fn()}
+        onLogin={jest.fn()}
+        registerAccount={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText("Municipio * no disponible")).toBeTruthy();
+    expect(screen.getByText("Elige primero el departamento")).toBeTruthy();
+
+    fireEvent.changeText(screen.getByLabelText("Departamento *"), "quind");
+    fireEvent.press(screen.getByLabelText("Elegir el departamento Quindío"));
+
+    expect(screen.queryByLabelText("Municipio * no disponible")).toBeNull();
+    expect(screen.getByLabelText("Municipio *")).toBeTruthy();
+  });
+
+  it("cambiar de departamento limpia el municipio elegido", () => {
+    render(
+      <RegistrationForm
+        onBack={jest.fn()}
+        onLogin={jest.fn()}
+        registerAccount={jest.fn()}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText("Departamento *"), "santand");
+    fireEvent.press(screen.getByLabelText("Elegir el departamento Santander"));
+    fireEvent.changeText(screen.getByLabelText("Municipio *"), "bucaram");
+    fireEvent.press(screen.getByLabelText("Elegir el municipio Bucaramanga"));
+    expect(screen.getByLabelText("Municipio *: Bucaramanga")).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText("Cambiar departamento"));
+    fireEvent.changeText(screen.getByLabelText("Departamento *"), "antioq");
+    fireEvent.press(screen.getByLabelText("Elegir el departamento Antioquia"));
+
+    expect(screen.queryByLabelText("Municipio *: Bucaramanga")).toBeNull();
+    // El municipio vuelve a pedirse, ahora entre los de Antioquia.
+    fireEvent.changeText(screen.getByLabelText("Municipio *"), "bucaram");
+    expect(
+      screen.queryByLabelText("Elegir el municipio Bucaramanga"),
+    ).toBeNull();
   });
 });

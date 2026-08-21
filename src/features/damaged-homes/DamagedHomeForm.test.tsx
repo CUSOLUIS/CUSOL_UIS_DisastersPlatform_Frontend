@@ -338,6 +338,55 @@ describe("DamagedHomeForm (CHG-182)", () => {
     expect(submitReport).not.toHaveBeenCalled();
   });
 
+  // CHG-187 — El portón es el único que pide cuenta: la leyenda del
+  // reporte, que ofrece enviar de forma anónima, no aplica aquí y
+  // duplicaba «REGISTRARME / YA TENGO CUENTA».
+  it("sin sesión no repite los accesos de cuenta ni ofrece el envío anónimo", async () => {
+    render(
+      <DamagedHomeForm
+        onBack={jest.fn()}
+        sessionSource={anonymousSession}
+        onRegister={jest.fn()}
+        onLogin={jest.fn()}
+        submitReport={jest.fn()}
+      />,
+    );
+
+    expect(await screen.findByTestId("session-gate")).toBeTruthy();
+    expect(screen.queryByTestId("report-considerations")).toBeNull();
+    expect(
+      screen.queryAllByLabelText("Registrarme para continuar"),
+    ).toHaveLength(1);
+    expect(
+      screen.queryAllByLabelText("Iniciar sesión para continuar"),
+    ).toHaveLength(1);
+    expect(
+      screen.queryByLabelText("Registrarme para reportar con cuenta"),
+    ).toBeNull();
+    expect(
+      screen.queryByLabelText("Iniciar sesión para reportar con cuenta"),
+    ).toBeNull();
+  });
+
+  // CHG-187 — Con sesión la leyenda vuelve, dentro del portón abierto.
+  it("con sesión muestra la leyenda del reporte y ningún acceso de cuenta", async () => {
+    render(
+      <DamagedHomeForm
+        onBack={jest.fn()}
+        sessionSource={accountSession}
+        onRegister={jest.fn()}
+        onLogin={jest.fn()}
+        submitReport={jest.fn()}
+      />,
+    );
+
+    expect(await screen.findByTestId("report-considerations")).toBeTruthy();
+    expect(screen.queryByTestId("session-gate")).toBeNull();
+    expect(
+      screen.queryByLabelText("Registrarme para reportar con cuenta"),
+    ).toBeNull();
+  });
+
   // CHG-182 — El medio de ayuda va completo o no va.
   it("exige el dato de transferencia al elegir un medio de ayuda", async () => {
     const submitReport = jest.fn();

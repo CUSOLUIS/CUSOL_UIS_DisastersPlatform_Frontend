@@ -20,6 +20,13 @@ import {
   isValidPhone,
   sanitizePhone,
 } from "../contact/phoneValidation";
+import {
+  DEPARTMENTS,
+  isKnownDepartment,
+  isKnownMunicipality,
+  municipalitiesOf,
+} from "../territory/territory";
+import { TerritorySelectField } from "../territory/TerritorySelectField";
 import { authDataSource } from "./dataSource";
 import type {
   AccountRegistrationInput,
@@ -94,6 +101,16 @@ export function RegistrationForm({
     field: Key,
     value: RegistrationDraft[Key],
   ) => setDraft((current) => ({ ...current, [field]: value }));
+
+  // CHG-185: el municipio depende del departamento. Cambiarlo limpia el
+  // municipio elegido; si no, quedaría guardada una pareja imposible
+  // («Santander / Medellín») que ninguna validación posterior mira.
+  const selectDepartment = (department: string) =>
+    setDraft((current) =>
+      current.department === department
+        ? current
+        : { ...current, department, municipality: "" },
+    );
 
   const submit = async () => {
     const nextErrors = validateRegistrationDraft(draft);
@@ -184,17 +201,26 @@ export function RegistrationForm({
                   keyboardType="phone-pad"
                   onChangeText={(value) => setField("phone", value)}
                 />
-                <FormField
+                {/* CHG-185: catálogo oficial del DANE en vez de dos
+                    cajas libres; el municipio se acota al departamento
+                    elegido. */}
+                <TerritorySelectField
                   label="Departamento *"
+                  name="departamento"
+                  hint="Lista oficial"
                   value={draft.department}
-                  maxLength={100}
-                  onChangeText={(value) => setField("department", value)}
+                  options={DEPARTMENTS}
+                  onSelect={selectDepartment}
                 />
-                <FormField
+                <TerritorySelectField
                   label="Municipio *"
+                  name="municipio"
+                  hint="Del departamento elegido"
                   value={draft.municipality}
-                  maxLength={100}
-                  onChangeText={(value) => setField("municipality", value)}
+                  options={municipalitiesOf(draft.department)}
+                  onSelect={(value) => setField("municipality", value)}
+                  disabled={!draft.department}
+                  disabledHint="Elige primero el departamento"
                 />
               </FieldGrid>
               <Text style={styles.fieldHelp}>
@@ -366,8 +392,22 @@ export function validateRegistrationDraft(draft: RegistrationDraft): string[] {
   if (draft.phone.trim() && !isValidPhone(draft.phone)) {
     errors.push(PHONE_FORMAT_MESSAGE);
   }
-  if (!draft.department.trim()) errors.push("Ingresa tu departamento.");
-  if (!draft.municipality.trim()) errors.push("Ingresa tu municipio.");
+  // CHG-185: departamento y municipio se eligen del catálogo oficial
+  // del DANE. Se valida también aquí, y no solo en la lista, porque el
+  // borrador puede llegar de otra parte y porque un municipio válido
+  // deja de serlo al cambiar de departamento.
+  if (!draft.department.trim()) {
+    errors.push("Elige tu departamento de la lista.");
+  } else if (!isKnownDepartment(draft.department)) {
+    errors.push("Elige un departamento de la lista oficial.");
+  }
+  if (!draft.municipality.trim()) {
+    errors.push("Elige tu municipio de la lista.");
+  } else if (!isKnownMunicipality(draft.department, draft.municipality)) {
+    errors.push(
+      "Elige un municipio de la lista oficial del departamento elegido.",
+    );
+  }
   if (
     draft.requestedAccountType === "organization_representative" &&
     !draft.organizationName.trim()

@@ -421,6 +421,18 @@ export function DamagedHomeForm({
               </Text>
             </View>
 
+            {/* CHG-182: sin cuenta no se muestra el formulario ni se
+                envía nada; se explica por qué y se ofrece entrar.
+                CHG-187: la leyenda del reporte va DENTRO del portón —como
+                en AidLocationForm—; fuera de él repetía «REGISTRARME / YA
+                TENGO CUENTA» y ofrecía enviar de forma anónima, que aquí
+                no existe. */}
+            <SessionGate
+              session={session}
+              explanation={DAMAGED_HOME_SESSION_EXPLANATION}
+              onRegister={onRegister}
+              onLogin={onLogin}
+            >
             <ReportConsiderations
               purpose="La publicación de tu casa destruida; sale en el mapa para que la ayuda sepa a dónde llegar."
               considerations={[
@@ -434,14 +446,6 @@ export function DamagedHomeForm({
               session={session}
             />
 
-            {/* CHG-182: sin cuenta no se muestra el formulario ni se
-                envía nada; se explica por qué y se ofrece entrar. */}
-            <SessionGate
-              session={session}
-              explanation={DAMAGED_HOME_SESSION_EXPLANATION}
-              onRegister={onRegister}
-              onLogin={onLogin}
-            >
             <FormSection
               code="01"
               title="Qué le pasó a tu casa"
