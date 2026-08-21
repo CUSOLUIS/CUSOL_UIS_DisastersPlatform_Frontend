@@ -512,6 +512,48 @@ it("la banda de la solicitud seleccionada muestra estrellas y VER MÁS", async (
   });
 });
 
+// CHG-194 — Quien creó la solicitud no ve «VER MÁS» en ninguna de las
+// superficies que abre un click en el mapa: ni la banda de detalle ni el
+// popup genérico. La ficha pública es para los demás.
+it("la banda de la solicitud propia no ofrece VER MÁS", async () => {
+  const onOpenPointDetail = jest.fn();
+  renderPanel({
+    helpRequests: [{ ...request, createdByMe: true }],
+    helpRequestActions: { isAuthenticated: true, attend: jest.fn() },
+    onOpenPointDetail,
+  });
+
+  fireEvent.press(
+    await screen.findByTestId(`map-marker-help_request:${request.id}`),
+  );
+
+  // La banda sigue ahí con su información; lo que desaparece es el paso
+  // a la ficha y, en la ventana, la acción de atender.
+  expect(screen.getByTestId("help-request-map-detail")).toBeTruthy();
+  expect(screen.queryByTestId("help-request-map-detail-more")).toBeNull();
+  expect(screen.queryByTestId("action-sheet-view-more")).toBeNull();
+  expect(
+    screen.queryByRole("button", {
+      name: "Atender esta solicitud y compartir mi nombre",
+    }),
+  ).toBeNull();
+  expect(onOpenPointDetail).not.toHaveBeenCalled();
+});
+
+it("el popup genérico de la solicitud propia tampoco ofrece VER MÁS", async () => {
+  renderPanel({
+    helpRequests: [{ ...request, createdByMe: true }],
+    onOpenPointDetail: jest.fn(),
+  });
+
+  fireEvent.press(
+    await screen.findByTestId(`map-marker-help_request:${request.id}`),
+  );
+
+  expect(screen.getByTestId("map-marker-popup")).toBeTruthy();
+  expect(screen.queryByTestId("map-marker-popup-more")).toBeNull();
+});
+
 it("una solicitud sin calificar lo dice también en la banda", async () => {
   renderPanel({ helpRequests: [request], onOpenPointDetail: jest.fn() });
 

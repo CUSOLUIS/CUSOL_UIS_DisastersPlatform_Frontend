@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 import type {
   ActiveHelpRequest,
+  HelpRequestAttendersPage,
   HelpRequestAttendReceipt,
   HelpRequestPage,
   HelpRequestsDataSource,
@@ -65,10 +66,17 @@ const apiHelpRequestsDataSource: HelpRequestsDataSource = {
   transport: "api",
   listActive: (signal) =>
     apiRequest<HelpRequestPage>("/api/v1/help-requests?limit=50", { signal }),
-  attend: (id) =>
+  attend: (id, sharesIdentity = false) =>
     apiRequest<HelpRequestAttendReceipt>(`/api/v1/help-requests/${id}/attend`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sharesIdentity }),
     }),
+  listAttenders: (id, signal) =>
+    apiRequest<HelpRequestAttendersPage>(
+      `/api/v1/help-requests/${id}/attenders`,
+      { signal },
+    ),
 };
 
 function nowIso() {
@@ -133,6 +141,24 @@ const demoHelpRequestsDataSource: HelpRequestsDataSource = {
       total: demoRequests.length,
       generatedAt: nowIso(),
     };
+  },
+  async listAttenders(id) {
+    // En demo nadie ha consentido compartir nada: la lista enseña el
+    // caso que más se va a ver en la realidad al principio.
+    const request = demoRequests.find((item) => item.id === id);
+    const items = Array.from(
+      { length: request ? request.attendersCount : 0 },
+      (_unused, index) => ({
+        id: `${id}-atendiendo-${index}`,
+        kind: index % 2 === 0 ? ("account" as const) : ("volunteer" as const),
+        joinedAt: nowIso(),
+        sharesContact: false,
+        name: null,
+        phone: null,
+        photoUrl: null,
+      }),
+    );
+    return { items, total: items.length, generatedAt: nowIso() };
   },
   async attend(id) {
     const request = demoRequests.find((item) => item.id === id);

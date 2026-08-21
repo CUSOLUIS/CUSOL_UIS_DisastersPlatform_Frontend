@@ -7,6 +7,12 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react-nativ
 import { MySpacePanel } from "./MySpacePanel";
 import type { MySpaceDataSource } from "./types";
 import type { HelpRequestsDataSource } from "../help-requests/types";
+import { setLastKnownVisitorLocation } from "../operational-map/visitorPresence";
+
+// CHG-191: la última posición conocida vive en memoria del módulo y
+// sobrevive entre pruebas; se limpia para que cada caso empiece igual
+// que una pestaña recién abierta.
+beforeEach(() => setLastKnownVisitorLocation(null));
 
 function createDataSource(): MySpaceDataSource & {
   createVolunteerAlert: jest.Mock;
@@ -265,6 +271,11 @@ function helpRequestsWith(
       generatedAt: "2026-08-21T10:05:00Z",
     }),
     attend: jest.fn(),
+    listAttenders: jest.fn().mockResolvedValue({
+      items: [],
+      total: 0,
+      generatedAt: "2026-08-21T10:05:00Z",
+    }),
   };
 }
 
@@ -297,8 +308,9 @@ it("no ofrece para atender la solicitud de ayuda creada por la propia cuenta", a
   expect(
     screen.queryByTestId("help-request-item-40000000-0000-4000-8000-000000000001"),
   ).toBeNull();
-  // El contador de la cabecera cuenta lo que de verdad se puede atender.
-  expect(screen.getByText("1 VIGENTE")).toBeTruthy();
+  // CHG-193: teniendo solicitud propia, la píldora deja de contar
+  // vigentes y dice cuánta gente la está atendiendo.
+  expect(screen.getByText("NADIE ATIENDE TU SOLICITUD AÚN")).toBeTruthy();
 });
 
 it("si todas las solicitudes vigentes son propias, la pestaña queda vacía sin error", async () => {
@@ -326,3 +338,102 @@ it("si todas las solicitudes vigentes son propias, la pestaña queda vacía sin 
     ),
   ).toBeTruthy();
 });
+
+// CHG-191 — La distancia hasta la solicitud, sin provocar nunca un
+// diálogo de permiso por abrir el panel.
+it("dice a qué distancia queda la solicitud cuando el navegador ya tenía permiso", async () => {
+  const locate = jest
+    .fn()
+    .mockResolvedValue({ latitude: 7.1299, longitude: -73.12 });
+
+  render(
+    <MySpacePanel
+      visible
+      onClose={jest.fn()}
+      dataSource={createDataSource()}
+      helpRequests={helpRequestsWith([
+        {
+          id: "40000000-0000-4000-8000-000000000004",
+          address: "Vereda El Salado, Piedecuesta",
+        },
+      ])}
+      geocode={geocode}
+      locate={locate}
+      permissionState={jest.fn().mockResolvedValue("granted")}
+    />,
+  );
+
+  fireEvent.press(await screen.findByRole("tab", { name: "Solicitudes de ayuda" }));
+
+  expect(
+    await screen.findByTestId(
+      "help-request-distance-40000000-0000-4000-8000-000000000004",
+    ),
+  ).toBeTruthy();
+  expect(locate).toHaveBeenCalled();
+});
+
+it("con el permiso sin conceder no pide la ubicación ni habla de distancia", async () => {
+  const locate = jest.fn();
+
+  render(
+    <MySpacePanel
+      visible
+      onClose={jest.fn()}
+      dataSource={createDataSource()}
+      helpRequests={helpRequestsWith([
+        {
+          id: "40000000-0000-4000-8000-000000000005",
+          address: "Vereda El Salado, Piedecuesta",
+        },
+      ])}
+      geocode={geocode}
+      locate={locate}
+      permissionState={jest.fn().mockResolvedValue("prompt")}
+    />,
+  );
+
+  fireEvent.press(await screen.findByRole("tab", { name: "Solicitudes de ayuda" }));
+
+  expect(
+    await screen.findByTestId("help-request-item-40000000-0000-4000-8000-000000000005"),
+  ).toBeTruthy();
+  await waitFor(() => expect(locate).not.toHaveBeenCalled());
+  expect(screen.queryByText(/DE TI$/)).toBeNull();
+});
+
+// CHG-193 — El paso a la vista de quién atiende: el panel es un modal,
+// así que se cierra antes de navegar (igual que la consola de admin).
+it("desde la píldora se abre quién atiende y se cierra el panel", async () => {
+  const onClose = jest.fn();
+  const onOpenAttenders = jest.fn();
+  render(
+    <MySpacePanel
+      visible
+      onClose={onClose}
+      dataSource={createDataSource()}
+      helpRequests={helpRequestsWith([
+        {
+          id: "40000000-0000-4000-8000-000000000006",
+          address: "Calle 33, Bucaramanga",
+          createdByMe: true,
+        },
+      ])}
+      geocode={geocode}
+      onOpenAttenders={onOpenAttenders}
+    />,
+  );
+
+  fireEvent.press(await screen.findByRole("tab", { name: "Solicitudes de ayuda" }));
+  fireEvent.press(
+    await screen.findByRole("button", {
+      name: "Ver quién atiende tu solicitud",
+    }),
+  );
+
+  expect(onClose).toHaveBeenCalled();
+  expect(onOpenAttenders).toHaveBeenCalledWith(
+    expect.objectContaining({ id: "40000000-0000-4000-8000-000000000006" }),
+  );
+});
+

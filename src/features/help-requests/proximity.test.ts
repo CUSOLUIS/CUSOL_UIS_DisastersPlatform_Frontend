@@ -1,6 +1,11 @@
 // CHG-131 — Distancias y filtro de proximidad de las solicitudes.
 
-import { distanceKm, nearbyHelpRequests } from "./proximity";
+import {
+  distanceKm,
+  distanceToRequest,
+  formatDistance,
+  nearbyHelpRequests,
+} from "./proximity";
 import type { ActiveHelpRequest } from "./types";
 
 function request(overrides: Partial<ActiveHelpRequest>): ActiveHelpRequest {
@@ -78,5 +83,57 @@ describe("nearbyHelpRequests (CHG-131)", () => {
       cercana.id,
       lejana.id,
     ]);
+  });
+});
+
+// CHG-191 — La distancia se dice como la diría una persona, y solo
+// cuando existen las dos posiciones.
+describe("formatDistance", () => {
+  it("usa metros por debajo del kilómetro, redondeados a la decena", () => {
+    expect(formatDistance(0.847)).toBe("850 m");
+    expect(formatDistance(0.012)).toBe("10 m");
+  });
+
+  it("nunca dice 0 m: por cerca que esté, hay al menos una decena", () => {
+    expect(formatDistance(0.0001)).toBe("10 m");
+  });
+
+  it("usa un decimal con coma hasta los 10 km", () => {
+    expect(formatDistance(3.42)).toBe("3,4 km");
+  });
+
+  it("a partir de 10 km redondea al kilómetro", () => {
+    expect(formatDistance(12.6)).toBe("13 km");
+  });
+
+  it("no inventa nada con una entrada inválida", () => {
+    expect(formatDistance(Number.NaN)).toBe("");
+    expect(formatDistance(-1)).toBe("");
+  });
+});
+
+describe("distanceToRequest", () => {
+  const solicitud = request({ latitude: 7.1398, longitude: -73.1211 });
+
+  it("mide entre quien mira y el punto de la solicitud", () => {
+    const distance = distanceToRequest(solicitud, {
+      latitude: 7.1198,
+      longitude: -73.1211,
+    });
+    expect(distance).not.toBeNull();
+    expect(distance as number).toBeCloseTo(2.22, 1);
+  });
+
+  it("calla si quien mira no tiene posición", () => {
+    expect(distanceToRequest(solicitud, null)).toBeNull();
+  });
+
+  it("calla si la solicitud llegó solo con dirección escrita", () => {
+    expect(
+      distanceToRequest(
+        { ...solicitud, latitude: null, longitude: null },
+        { latitude: 7.11, longitude: -73.12 },
+      ),
+    ).toBeNull();
   });
 });

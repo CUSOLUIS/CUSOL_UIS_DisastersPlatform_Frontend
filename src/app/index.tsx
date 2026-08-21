@@ -14,6 +14,14 @@ export default function HomeRoute() {
       onRegister={() => router.push("/registrarse")}
       onAbout={() => router.push("/quienes-somos")}
       onOpenAdmin={() => router.push("/administracion")}
+      // CHG-193: «Ver más» de la píldora de «Mi espacio» → quién
+      // atiende la solicitud que publicó esta cuenta.
+      onOpenAttenders={(request) =>
+        router.push({
+          pathname: "/quien-atiende",
+          params: { solicitud: request.id, direccion: request.address },
+        })
+      }
       onReportMissingPerson={() => router.push("/reportar-persona-perdida")}
       onReportUnverifiedBuilding={() =>
         router.push("/reportar-edificio-sin-verificar")

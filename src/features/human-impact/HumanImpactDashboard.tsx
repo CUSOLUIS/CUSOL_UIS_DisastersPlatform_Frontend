@@ -34,6 +34,7 @@ import type {
 } from "../humanitarian-directory/types";
 import { HelpRequestProximityAlert } from "../help-requests/HelpRequestProximityAlert";
 import { useActiveHelpRequests } from "../help-requests/useActiveHelpRequests";
+import type { ActiveHelpRequest } from "../help-requests/types";
 import { FoodOfferProximityAlert } from "../food-offers/FoodOfferProximityAlert";
 import { useActiveFoodOffers } from "../food-offers/useActiveFoodOffers";
 import { useActiveDamagedHomes } from "../damaged-homes/useActiveDamagedHomes";
@@ -100,6 +101,8 @@ interface HumanImpactDashboardProps {
   onAbout: () => void;
   // CHG-139: navegación a la consola (solo la usa el super_admin).
   onOpenAdmin?: () => void;
+  // CHG-193: «Ver más» de quién atiende la solicitud propia.
+  onOpenAttenders?: (request: ActiveHelpRequest) => void;
   // CHG-091: deep link ?buscar= hacia el buscador del directorio.
   initialDirectorySearch?: string;
   // CHG-051: sesión activa visible en el encabezado, con cierre.
@@ -234,6 +237,7 @@ export function HumanImpactDashboard({
   onRegister,
   onAbout,
   onOpenAdmin,
+  onOpenAttenders,
   account = null,
   onLogout = () => undefined,
   onOpenMapPointDetail,
@@ -402,6 +406,7 @@ export function HumanImpactDashboard({
           onClose={() => setMySpaceOpen(false)}
           isSuperAdmin={account?.assignedRole === "super_admin"}
           onOpenAdmin={onOpenAdmin}
+          onOpenAttenders={onOpenAttenders}
           helpRequests={helpRequestsDataSource}
           foodOffers={foodOffersDataSource}
         />

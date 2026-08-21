@@ -60,3 +60,43 @@ export function nearbyHelpRequests(
     .filter((entry) => entry.distanceKm <= entry.request.notificationRadiusKm)
     .sort((a, b) => a.distanceKm - b.distanceKm);
 }
+
+// CHG-191 — Cuánto hay hasta la solicitud, dicho como lo diría una
+// persona: metros cuando se puede llegar caminando, kilómetros cuando
+// no. Redondear a la decena de metros evita fingir una precisión que el
+// GPS de un teléfono no tiene, y el separador decimal es el de Colombia.
+const kilometerFormatter = new Intl.NumberFormat("es-CO", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
+
+export function formatDistance(distance: number): string {
+  if (!Number.isFinite(distance) || distance < 0) {
+    return "";
+  }
+  if (distance < 1) {
+    const meters = Math.max(10, Math.round((distance * 1000) / 10) * 10);
+    return `${meters} m`;
+  }
+  if (distance < 10) {
+    return `${kilometerFormatter.format(distance)} km`;
+  }
+  return `${Math.round(distance)} km`;
+}
+
+// La distancia entre quien mira y una solicitud, o null cuando falta
+// alguna de las dos posiciones: la solicitud pudo llegar solo con
+// dirección escrita (CHG-127) y el navegador puede no haber dado
+// permiso. Sin dato no se inventa uno (constitución §1).
+export function distanceToRequest(
+  request: ActiveHelpRequest,
+  viewer: GeographicCenter | null,
+): number | null {
+  if (!viewer || request.latitude === null || request.longitude === null) {
+    return null;
+  }
+  return distanceKm(viewer, {
+    latitude: request.latitude,
+    longitude: request.longitude,
+  });
+}

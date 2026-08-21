@@ -643,7 +643,9 @@ function MapContent({
                 ? "1 PERSONA ATENDIENDO"
                 : `${mapNumberFormatter.format(selectedHelpRequest.attendersCount)} PERSONAS ATENDIENDO`}
             </Text>
-            {onOpenPointDetail && (
+            {/* CHG-194: quien creó la solicitud no necesita el paso a
+                la ficha pública; su vista es «Mi espacio» (CHG-193). */}
+            {onOpenPointDetail && selectedHelpRequest.createdByMe !== true && (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Ver más información de la solicitud"

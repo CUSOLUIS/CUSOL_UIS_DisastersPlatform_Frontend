@@ -9,9 +9,26 @@ import {
 import { colors, fontFamilies } from "../../theme";
 import { font } from "../../typography";
 import { CountdownLabel } from "./CountdownLabel";
+import { distanceToRequest, formatDistance } from "./proximity";
+import type { GeographicCenter } from "../operational-map/webMercator";
 import type { ActiveHelpRequest } from "./types";
 
 const countFormatter = new Intl.NumberFormat("es-CO");
+
+// CHG-193 — Para quien pidió ayuda, el dato que importa no es cuántas
+// solicitudes hay vigentes: es cuánta gente viene. El contador de la
+// cabecera lo dice con sus palabras, incluido el caso de que aún no
+// haya nadie, que también es información.
+export function attendersHeadline(ownRequests: ActiveHelpRequest[]): string {
+  const total = ownRequests.reduce(
+    (sum, request) => sum + request.attendersCount,
+    0,
+  );
+  const mine = ownRequests.length === 1 ? "TU SOLICITUD" : "TUS SOLICITUDES";
+  if (total === 0) return `NADIE ATIENDE ${mine} AÚN`;
+  if (total === 1) return `1 PERSONA ATIENDE ${mine}`;
+  return `${countFormatter.format(total)} PERSONAS ATIENDEN ${mine}`;
+}
 
 export interface HelpRequestsSectionProps {
   items: ActiveHelpRequest[];
@@ -19,7 +36,8 @@ export interface HelpRequestsSectionProps {
   errorMessage: string | null;
   // La sesión decide si «Atender solicitud» actúa o invita a entrar.
   isAuthenticated: boolean;
-  attend: (id: string) => Promise<unknown>;
+  // CHG-193: el segundo argumento es el aviso aceptado.
+  attend: (id: string, sharesIdentity?: boolean) => Promise<unknown>;
   onAttended: () => void;
   onLogin?: () => void;
   onRegister?: () => void;
@@ -28,6 +46,16 @@ export interface HelpRequestsSectionProps {
   embedded?: boolean;
   maxItems?: number;
   title?: string;
+  // CHG-191: posición de quien mira, para decir a qué distancia queda
+  // cada solicitud. Null (sin permiso de ubicación) = no se dice nada.
+  viewerLocation?: GeographicCenter | null;
+  // CHG-193: las solicitudes vigentes de la propia cuenta. No se listan
+  // aquí —nadie se atiende a sí mismo, CHG-190—, pero su dueña necesita
+  // saber cuánta gente va en camino: el contador de la cabecera pasa a
+  // hablar de ellas.
+  ownRequests?: ActiveHelpRequest[];
+  // CHG-193: abrir la vista de quién atiende la solicitud propia.
+  onOpenAttenders?: (request: ActiveHelpRequest) => void;
 }
 
 // CHG-125 — Solicitudes «Necesitamos ayuda» vigentes: descripción,
@@ -46,17 +74,24 @@ export function HelpRequestsSection({
   embedded = false,
   maxItems,
   title = "Solicitudes activas de ayuda",
+  viewerLocation = null,
+  ownRequests = [],
+  onOpenAttenders,
 }: HelpRequestsSectionProps) {
   const [attendingId, setAttendingId] = useState<string | null>(null);
   const [attendError, setAttendError] = useState<string | null>(null);
+  // CHG-193: atender comparte tu nombre y tu teléfono con quien pidió
+  // ayuda, así que se avisa ANTES y solo se registra si se acepta.
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const visibleItems =
     maxItems !== undefined ? items.slice(0, maxItems) : items;
 
   const attendRequest = async (id: string) => {
     setAttendingId(id);
     setAttendError(null);
+    setConfirmingId(null);
     try {
-      await attend(id);
+      await attend(id, true);
       onAttended();
     } catch (error: unknown) {
       setAttendError(
@@ -86,12 +121,33 @@ export function HelpRequestsSection({
             para que se sepa cuánta gente va en camino.
           </Text>
         </View>
-        <View style={styles.badge}>
-          <View style={styles.badgeDot} />
-          <Text style={styles.badgeText}>
-            {countFormatter.format(items.length)}{" "}
-            {items.length === 1 ? "VIGENTE" : "VIGENTES"}
-          </Text>
+        <View style={styles.headingSide}>
+          <View style={styles.badge}>
+            <View style={styles.badgeDot} />
+            <Text style={styles.badgeText}>
+              {ownRequests.length > 0
+                ? attendersHeadline(ownRequests)
+                : `${countFormatter.format(items.length)} ${
+                    items.length === 1 ? "VIGENTE" : "VIGENTES"
+                  }`}
+            </Text>
+          </View>
+          {/* CHG-193: quién atiende, persona por persona. Solo aparece
+              para quien publicó la solicitud. */}
+          {ownRequests.length > 0 && onOpenAttenders && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Ver quién atiende tu solicitud"
+              onPress={() => onOpenAttenders(ownRequests[0])}
+              testID="help-request-own-see-more"
+              style={({ pressed }) => [
+                styles.seeMoreButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.seeMoreText}>VER MÁS</Text>
+            </Pressable>
+          )}
         </View>
       </View>
 
@@ -134,31 +190,90 @@ export function HelpRequestsSection({
               </Text>
             </View>
             <Text style={styles.itemAddress}>{request.address}</Text>
+            {/* CHG-191: decidir si puedes acudir depende de qué tan
+                lejos queda. Solo aparece cuando hay las dos posiciones:
+                la de la solicitud y la de quien mira. */}
+            {(() => {
+              const distance = distanceToRequest(request, viewerLocation);
+              if (distance === null) return null;
+              const label = formatDistance(distance);
+              return (
+                <Text
+                  style={styles.itemDistance}
+                  accessibilityLabel={`A ${label} de tu ubicación`}
+                  testID={`help-request-distance-${request.id}`}
+                >
+                  {`A ${label.toUpperCase()} DE TI`}
+                </Text>
+              );
+            })()}
             <Text style={styles.itemDescription}>{request.description}</Text>
             {isAuthenticated ? (
               request.attendedByMe ? (
                 <Text style={styles.attendingNote}>
                   ✓ ESTÁS ATENDIENDO ESTA SOLICITUD
                 </Text>
+              ) : confirmingId === request.id ? (
+                /* CHG-193: quien pidió ayuda necesita saber quién va en
+                   camino, así que atender comparte nombre y teléfono.
+                   Se dice antes, no después. */
+                <View
+                  style={styles.consentBox}
+                  testID={`help-request-consent-${request.id}`}
+                >
+                  <Text style={styles.consentText}>
+                    Al atender, tu nombre y tu teléfono se comparten con
+                    quien pidió la ayuda, para que sepa quién va en
+                    camino. Tu correo no se comparte.
+                  </Text>
+                  <View style={styles.consentActions}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Confirmar que atiendes la solicitud en ${request.address}`}
+                      disabled={attendingId !== null}
+                      onPress={() => void attendRequest(request.id)}
+                      style={({ pressed }) => [
+                        styles.attendButton,
+                        pressed && styles.pressed,
+                        attendingId !== null && styles.disabled,
+                      ]}
+                    >
+                      {attendingId === request.id ? (
+                        <ActivityIndicator size="small" color="#07101b" />
+                      ) : (
+                        <Text style={styles.attendButtonText}>
+                          SÍ, ATENDER Y COMPARTIR
+                        </Text>
+                      )}
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Cancelar la atención"
+                      onPress={() => setConfirmingId(null)}
+                      style={({ pressed }) => [
+                        styles.cancelButton,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={styles.cancelButtonText}>CANCELAR</Text>
+                    </Pressable>
+                  </View>
+                </View>
               ) : (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Atender solicitud en ${request.address}`}
                   disabled={attendingId !== null}
-                  onPress={() => void attendRequest(request.id)}
+                  onPress={() => setConfirmingId(request.id)}
                   style={({ pressed }) => [
                     styles.attendButton,
                     pressed && styles.pressed,
                     attendingId !== null && styles.disabled,
                   ]}
                 >
-                  {attendingId === request.id ? (
-                    <ActivityIndicator size="small" color="#07101b" />
-                  ) : (
-                    <Text style={styles.attendButtonText}>
-                      ATENDER SOLICITUD
-                    </Text>
-                  )}
+                  <Text style={styles.attendButtonText}>
+                    ATENDER SOLICITUD
+                  </Text>
                 </Pressable>
               )
             ) : null}
@@ -236,6 +351,47 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   headingCopy: { minWidth: 220, flex: 1 },
+  // CHG-193: contador y acceso a la lista viajan juntos y envuelven en
+  // pantalla estrecha, como el resto de la cabecera.
+  headingSide: { alignItems: "flex-end", gap: 6 },
+  seeMoreButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 6,
+  },
+  consentBox: {
+    gap: 9,
+    padding: 11,
+    borderWidth: 1,
+    borderColor: "rgba(255, 77, 94, 0.36)",
+    borderRadius: 8,
+    backgroundColor: "rgba(255, 77, 94, 0.06)",
+  },
+  consentText: { color: colors.ink, fontSize: font(12), lineHeight: 18 },
+  consentActions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  cancelButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 8,
+  },
+  cancelButtonText: {
+    color: colors.inkSoft,
+    fontFamily: fontFamilies.mono,
+    fontSize: font(11),
+    fontWeight: "800",
+    letterSpacing: 0.7,
+  },
+  seeMoreText: {
+    color: colors.cyan,
+    fontFamily: fontFamilies.mono,
+    fontSize: font(10),
+    fontWeight: "800",
+    letterSpacing: 0.8,
+  },
   overline: {
     marginBottom: 3,
     color: colors.emergency,
@@ -325,6 +481,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   itemAddress: { color: colors.ink, fontSize: font(14), fontWeight: "700" },
+  // CHG-191: mismo registro que el resto de los datos de la tarjeta
+  // (mono, versalita), para que se lea como dato y no como titular.
+  itemDistance: {
+    color: colors.cyan,
+    fontFamily: fontFamilies.mono,
+    fontSize: font(11),
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
   itemDescription: {
     color: colors.inkSoft,
     fontSize: font(12),

@@ -51,11 +51,14 @@ describe("HelpRequestActionSheet (CHG-148)", () => {
 
     await act(async () => {
       fireEvent.press(
-        screen.getByRole("button", { name: "Atender esta solicitud" }),
+        screen.getByRole("button", {
+          name: "Atender esta solicitud y compartir mi nombre",
+        }),
       );
     });
 
-    expect(attend).toHaveBeenCalledWith(request.id);
+    // CHG-193: atender lleva el aviso aceptado (nombre y teléfono).
+    expect(attend).toHaveBeenCalledWith(request.id, true);
     expect(onAttended).toHaveBeenCalled();
     expect(screen.getByText("3 PERSONAS ATENDIENDO")).toBeTruthy();
     expect(
@@ -112,5 +115,74 @@ describe("HelpRequestActionSheet (CHG-148)", () => {
     );
     expect(screen.getByText(/Quedaste en la lista de voluntarios/)).toBeTruthy();
     expect(screen.getByText("3 PERSONAS ATENDIENDO")).toBeTruthy();
+  });
+});
+
+// CHG-194 — La solicitud propia no se atiende a sí misma (la regla de
+// CHG-190, aplicada a la ventana que abre el mapa).
+describe("HelpRequestActionSheet · solicitud propia (CHG-194)", () => {
+  const propia: ActiveHelpRequest = { ...request, createdByMe: true };
+
+  it("a quien la creó no le ofrece atender ni «VER MÁS»", () => {
+    const attend = jest.fn();
+
+    render(
+      <HelpRequestActionSheet
+        request={propia}
+        visible
+        onClose={jest.fn()}
+        isAuthenticated
+        attend={attend}
+        onViewMore={jest.fn()}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", {
+        name: "Atender esta solicitud y compartir mi nombre",
+      }),
+    ).toBeNull();
+    // El aviso de CHG-193 solo tiene sentido si hay algo que atender.
+    expect(screen.queryByText(/tu nombre y tu teléfono se comparten/i)).toBeNull();
+    expect(screen.queryByTestId("action-sheet-view-more")).toBeNull();
+    expect(attend).not.toHaveBeenCalled();
+  });
+
+  it("pero sigue mostrándole la información de su solicitud", () => {
+    render(
+      <HelpRequestActionSheet
+        request={propia}
+        visible
+        onClose={jest.fn()}
+        isAuthenticated
+        attend={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText(propia.address)).toBeTruthy();
+    expect(screen.getByText(propia.description)).toBeTruthy();
+    expect(screen.getByTestId("action-sheet-count")).toHaveTextContent(
+      "2 PERSONAS ATENDIENDO",
+    );
+  });
+
+  it("sin la marca (bundle viejo) se comporta como siempre", () => {
+    render(
+      <HelpRequestActionSheet
+        request={request}
+        visible
+        onClose={jest.fn()}
+        isAuthenticated
+        attend={jest.fn()}
+        onViewMore={jest.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", {
+        name: "Atender esta solicitud y compartir mi nombre",
+      }),
+    ).toBeTruthy();
+    expect(screen.getByTestId("action-sheet-view-more")).toBeTruthy();
   });
 });

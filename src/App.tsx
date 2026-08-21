@@ -26,7 +26,10 @@ import type {
   HumanitarianDirectoryDataSource,
 } from "./features/humanitarian-directory/types";
 import { helpRequestsDataSource } from "./features/help-requests/dataSource";
-import type { HelpRequestsDataSource } from "./features/help-requests/types";
+import type {
+  ActiveHelpRequest,
+  HelpRequestsDataSource,
+} from "./features/help-requests/types";
 import { foodOffersDataSource } from "./features/food-offers/dataSource";
 import type { FoodOffersDataSource } from "./features/food-offers/types";
 import { operationalMapDataSource } from "./features/operational-map/dataSource";
@@ -82,6 +85,7 @@ interface AppProps {
   onAbout?: () => void;
   // CHG-139: abre /administracion desde Mi espacio (super_admin).
   onOpenAdmin?: () => void;
+  onOpenAttenders?: (request: ActiveHelpRequest) => void;
   // CHG-164: «VER MÁS» del popup de un marcador del mapa abre
   // /detalle-punto con el registro serializado.
   onOpenMapPointDetail?: (payload: MapPointDetailPayload) => void;
@@ -118,6 +122,7 @@ export function App({
   onRegister = () => undefined,
   onAbout = () => undefined,
   onOpenAdmin,
+  onOpenAttenders,
   onOpenMapPointDetail = () => undefined,
   initialDirectorySearch,
   authSource = authDataSource,
@@ -210,6 +215,7 @@ export function App({
         onRegister={onRegister}
         onAbout={onAbout}
         onOpenAdmin={onOpenAdmin}
+        onOpenAttenders={onOpenAttenders}
         onOpenMapPointDetail={onOpenMapPointDetail}
         initialDirectorySearch={initialDirectorySearch}
         sessionAccount={sessionAccount}
@@ -247,6 +253,7 @@ function DashboardLoader({
   onRegister,
   onAbout,
   onOpenAdmin,
+  onOpenAttenders,
   onOpenMapPointDetail,
   sessionAccount,
   initialDirectorySearch,
@@ -277,6 +284,7 @@ function DashboardLoader({
   onAbout: () => void;
   // CHG-139: abre /administracion desde Mi espacio (super_admin).
   onOpenAdmin?: () => void;
+  onOpenAttenders?: (request: ActiveHelpRequest) => void;
   // CHG-164: «VER MÁS» de un marcador del mapa.
   onOpenMapPointDetail: (payload: MapPointDetailPayload) => void;
   initialDirectorySearch?: string;
@@ -403,6 +411,7 @@ function DashboardLoader({
       onRegister={onRegister}
       onAbout={onAbout}
       onOpenAdmin={onOpenAdmin}
+      onOpenAttenders={onOpenAttenders}
       onOpenMapPointDetail={onOpenMapPointDetail}
       account={sessionAccount}
       onLogout={onLogout}

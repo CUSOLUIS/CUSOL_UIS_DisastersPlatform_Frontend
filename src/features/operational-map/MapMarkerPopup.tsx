@@ -57,7 +57,8 @@ export const popupPrecisionLabels = {
 
 /**
  * El registro que abriría «VER MÁS», o `null` cuando no hay vista
- * completa que ofrecer (clústeres anónimos).
+ * completa que ofrecer (clústeres anónimos) o no corresponde ofrecerla
+ * (CHG-194: la solicitud de ayuda que mira su propia dueña).
  */
 export function detailPayloadFromTarget(
   target: MapMarkerPopupTarget,
@@ -66,7 +67,11 @@ export function detailPayloadFromTarget(
     case "operational":
       return { kind: "operational", point: target.point };
     case "help_request":
-      return { kind: "help_request", request: target.request };
+      // CHG-194: quien creó la solicitud no ve «VER MÁS»; esa ficha es
+      // para los demás. `createdByMe` solo es true con sesión propia.
+      return target.request.createdByMe === true
+        ? null
+        : { kind: "help_request", request: target.request };
     case "food_offer":
       return { kind: "food_offer", offer: target.offer };
     case "damaged_home":

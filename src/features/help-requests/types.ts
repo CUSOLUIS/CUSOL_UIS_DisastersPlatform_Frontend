@@ -84,6 +84,25 @@ export interface HelpRequestPage {
   generatedAt: string;
 }
 
+// CHG-193 — Quién atiende MI solicitud. `sharesContact` manda: si es
+// false, esa persona no consintió compartir nada y el resto llega en
+// null (atendió antes de que se le advirtiera, o no aceptó el aviso).
+export interface HelpRequestAttender {
+  id: string;
+  kind: "account" | "volunteer";
+  joinedAt: string;
+  sharesContact: boolean;
+  name: string | null;
+  phone: string | null;
+  photoUrl: string | null;
+}
+
+export interface HelpRequestAttendersPage {
+  items: HelpRequestAttender[];
+  total: number;
+  generatedAt: string;
+}
+
 export interface HelpRequestAttendReceipt {
   id: string;
   attendersCount: number;
@@ -93,5 +112,15 @@ export interface HelpRequestAttendReceipt {
 export interface HelpRequestsDataSource {
   transport: "api" | "demo";
   listActive(signal?: AbortSignal): Promise<HelpRequestPage>;
-  attend(id: string): Promise<HelpRequestAttendReceipt>;
+  // CHG-193: `sharesIdentity` es el aviso aceptado. El nombre y el
+  // teléfono no viajan desde aquí: los pone el gateway desde la sesión.
+  attend(
+    id: string,
+    sharesIdentity?: boolean,
+  ): Promise<HelpRequestAttendReceipt>;
+  // CHG-193: solo responde para la dueña de la solicitud.
+  listAttenders(
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<HelpRequestAttendersPage>;
 }

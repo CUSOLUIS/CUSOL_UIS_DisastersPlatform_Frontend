@@ -36,8 +36,15 @@ export interface HelpRequestVolunteerDraft {
 
 export function buildVolunteerPayload(
   draft: HelpRequestVolunteerDraft,
-): Record<string, string> {
-  const payload: Record<string, string> = { name: draft.name.trim() };
+): Record<string, string | boolean> {
+  // CHG-193: el formulario advierte, antes de pedir nada, que el
+  // nombre, el teléfono y la foto los verá quien pidió la ayuda. Quien
+  // envía desde este formulario lo está aceptando; el correo sigue
+  // siendo privado del super_admin (DEC-148-01).
+  const payload: Record<string, string | boolean> = {
+    name: draft.name.trim(),
+    sharesContact: true,
+  };
   const phone = draft.phone.trim();
   const email = draft.email.trim();
   if (phone) {

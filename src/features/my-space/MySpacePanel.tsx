@@ -21,7 +21,15 @@ import {
   searchAddressCandidates,
   type AddressCandidate,
 } from "../missing-persons/geocoding";
-import { requestVisitorLocation } from "../operational-map/visitorLocation";
+import {
+  getGeolocationPermissionState,
+  requestVisitorLocation,
+} from "../operational-map/visitorLocation";
+import {
+  getLastKnownVisitorLocation,
+  setLastKnownVisitorLocation,
+} from "../operational-map/visitorPresence";
+import type { GeographicCenter } from "../operational-map/webMercator";
 import {
   fetchMyTransports,
   type MyTransportSummary,
@@ -29,6 +37,7 @@ import {
 import { helpRequestsDataSource } from "../help-requests/dataSource";
 import { HelpRequestsSection } from "../help-requests/HelpRequestsSection";
 import type {
+  ActiveHelpRequest,
   HelpRequestPage,
   HelpRequestsDataSource,
 } from "../help-requests/types";
@@ -102,8 +111,13 @@ export function MySpacePanel({
   damagedHomes = damagedHomesDataSource,
   geocode = searchAddressCandidates,
   locate = requestVisitorLocation,
+  // CHG-191: solo se consulta la posición si el navegador YA tiene el
+  // permiso concedido; nunca se provoca un diálogo por abrir el panel.
+  permissionState = getGeolocationPermissionState,
   isSuperAdmin = false,
   onOpenAdmin,
+  // CHG-193: ver quién atiende la solicitud propia (vista aparte).
+  onOpenAttenders,
   // CHG-174: transportes de la cuenta (inyectable en pruebas).
   loadTransports = fetchMyTransports,
 }: {
@@ -112,6 +126,7 @@ export function MySpacePanel({
   // CHG-139: acceso directo a la consola, solo para super_admin.
   isSuperAdmin?: boolean;
   onOpenAdmin?: () => void;
+  onOpenAttenders?: (request: ActiveHelpRequest) => void;
   dataSource?: MySpaceDataSource;
   // CHG-125 / DEC-125-09 y DEC-125-11: las solicitudes activas se
   // notifican dentro del espacio personal con su acción de atender.
@@ -120,6 +135,7 @@ export function MySpacePanel({
   foodOffers?: FoodOffersDataSource;
   geocode?: (query: string) => Promise<AddressCandidate[]>;
   locate?: () => Promise<{ latitude: number; longitude: number }>;
+  permissionState?: () => Promise<string>;
   loadTransports?: typeof fetchMyTransports;
   // CHG-182: casitas de la cuenta y sus comentarios sin leer.
   damagedHomes?: DamagedHomesDataSource;
@@ -174,6 +190,35 @@ export function MySpacePanel({
     if (visible) void load();
   }, [load, visible]);
 
+  // CHG-191: la distancia hasta cada solicitud se mide desde aquí. La
+  // posición suele estar ya en memoria —el portón de la app la vigila
+  // (CHG-066) y el mapa de la web la comparte al ubicarse (CHG-064)—;
+  // si no está y el navegador ya tenía el permiso concedido, se pide
+  // sin diálogo. Con el permiso en «prompt» o denegado no se pregunta
+  // nada y la tarjeta simplemente no habla de distancia.
+  const [viewerLocation, setViewerLocation] = useState<GeographicCenter | null>(
+    () => getLastKnownVisitorLocation(),
+  );
+
+  useEffect(() => {
+    if (!visible || viewerLocation) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        if ((await permissionState()) !== "granted") return;
+        const located = await locate();
+        if (cancelled) return;
+        setViewerLocation(located);
+        setLastKnownVisitorLocation(located);
+      } catch {
+        // Sin ubicación no hay distancia que mostrar; nada más falla.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, viewerLocation, permissionState, locate]);
+
   // CHG-190: en «Mi espacio» las solicitudes de ayuda están para
   // atenderlas, y nadie se atiende a sí mismo: la que creó esta cuenta
   // no se lista aquí. El listado del servidor sigue siendo completo
@@ -181,6 +226,13 @@ export function MySpacePanel({
   // necesitan viva—; quien la esconde es esta superficie.
   const attendableHelpRequests = useMemo(
     () => (helpPage?.items ?? []).filter((request) => !request.createdByMe),
+    [helpPage],
+  );
+
+  // CHG-193: las propias no se listan para atender, pero su dueña
+  // necesita saber cuánta gente va en camino.
+  const ownHelpRequests = useMemo(
+    () => (helpPage?.items ?? []).filter((request) => request.createdByMe),
     [helpPage],
   );
 
@@ -383,6 +435,18 @@ export function MySpacePanel({
                 onAttended={() => void load()}
                 embedded
                 title="Solicitudes de ayuda vigentes"
+                viewerLocation={viewerLocation}
+                ownRequests={ownHelpRequests}
+                onOpenAttenders={
+                  onOpenAttenders
+                    ? (request) => {
+                        // La vista es una pantalla aparte: el panel se
+                        // cierra, como con la consola de administración.
+                        onClose();
+                        onOpenAttenders(request);
+                      }
+                    : undefined
+                }
               />
             )}
             {/* CHG-174: los transportes de la cuenta, con el estado de

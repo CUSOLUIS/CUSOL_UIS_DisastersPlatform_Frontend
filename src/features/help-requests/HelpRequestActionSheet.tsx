@@ -25,8 +25,14 @@ import type { ActiveHelpRequest, HelpRequestAttendReceipt } from "./types";
 // Muestra la info y, según la sesión, la acción de voluntario:
 //   · con cuenta → botón que registra la atención (aumenta el contador);
 //   · sin cuenta → formulario con los datos personales del voluntario
-//     (nombre, teléfono, correo, foto opcional). Esos datos son
-//     PRIVADOS (solo super_admin); el público solo ve el contador.
+//     (nombre, teléfono, correo, foto opcional). CHG-193: el nombre, el
+//     teléfono y la foto los ve la DUEÑA de la solicitud —el formulario
+//     lo advierte antes de pedirlos—; el correo sigue siendo privado
+//     del super_admin. El público solo ve el contador.
+// CHG-194: a quien CREÓ la solicitud la ventana no le ofrece nada que
+// hacer —ni atender (inflaría el contador que mira la comunidad) ni
+// «VER MÁS»—; se queda en informativa. Su camino a quién la atiende es
+// «Mi espacio» (CHG-193), no esta ventana.
 
 const countFormatter = new Intl.NumberFormat("es-CO");
 const VOLUNTEER_MIN_NAME_WORDS = 1;
@@ -42,7 +48,11 @@ export interface HelpRequestActionSheetProps {
   visible: boolean;
   onClose: () => void;
   isAuthenticated: boolean;
-  attend: (id: string) => Promise<HelpRequestAttendReceipt>;
+  // CHG-193: el segundo argumento es el aviso aceptado.
+  attend: (
+    id: string,
+    sharesIdentity?: boolean,
+  ) => Promise<HelpRequestAttendReceipt>;
   onAttended?: () => void;
   onLogin?: () => void;
   onRegister?: () => void;
@@ -72,6 +82,10 @@ export function HelpRequestActionSheet({
   submitVolunteer = submitHelpRequestVolunteer,
   onViewMore,
 }: HelpRequestActionSheetProps) {
+  // CHG-194: `createdByMe` solo puede ser true con sesión; ausente
+  // (bundle viejo, CHG-137) se lee como «no es mía», que es el
+  // comportamiento de siempre.
+  const isOwnRequest = request.createdByMe === true;
   const [count, setCount] = useState(request.attendersCount);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -89,7 +103,7 @@ export function HelpRequestActionSheet({
     setBusy(true);
     setError(null);
     try {
-      const receipt = await attend(request.id);
+      const receipt = await attend(request.id, true);
       setCount(receipt.attendersCount);
       setDone(true);
       onAttended?.();
@@ -200,8 +214,9 @@ export function HelpRequestActionSheet({
             </View>
 
             {/* CHG-164: información completa de la solicitud, para
-                cualquier visitante (anónimo o con cuenta). */}
-            {onViewMore && (
+                cualquier visitante (anónimo o con cuenta).
+                CHG-194: menos para quien la creó. */}
+            {onViewMore && !isOwnRequest && (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Ver más información de la solicitud"
@@ -213,7 +228,10 @@ export function HelpRequestActionSheet({
               </Pressable>
             )}
 
-            {done ? (
+            {/* CHG-194: la solicitud propia no tiene zona de acción.
+                Quien la creó ya hizo lo suyo —pedir la ayuda—, así que
+                la ventana se queda en la información de arriba. */}
+            {isOwnRequest ? null : done ? (
               <View style={styles.confirmation} accessibilityRole="alert">
                 <Text style={styles.confirmationText}>
                   {isAuthenticated
@@ -230,27 +248,40 @@ export function HelpRequestActionSheet({
                 </Pressable>
               </View>
             ) : isAuthenticated ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Atender esta solicitud"
-                disabled={busy}
-                onPress={() => void attendNow()}
-                style={[styles.primaryButton, busy && styles.disabled]}
-              >
-                {busy ? (
-                  <ActivityIndicator color="#07101b" />
-                ) : (
-                  <Text style={styles.primaryButtonText}>ATENDER SOLICITUD</Text>
-                )}
-              </Pressable>
+              /* CHG-193: atender comparte tu nombre y tu teléfono con
+                 quien pidió la ayuda. Se dice aquí, antes de pulsar. */
+              <View style={styles.attendBlock}>
+                <Text style={styles.consentText}>
+                  Al atender, tu nombre y tu teléfono se comparten con
+                  quien pidió la ayuda, para que sepa quién va en camino.
+                  Tu correo no se comparte.
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Atender esta solicitud y compartir mi nombre"
+                  disabled={busy}
+                  onPress={() => void attendNow()}
+                  style={[styles.primaryButton, busy && styles.disabled]}
+                >
+                  {busy ? (
+                    <ActivityIndicator color="#07101b" />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>
+                      ATENDER SOLICITUD
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
             ) : (
               <View style={styles.form}>
                 <Text style={styles.formTitle}>
                   OFRÉCETE COMO VOLUNTARIO
                 </Text>
                 <Text style={styles.formHint}>
-                  Tus datos son privados: solo los ve el equipo que
-                  coordina. La comunidad solo ve cuántas personas atienden.
+                  Tu nombre, tu teléfono y tu foto se comparten con quien
+                  pidió la ayuda, para que sepa quién va en camino. Tu
+                  correo no: ese solo lo ve el equipo que coordina. La
+                  comunidad solo ve cuántas personas atienden.
                 </Text>
                 <Field
                   label="Tu nombre *"
@@ -259,7 +290,7 @@ export function HelpRequestActionSheet({
                   onChangeText={(value) => setField("name", value)}
                 />
                 <Field
-                  label="Teléfono · privado"
+                  label="Teléfono · lo verá quien pidió ayuda"
                   value={draft.phone}
                   onChangeText={(value) => setField("phone", value)}
                   keyboardType="phone-pad"
@@ -438,6 +469,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7,
   },
   disabled: { opacity: 0.55 },
+  attendBlock: { gap: 9 },
+  consentText: { color: colors.ink, fontSize: 12, lineHeight: 18 },
   form: { gap: 10 },
   formTitle: {
     color: colors.cyan,
