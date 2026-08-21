@@ -10,7 +10,6 @@ import {
 import { colors, fontFamilies } from "../../theme";
 import { font } from "../../typography";
 import { useDataRefreshTick } from "../../platform/dataRefresh";
-import { CountdownLabel } from "../help-requests/CountdownLabel";
 import { HelpRequestActionSheet } from "../help-requests/HelpRequestActionSheet";
 import {
   helpRequestIdFromPointId,
@@ -38,7 +37,6 @@ import {
 import type { ActiveTransport } from "../transports/types";
 import type { SelectedPhoto } from "../missing-persons/reportTypes";
 import type { HumanStatus } from "../human-impact/types";
-import { ratingSummaryLine } from "../aid-locations/ratingStars";
 import { categoryMeta } from "./categoryMeta";
 import { CategoryMarkerIcon } from "./CategoryMarkerIcon";
 import { humanStatusMeta } from "./humanStatusMeta";
@@ -424,14 +422,6 @@ function MapContent({
     visiblePoints.find((point) => point.id === selectedId) ??
     visiblePoints[0] ??
     null;
-  const selectedHelpRequest = useMemo(() => {
-    const rawId = selectedPoint
-      ? helpRequestIdFromPointId(selectedPoint.id)
-      : null;
-    return rawId
-      ? (helpRequests.find((request) => request.id === rawId) ?? null)
-      : null;
-  }, [helpRequests, selectedPoint]);
   // CHG-148: la solicitud cuya ventana de acción está abierta (solo al
   // tocar explícitamente su marcador; nunca por la selección inicial).
   const [actionRequestId, setActionRequestId] = useState<string | null>(null);
@@ -609,86 +599,11 @@ function MapContent({
         selectedFeature={selectedHumanFeature}
       />
 
-      {/* CHG-125: los datos de la solicitud elegida en el mapa —
-          descripción, dirección, vigencia y cuánta gente atiende.
-          CHG-181: y, como en la tarjeta de un centro de acopio, su
-          calificación y el paso a la ficha completa. Era la última
-          superficie de la solicitud sin esas dos piezas. */}
-      {selectedHelpRequest && (
-        <View style={styles.detail} testID="help-request-map-detail">
-          <View
-            style={[styles.detailAccent, { backgroundColor: colors.emergency }]}
-          />
-          <View style={styles.detailMain}>
-            <Text style={[styles.detailCategory, { color: colors.emergency }]}>
-              NECESITAMOS AYUDA · SOLICITUD VIGENTE
-            </Text>
-            <Text style={styles.detailTitle}>{selectedHelpRequest.address}</Text>
-            <Text
-              style={styles.detailRating}
-              testID="help-request-map-detail-rating"
-            >
-              {ratingSummaryLine(
-                selectedHelpRequest.commentRatingAverage ?? null,
-                selectedHelpRequest.commentRatingCount ?? 0,
-              )}
-            </Text>
-            <Text style={styles.detailDescription}>
-              {selectedHelpRequest.description}
-            </Text>
-          </View>
-          <View style={styles.detailMeta}>
-            <CountdownLabel
-              expiresAt={selectedHelpRequest.expiresAt}
-              style={[styles.detailMetaText, { color: colors.emergency }]}
-            />
-            <Text style={styles.detailMetaText}>
-              {selectedHelpRequest.attendersCount === 1
-                ? "1 PERSONA ATENDIENDO"
-                : `${mapNumberFormatter.format(selectedHelpRequest.attendersCount)} PERSONAS ATENDIENDO`}
-            </Text>
-            {/* CHG-194/195: el mismo VER MÁS lleva a sitios distintos
-                según quién mire. A la dueña no le sirve la ficha
-                pública —la escribió ella—: le sirve saber quién va en
-                camino y cómo llamarle (CHG-193). */}
-            {selectedHelpRequest.createdByMe === true
-              ? helpRequestActions?.onOpenAttenders && (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Ver quiénes atienden mi solicitud"
-                    onPress={() =>
-                      helpRequestActions.onOpenAttenders?.(selectedHelpRequest)
-                    }
-                    style={styles.detailMoreButton}
-                    testID="help-request-map-detail-attenders"
-                  >
-                    <Text style={styles.detailMoreText}>VER MÁS →</Text>
-                  </Pressable>
-                )
-              : onOpenPointDetail && (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Ver más información de la solicitud"
-                    onPress={() =>
-                      onOpenPointDetail({
-                        kind: "help_request",
-                        request: selectedHelpRequest,
-                      })
-                    }
-                    style={styles.detailMoreButton}
-                    testID="help-request-map-detail-more"
-                  >
-                    <Text style={styles.detailMoreText}>VER MÁS →</Text>
-                  </Pressable>
-                )}
-          </View>
-        </View>
-      )}
-
-      {/* CHG-177: la oferta de comida ya no abre una banda informativa
-          bajo el dashboard. Al tocar su marcador se explica todo en el
-          popup, con su VER MÁS; repetirlo abajo solo alargaba la
-          portada. */}
+      {/* CHG-177 y CHG-200: ni la oferta de comida ni la solicitud de
+          ayuda abren ya una banda informativa bajo el dashboard. Al
+          tocar su marcador se explica todo donde el usuario acaba de
+          tocar —la ventana de acción o el popup, cada uno con su VER
+          MÁS—; repetirlo abajo solo alargaba la portada. */}
 
       {/* CHG-148: ventana de acción al tocar la solicitud — con cuenta
           se atiende; sin cuenta se ofrece como voluntario. */}
@@ -1209,62 +1124,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   mapTime: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: font(11) },
-  detail: {
-    position: "relative",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    overflow: "hidden",
-    padding: 11,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 8,
-    backgroundColor: colors.panel,
-  },
-  detailAccent: { position: "absolute", top: 0, bottom: 0, left: 0, width: 2 },
-  detailMain: { minWidth: 0, flex: 1 },
-  detailCategory: {
-    marginBottom: 3,
-    fontFamily: fontFamilies.mono,
-    fontSize: font(11),
-    fontWeight: "800",
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-  },
-  detailTitle: { color: colors.ink, fontSize: font(11), fontWeight: "700" },
-  detailLocation: { marginTop: 3, color: colors.inkSoft, fontSize: font(11) },
-  detailDescription: { maxWidth: 660, marginTop: 6, color: colors.inkSoft, fontSize: font(11), lineHeight: 17 },
-  // CHG-181: misma línea de estrellas que el popup del marcador.
-  detailRating: {
-    color: colors.missing,
-    fontFamily: fontFamilies.mono,
-    fontSize: font(11),
-  },
-  detailMeta: { alignItems: "flex-end", gap: 2 },
-  detailMoreButton: {
-    marginTop: 4,
-    paddingVertical: 5,
-    paddingHorizontal: 9,
-    borderWidth: 1,
-    borderColor: colors.lineStrong,
-    borderRadius: 7,
-  },
-  detailMoreText: {
-    color: colors.ink,
-    fontFamily: fontFamilies.mono,
-    fontSize: font(9),
-    fontWeight: "800",
-    letterSpacing: 0.7,
-  },
-  detailMetaText: { color: colors.inkDim, fontFamily: fontFamilies.mono, fontSize: font(11) },
-  noSelection: {
-    minHeight: 70,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 8,
-  },
   noSelectionText: { color: colors.inkDim, fontSize: font(11) },
   state: {
     minHeight: 430,

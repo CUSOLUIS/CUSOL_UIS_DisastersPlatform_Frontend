@@ -479,10 +479,10 @@ it("la ventana de acción de la solicitud también muestra la puntuación", asyn
   );
 });
 
-// CHG-181 — La banda de detalle bajo el mapa era la única superficie de
-// la solicitud sin calificación ni paso a la ficha; ahora las tiene,
-// como la tarjeta de un centro de acopio.
-it("la banda de la solicitud seleccionada muestra estrellas y VER MÁS", async () => {
+// CHG-181 la añadió, CHG-199 le quitó las estrellas y CHG-200 la retiró
+// entera: tocar el marcador ya no dibuja nada bajo el mapa, porque la
+// ventana de acción dice lo mismo donde el usuario acaba de tocar.
+it("tocar la solicitud no dibuja ninguna banda bajo el mapa", async () => {
   const onOpenPointDetail = jest.fn();
   const calificada = {
     ...request,
@@ -499,13 +499,15 @@ it("la banda de la solicitud seleccionada muestra estrellas y VER MÁS", async (
     await screen.findByTestId(`map-marker-help_request:${request.id}`),
   );
 
-  const banda = screen.getByTestId("help-request-map-detail");
-  expect(banda).toBeTruthy();
-  expect(
-    screen.getByTestId("help-request-map-detail-rating"),
-  ).toHaveTextContent(/4,5 · 8 calificaciones/);
+  expect(screen.queryByTestId("help-request-map-detail")).toBeNull();
 
-  fireEvent.press(screen.getByTestId("help-request-map-detail-more"));
+  // Lo que el usuario ve es la ventana, con su información y su paso a
+  // la ficha: no se perdió nada por el camino.
+  expect(screen.getByTestId("help-request-action-sheet")).toBeTruthy();
+  expect(screen.getByTestId("action-sheet-rating")).toHaveTextContent(
+    /4,5 · 8 calificaciones/,
+  );
+  fireEvent.press(screen.getByTestId("action-sheet-view-more"));
   expect(onOpenPointDetail).toHaveBeenCalledWith({
     kind: "help_request",
     request: calificada,
@@ -515,7 +517,7 @@ it("la banda de la solicitud seleccionada muestra estrellas y VER MÁS", async (
 // CHG-194 — Quien creó la solicitud no ve «VER MÁS» en ninguna de las
 // superficies que abre un click en el mapa: ni la banda de detalle ni el
 // popup genérico. La ficha pública es para los demás.
-it("la banda de la solicitud propia no ofrece la ficha pública", async () => {
+it("la solicitud propia no ofrece la ficha pública ni atenderla", async () => {
   const onOpenPointDetail = jest.fn();
   renderPanel({
     helpRequests: [{ ...request, createdByMe: true }],
@@ -527,10 +529,9 @@ it("la banda de la solicitud propia no ofrece la ficha pública", async () => {
     await screen.findByTestId(`map-marker-help_request:${request.id}`),
   );
 
-  // La banda sigue ahí con su información; lo que desaparece es el paso
-  // a la ficha y, en la ventana, la acción de atender.
-  expect(screen.getByTestId("help-request-map-detail")).toBeTruthy();
-  expect(screen.queryByTestId("help-request-map-detail-more")).toBeNull();
+  // CHG-200: ya no hay banda que comprobar; la ventana es la superficie.
+  expect(screen.queryByTestId("help-request-map-detail")).toBeNull();
+  expect(screen.getByTestId("help-request-action-sheet")).toBeTruthy();
   expect(screen.queryByTestId("action-sheet-view-more")).toBeNull();
   expect(
     screen.queryByRole("button", {
@@ -557,7 +558,7 @@ it("el popup genérico de la solicitud propia tampoco ofrece VER MÁS", async ()
 // CHG-195 — El VER MÁS de la dueña cambia de destino, no desaparece:
 // en el mapa la lleva a quiénes la atienden, igual que la píldora de
 // «Mi espacio».
-it("el VER MÁS de la dueña lleva a quiénes atienden, en la banda y en la ventana", async () => {
+it("el VER MÁS de la dueña lleva a quiénes atienden", async () => {
   const onOpenAttenders = jest.fn();
   const onOpenPointDetail = jest.fn();
   const propia = { ...request, createdByMe: true };
@@ -579,25 +580,28 @@ it("el VER MÁS de la dueña lleva a quiénes atienden, en la banda y en la vent
   fireEvent.press(screen.getByTestId("action-sheet-view-attenders"));
   expect(onOpenAttenders).toHaveBeenCalledWith(propia);
 
-  // Y la banda bajo el mapa, el mismo destino.
-  fireEvent.press(screen.getByTestId("help-request-map-detail-attenders"));
-  expect(onOpenAttenders).toHaveBeenCalledTimes(2);
-
-  // En ningún caso la ficha pública.
+  // Nunca la ficha pública, y CHG-200: sin banda bajo el mapa.
+  expect(onOpenAttenders).toHaveBeenCalledTimes(1);
   expect(onOpenPointDetail).not.toHaveBeenCalled();
-  expect(screen.queryByTestId("help-request-map-detail-more")).toBeNull();
+  expect(screen.queryByTestId("help-request-map-detail")).toBeNull();
 });
 
-it("una solicitud sin calificar lo dice también en la banda", async () => {
+// CHG-200 — Sin acciones cableadas el click abre el popup del marcador,
+// que sí conserva su puntuación: lo que se retiró fue la banda, no la
+// calificación de todas las superficies.
+it("sin acciones, el click abre el popup completo y ninguna banda", async () => {
   renderPanel({ helpRequests: [request], onOpenPointDetail: jest.fn() });
 
   fireEvent.press(
     await screen.findByTestId(`map-marker-help_request:${request.id}`),
   );
 
-  expect(
-    screen.getByTestId("help-request-map-detail-rating"),
-  ).toHaveTextContent(/Sin calificaciones/);
+  expect(screen.queryByTestId("help-request-map-detail")).toBeNull();
+  expect(screen.getByTestId("map-marker-popup")).toBeTruthy();
+  expect(screen.getByTestId("map-marker-popup-rating")).toHaveTextContent(
+    /Sin calificaciones/,
+  );
+  expect(screen.getByTestId("map-marker-popup-more")).toBeTruthy();
 });
 
 // CHG-182 — La casita destruida se toca en el mapa como cualquier otro
