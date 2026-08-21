@@ -77,6 +77,21 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
+// CHG-203 — El mapa arranca con TODOS los filtros desmarcados. Estas
+// pruebas van sobre lo que se DIBUJA en el mapa, así que hacen primero
+// lo que hace una persona: encender las capas. El punto de partida en
+// blanco lo defiende su propia prueba, en MapMarkerPopup.test.tsx.
+async function encenderCapasDelMapa() {
+  // Espera a que la leyenda exista: si se pulsara antes de que monte,
+  // no habría botones que pulsar y el mapa seguiría en blanco.
+  for (const boton of await screen.findAllByLabelText(/^Filtrar mapa por /)) {
+    fireEvent.press(boton);
+  }
+  for (const boton of screen.queryAllByLabelText(/^Filtrar capa humana por /)) {
+    fireEvent.press(boton);
+  }
+}
+
 describe("App universal", () => {
   it("muestra el logotipo de CUSOL UIS sin un fondo adicional (CHG-014)", async () => {
     render(<App dataSource={demoDataSource} />);
@@ -940,6 +955,7 @@ describe("App universal", () => {
 
   it("separa personas de las categorías de respuesta e infraestructura", async () => {
     render(<App dataSource={demoDataSource} mapDataSource={demoMapDataSource} />);
+    await encenderCapasDelMapa();
 
     expect(await screen.findByText("DATOS DEMO")).toBeTruthy();
     expect(screen.getByRole("header", { name: "Mapa operativo" })).toBeTruthy();
@@ -952,7 +968,12 @@ describe("App universal", () => {
     expect(screen.getByRole("button", { name: "Filtrar mapa por Escombros revisados" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Filtrar mapa por Escombros pendientes" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Filtrar mapa por Edificios sin revisar" })).toBeTruthy();
-    expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(8);
+    // CHG-203: con todas las capas encendidas son 8 puntos operativos
+    // + 2 solicitudes de ayuda (CHG-125) + 2 ofertas de comida
+    // (CHG-163). El 8 de antes era una foto del mapa a medio cargar:
+    // la prueba de más abajo ya contaba 6+2+2 con los edificios
+    // apagados, así que la aritmética cuadra ahora y no cuadraba antes.
+    expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(12);
     // CHG-157: la leyenda vive en dos bloques separados.
     expect(screen.getByLabelText("Leyenda de infraestructura")).toBeTruthy();
     expect(screen.getByLabelText("Leyenda de ayuda humanitaria")).toBeTruthy();
@@ -980,6 +1001,7 @@ describe("App universal", () => {
         humanMapDataSource={demoHumanMapDataSource}
       />,
     );
+    await encenderCapasDelMapa();
 
     expect(
       await screen.findByText("2.012 PERSONAS EN MAPA · 14 FEATURES"),
@@ -1017,6 +1039,7 @@ describe("App universal", () => {
         humanMapDataSource={reactiveHumanMapSource}
       />,
     );
+    await encenderCapasDelMapa();
 
     await waitFor(() => expect(getOverview).toHaveBeenCalled());
     expect(getOverview.mock.calls.at(-1)?.[0].zoom).toBe(5);
@@ -1043,6 +1066,7 @@ describe("App universal", () => {
 
   it("mantiene filtros y mapa sobre el mismo subconjunto sin listado inferior", async () => {
     render(<App dataSource={demoDataSource} mapDataSource={demoMapDataSource} />);
+    await encenderCapasDelMapa();
 
     // CHG-125: a los 8 puntos operativos demo se suman los 2 marcadores
     // de solicitudes «Necesitamos ayuda» (categoría propia del mapa) y
@@ -1087,6 +1111,7 @@ describe("App universal", () => {
 
   it("filtra únicamente los edificios sin revisar y permite seleccionarlos", async () => {
     render(<App dataSource={demoDataSource} mapDataSource={demoMapDataSource} />);
+    await encenderCapasDelMapa();
 
     const buildingFilter = await screen.findByRole("button", {
       name: "Filtrar mapa por Edificios sin revisar",
@@ -1119,6 +1144,7 @@ describe("App universal", () => {
 
   it("marca como seleccionado el punto elegido sin panel de detalle inferior", async () => {
     render(<App dataSource={demoDataSource} mapDataSource={demoMapDataSource} />);
+    await encenderCapasDelMapa();
 
     const marker = await screen.findByRole("button", {
       name: "Centros de acopio local: Centro de acopio Norte, Bogotá, Distrito Capital",
@@ -1156,6 +1182,7 @@ describe("App universal", () => {
 
     render(<App dataSource={demoDataSource} mapDataSource={updatingMapSource} />);
     await act(async () => Promise.resolve());
+    await encenderCapasDelMapa();
     // 8 puntos operativos demo + 2 solicitudes de ayuda (CHG-125) +
     // 2 ofertas de comida (CHG-163).
     expect(screen.getAllByTestId(/^map-marker-/)).toHaveLength(12);
@@ -1196,6 +1223,7 @@ describe("App universal", () => {
     };
 
     render(<App dataSource={demoDataSource} mapDataSource={emptyMapSource} />);
+    await encenderCapasDelMapa();
 
     await waitFor(() =>
       expect(screen.getAllByTestId(/^human-map-feature-/)).toHaveLength(14),
